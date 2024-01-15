@@ -145,6 +145,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
         super._transfer(_from, address(this), _fee);
       }
     }
+    _processBurnFee(_fee);
     super._transfer(_from, _to, _amount - _fee);
   }
 
@@ -156,19 +157,21 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
       uint256 _totalAmt = _bal >= _min * 100 ? _min * 100 : _bal >= _min * 20
         ? _min * 20
         : _min;
-      uint256 _burnAmt;
       uint256 _partnerAmt;
-      if (fees.burn > 0) {
-        _burnAmt = (_totalAmt * fees.burn) / DEN;
-        _burn(address(this), _burnAmt);
-      }
       if (fees.partner > 0 && partner != address(0)) {
         _partnerAmt = (_totalAmt * fees.partner) / DEN;
         _transfer(address(this), partner, _partnerAmt);
       }
-      _feeSwap(_totalAmt - _burnAmt - _partnerAmt);
+      _feeSwap(_totalAmt - _partnerAmt);
       _swapping = false;
     }
+  }
+
+  function _processBurnFee(uint256 _amtToProcess) internal {
+    if (_amtToProcess == 0 || fees.burn == 0) {
+      return;
+    }
+    _burn(address(this), (_amtToProcess * fees.burn) / DEN);
   }
 
   function _feeSwap(uint256 _amount) internal {
@@ -209,10 +212,12 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
     }
   }
 
-  function _canWrapFeeFree() internal view returns (bool) {
+  function _canWrapFeeFree(address _wrapper) internal view returns (bool) {
     return
       _isFirstIn() ||
-      (_partnerFirstWrapped == 0 && block.timestamp <= created + 7 days);
+      (_wrapper == partner &&
+        _partnerFirstWrapped == 0 &&
+        block.timestamp <= created + 7 days);
   }
 
   function _isFirstIn() internal view returns (bool) {
@@ -335,6 +340,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
     uint256 _amount,
     bytes calldata _data
   ) external override lock {
+    require(_isTokenInIndex[_token], 'ONLYPODTKN');
     address _rewards = StakingPoolToken(lpStakingPool).poolRewards();
     IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
       _msgSender(),

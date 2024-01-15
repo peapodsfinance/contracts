@@ -117,16 +117,23 @@ contract WeightedIndex is DecentralizedIndex {
     uint256 _tokenAmtSupplyRatioX96 = _isFirstIn()
       ? FixedPoint96.Q96
       : (_amount * FixedPoint96.Q96) / _tokenCurSupply;
-    uint256 _tokensMinted = _tokenAmtSupplyRatioX96 == FixedPoint96.Q96
-      ? (_amount * FixedPoint96.Q96 * 10 ** decimals()) /
-        indexTokens[_tokenIdx].q1
-      : (totalSupply() * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
-    uint256 _feeTokens = _canWrapFeeFree()
+    uint256 _tokensMinted;
+    if (_isFirstIn()) {
+      _tokensMinted =
+        (_amount * FixedPoint96.Q96 * 10 ** decimals()) /
+        indexTokens[_tokenIdx].q1;
+    } else {
+      _tokensMinted =
+        (totalSupply() * ((_amount * FixedPoint96.Q96) / _tokenCurSupply)) /
+        FixedPoint96.Q96;
+    }
+    uint256 _feeTokens = _canWrapFeeFree(_msgSender())
       ? 0
       : (_tokensMinted * fees.bond) / DEN;
     _mint(_msgSender(), _tokensMinted - _feeTokens);
     if (_feeTokens > 0) {
       _mint(address(this), _feeTokens);
+      _processBurnFee(_feeTokens);
     }
     for (uint256 _i; _i < indexTokens.length; _i++) {
       uint256 _transferAmt = _tokenAmtSupplyRatioX96 == FixedPoint96.Q96
@@ -155,6 +162,7 @@ contract WeightedIndex is DecentralizedIndex {
       totalSupply();
     _transfer(_msgSender(), address(this), _amount);
     _burn(address(this), _amountAfterFee);
+    _processBurnFee(_amount - _amountAfterFee);
     for (uint256 _i; _i < indexTokens.length; _i++) {
       uint256 _tokenSupply = IERC20(indexTokens[_i].token).balanceOf(
         address(this)

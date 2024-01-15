@@ -236,12 +236,13 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
     uint256 _tokensMinted = (_tokenPriceUSDX96 * _amount * 10 ** decimals()) /
       _currentIdxPriceUSDX96 /
       10 ** IERC20Metadata(_token).decimals();
-    uint256 _feeTokens = _canWrapFeeFree()
+    uint256 _feeTokens = _canWrapFeeFree(_msgSender())
       ? 0
       : (_tokensMinted * fees.bond) / DEN;
     _mint(_msgSender(), _tokensMinted - _feeTokens);
     if (_feeTokens > 0) {
       _mint(address(this), _feeTokens);
+      _processBurnFee(_feeTokens);
     }
     _rebalance();
     _bond();
@@ -259,6 +260,7 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
       : (_amount * (DEN - fees.debond)) / DEN;
     _transfer(_msgSender(), address(this), _amount);
     _burn(address(this), _amountAfterFee);
+    _processBurnFee(_amount - _amountAfterFee);
     (, uint256 _currentIdxPriceUSDX96) = getIdxPriceUSDX96();
     uint256 _usdToDebondX96 = (_currentIdxPriceUSDX96 * _amountAfterFee) /
       10 ** decimals();
