@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
@@ -14,22 +13,16 @@ import './interfaces/ITokenRewards.sol';
 import './interfaces/IUniswapV2Factory.sol';
 import './interfaces/IUniswapV3Pool.sol';
 import './interfaces/IUniswapV2Router02.sol';
-import './interfaces/IV3TwapUtilities.sol';
 import './interfaces/IWETH.sol';
+import './Zapper.sol';
 
-contract IndexUtils is Context, Ownable {
+contract IndexUtils is Context, Zapper {
   using SafeERC20 for IERC20;
 
-  address constant V3_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
-  address immutable V2_ROUTER;
-  address immutable WETH;
-  IV3TwapUtilities immutable V3_TWAP_UTILS;
-
-  constructor(address _v2Router, IV3TwapUtilities _v3TwapUtilities) {
-    V2_ROUTER = _v2Router;
-    V3_TWAP_UTILS = _v3TwapUtilities;
-    WETH = IUniswapV2Router02(_v2Router).WETH();
-  }
+  constructor(
+    address _v2Router,
+    IV3TwapUtilities _v3TwapUtilities
+  ) Zapper(_v2Router, _v3TwapUtilities) {}
 
   function bond(
     IDecentralizedIndex _indexFund,
@@ -213,6 +206,7 @@ contract IndexUtils is Context, Ownable {
   function addLPAndStake(
     IDecentralizedIndex _indexFund,
     uint256 _amountIdxTokens,
+    address _pairedLpTokenProvided,
     uint256 _amountPairedLpToken,
     uint256 _slippage
   ) external {
@@ -232,11 +226,20 @@ contract IndexUtils is Context, Ownable {
       address(this),
       _amountIdxTokens
     );
-    IERC20(_pairedLpToken).safeTransferFrom(
-      _msgSender(),
-      address(this),
-      _amountPairedLpToken
-    );
+    if (_pairedLpTokenProvided == _pairedLpToken) {
+      IERC20(_pairedLpToken).safeTransferFrom(
+        _msgSender(),
+        address(this),
+        _amountPairedLpToken
+      );
+    } else {
+      IERC20(_pairedLpTokenProvided).safeTransferFrom(
+        _msgSender(),
+        address(this),
+        _amountPairedLpToken
+      );
+      _zap(_pairedLpTokenProvided, _pairedLpToken, _amountPairedLpToken, 0);
+    }
 
     IERC20(_pairedLpToken).safeIncreaseAllowance(
       address(_indexFund),
@@ -399,9 +402,9 @@ contract IndexUtils is Context, Ownable {
     IDecentralizedIndex.IndexAssetInfo[] memory _assets = _indexFund
       .getAllAssets();
 
-    uint256 _bondingTokensGained;
+    uint256 _bondTokensGained;
     if (_assets[_poolIdx].token == WETH) {
-      _bondingTokensGained = _wethToBond;
+      _bondTokensGained = _wethToBond;
     } else {
       uint256 _poolPriceX96 = V3_TWAP_UTILS.priceX96FromSqrtPriceX96(
         V3_TWAP_UTILS.sqrtPriceX96FromPoolAndInterval(_assets[_poolIdx].c1)
@@ -412,7 +415,7 @@ contract IndexUtils is Context, Ownable {
         : (_wethToBond * FixedPoint96.Q96) / _poolPriceX96;
 
       IERC20(WETH).safeIncreaseAllowance(V3_ROUTER, _wethToBond);
-      _bondingTokensGained = ISwapRouter(V3_ROUTER).exactInputSingle(
+      _bondTokensGained = ISwapRouter(V3_ROUTER).exactInputSingle(
         ISwapRouter.ExactInputSingleParams({
           tokenIn: WETH,
           tokenOut: _assets[_poolIdx].token,
@@ -429,7 +432,7 @@ contract IndexUtils is Context, Ownable {
       _bondToRecipient(
         _indexFund,
         _assets[_poolIdx].token,
-        _bondingTokensGained,
+        _bondTokensGained,
         _recipient
       );
   }
@@ -459,56 +462,53 @@ contract IndexUtils is Context, Ownable {
     );
   }
 
-  function _swapToken0ForToken1V3(
-    address _tokenIn,
-    address _tokenOut,
-    uint256 _amountIn,
-    uint24 _poolFee,
-    uint256 _slippage
-  ) internal returns (uint256) {
-    address _v3Pool = V3_TWAP_UTILS.getV3Pool(
-      IPeripheryImmutableState(V3_ROUTER).factory(),
-      _tokenIn,
-      _tokenOut,
-      _poolFee
-    );
-    address _token0 = _tokenIn < _tokenOut ? _tokenIn : _tokenOut;
-    uint256 _poolPriceX96 = V3_TWAP_UTILS.priceX96FromSqrtPriceX96(
-      V3_TWAP_UTILS.sqrtPriceX96FromPoolAndInterval(_v3Pool)
-    );
-    uint256 _amountOut = _tokenIn == _token0
-      ? (_poolPriceX96 * _amountIn) / FixedPoint96.Q96
-      : (_amountIn * FixedPoint96.Q96) / _poolPriceX96;
-    IERC20(_tokenIn).safeIncreaseAllowance(V3_ROUTER, _amountIn);
-    return
-      ISwapRouter(V3_ROUTER).exactInputSingle(
-        ISwapRouter.ExactInputSingleParams({
-          tokenIn: _tokenIn,
-          tokenOut: _tokenOut,
-          fee: _poolFee,
-          recipient: address(this),
-          deadline: block.timestamp,
-          amountIn: _amountIn,
-          amountOutMinimum: (_amountOut * (1000 - _slippage)) / 1000,
-          sqrtPriceLimitX96: 0
-        })
-      );
-  }
+  // function _swapToken0ForToken1V3(
+  //   address _tokenIn,
+  //   address _tokenOut,
+  //   uint256 _amountIn,
+  //   uint24 _poolFee,
+  //   uint256 _slippage
+  // ) internal returns (uint256) {
+  //   address _v3Pool = V3_TWAP_UTILS.getV3Pool(
+  //     IPeripheryImmutableState(V3_ROUTER).factory(),
+  //     _tokenIn,
+  //     _tokenOut,
+  //     _poolFee
+  //   );
+  //   address _token0 = _tokenIn < _tokenOut ? _tokenIn : _tokenOut;
+  //   uint256 _poolPriceX96 = V3_TWAP_UTILS.priceX96FromSqrtPriceX96(
+  //     V3_TWAP_UTILS.sqrtPriceX96FromPoolAndInterval(_v3Pool)
+  //   );
+  //   uint256 _amountOut = _tokenIn == _token0
+  //     ? (_poolPriceX96 * _amountIn) / FixedPoint96.Q96
+  //     : (_amountIn * FixedPoint96.Q96) / _poolPriceX96;
+  //   IERC20(_tokenIn).safeIncreaseAllowance(V3_ROUTER, _amountIn);
+  //   return
+  //     ISwapRouter(V3_ROUTER).exactInputSingle(
+  //       ISwapRouter.ExactInputSingleParams({
+  //         tokenIn: _tokenIn,
+  //         tokenOut: _tokenOut,
+  //         fee: _poolFee,
+  //         recipient: address(this),
+  //         deadline: block.timestamp,
+  //         amountIn: _amountIn,
+  //         amountOutMinimum: (_amountOut * (1000 - _slippage)) / 1000,
+  //         sqrtPriceLimitX96: 0
+  //       })
+  //     );
+  // }
 
   function _bondToRecipient(
     IDecentralizedIndex _indexFund,
     address _indexToken,
-    uint256 _bondingTokens,
+    uint256 _bondTokens,
     address _recipient
   ) internal returns (uint256) {
     uint256 _idxTokensBefore = IERC20(address(_indexFund)).balanceOf(
       address(this)
     );
-    IERC20(_indexToken).safeIncreaseAllowance(
-      address(_indexFund),
-      _bondingTokens
-    );
-    _indexFund.bond(_indexToken, _bondingTokens);
+    IERC20(_indexToken).safeIncreaseAllowance(address(_indexFund), _bondTokens);
+    _indexFund.bond(_indexToken, _bondTokens);
     uint256 _idxTokensGained = IERC20(address(_indexFund)).balanceOf(
       address(this)
     ) - _idxTokensBefore;
@@ -537,12 +537,11 @@ contract IndexUtils is Context, Ownable {
     );
     address _stakingPool = _indexFund.lpStakingPool();
 
-    _swapToken0ForToken1V3(
+    _zap(
       WETH,
       _pairedLpToken,
       IERC20(WETH).balanceOf(address(this)) - _wethBefore,
-      3000,
-      _slippage
+      0
     );
 
     address _v2Pool = IUniswapV2Factory(IUniswapV2Router02(V2_ROUTER).factory())
@@ -582,15 +581,4 @@ contract IndexUtils is Context, Ownable {
       );
     }
   }
-
-  function rescueETH() external onlyOwner {
-    (bool _sent, ) = payable(owner()).call{ value: address(this).balance }('');
-    require(_sent);
-  }
-
-  function rescueERC20(IERC20 _token) external onlyOwner {
-    _token.safeTransfer(owner(), _token.balanceOf(address(this)));
-  }
-
-  receive() external payable {}
 }

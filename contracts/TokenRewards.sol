@@ -136,15 +136,9 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 _amountTkn = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
     require(_amountTkn > 0, 'NEEDTKN');
     (uint256 _yieldAdminFee, ) = _getYieldFees();
-    if (_yieldAdminFee > 0) {
-      uint256 _adminAmt = (_amountTkn * _yieldAdminFee) /
-        PROTOCOL_FEE_ROUTER.protocolFees().DEN();
-      IERC20(PAIRED_LP_TOKEN).safeTransfer(
-        Ownable(address(V3_TWAP_UTILS)).owner(),
-        _adminAmt
-      );
-      _amountTkn = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
-    }
+    uint256 _adminAmt = (_amountTkn * _yieldAdminFee) /
+      PROTOCOL_FEE_ROUTER.protocolFees().DEN();
+    _amountTkn -= _adminAmt;
     (address _token0, address _token1) = PAIRED_LP_TOKEN < rewardsToken
       ? (PAIRED_LP_TOKEN, rewardsToken)
       : (rewardsToken, PAIRED_LP_TOKEN);
@@ -185,6 +179,12 @@ contract TokenRewards is ITokenRewards, Context {
         })
       )
     {
+      if (_adminAmt > 0) {
+        IERC20(PAIRED_LP_TOKEN).safeTransfer(
+          Ownable(address(V3_TWAP_UTILS)).owner(),
+          _adminAmt
+        );
+      }
       _rewardsSwapSlippage = 10;
       _depositRewards(
         IERC20(rewardsToken).balanceOf(address(this)) - _rewardsBalBefore
