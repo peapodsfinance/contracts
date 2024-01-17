@@ -34,8 +34,8 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 realized;
   }
 
-  address public override trackingToken;
-  address public override rewardsToken;
+  address public immutable override trackingToken;
+  address public immutable override rewardsToken;
   uint256 public override totalShares;
   uint256 public override totalStakers;
   mapping(address => uint256) public shares;
@@ -117,7 +117,10 @@ contract TokenRewards is ITokenRewards, Context {
 
   function _processFeesIfApplicable() internal {
     IDecentralizedIndex(INDEX_FUND).processPreSwapFeesAndSwap();
-    if (IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) > 0) {
+    if (
+      rewardsToken != PAIRED_LP_TOKEN &&
+      IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) > 0
+    ) {
       depositFromPairedLpToken(0, 0);
     }
   }

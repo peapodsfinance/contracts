@@ -30,6 +30,7 @@ contract WeightedIndex is DecentralizedIndex {
     DecentralizedIndex(
       _name,
       _symbol,
+      IndexType.WEIGHTED,
       _fees,
       _partner,
       _pairedLpToken,
@@ -38,7 +39,6 @@ contract WeightedIndex is DecentralizedIndex {
       _stakeRestriction
     )
   {
-    indexType = IndexType.WEIGHTED;
     V2_FACTORY = IUniswapV2Factory(IUniswapV2Router02(_v2Router).factory());
     require(_tokens.length == _weights.length, 'INIT');
     for (uint256 _i; _i < _tokens.length; _i++) {

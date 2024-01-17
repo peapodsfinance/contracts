@@ -471,42 +471,6 @@ contract IndexUtils is Context, Zapper {
     );
   }
 
-  // function _swapToken0ForToken1V3(
-  //   address _tokenIn,
-  //   address _tokenOut,
-  //   uint256 _amountIn,
-  //   uint24 _poolFee,
-  //   uint256 _slippage
-  // ) internal returns (uint256) {
-  //   address _v3Pool = V3_TWAP_UTILS.getV3Pool(
-  //     IPeripheryImmutableState(V3_ROUTER).factory(),
-  //     _tokenIn,
-  //     _tokenOut,
-  //     _poolFee
-  //   );
-  //   address _token0 = _tokenIn < _tokenOut ? _tokenIn : _tokenOut;
-  //   uint256 _poolPriceX96 = V3_TWAP_UTILS.priceX96FromSqrtPriceX96(
-  //     V3_TWAP_UTILS.sqrtPriceX96FromPoolAndInterval(_v3Pool)
-  //   );
-  //   uint256 _amountOut = _tokenIn == _token0
-  //     ? (_poolPriceX96 * _amountIn) / FixedPoint96.Q96
-  //     : (_amountIn * FixedPoint96.Q96) / _poolPriceX96;
-  //   IERC20(_tokenIn).safeIncreaseAllowance(V3_ROUTER, _amountIn);
-  //   return
-  //     ISwapRouter(V3_ROUTER).exactInputSingle(
-  //       ISwapRouter.ExactInputSingleParams({
-  //         tokenIn: _tokenIn,
-  //         tokenOut: _tokenOut,
-  //         fee: _poolFee,
-  //         recipient: address(this),
-  //         deadline: block.timestamp,
-  //         amountIn: _amountIn,
-  //         amountOutMinimum: (_amountOut * (1000 - _slippage)) / 1000,
-  //         sqrtPriceLimitX96: 0
-  //       })
-  //     );
-  // }
-
   function _bondToRecipient(
     IDecentralizedIndex _indexFund,
     address _indexToken,
@@ -540,20 +504,12 @@ contract IndexUtils is Context, Zapper {
     uint256 _tokensBefore = IERC20(address(_indexFund)).balanceOf(
       address(this)
     );
-    uint256 _wethBefore = IERC20(WETH).balanceOf(address(this));
-    IWETH(WETH).deposit{ value: _amountETH }();
-
     uint256 _pairedLpTokenBefore = IERC20(_pairedLpToken).balanceOf(
       address(this)
     );
     address _stakingPool = _indexFund.lpStakingPool();
 
-    _zap(
-      WETH,
-      _pairedLpToken,
-      IERC20(WETH).balanceOf(address(this)) - _wethBefore,
-      0
-    );
+    _zap(address(0), _pairedLpToken, _amountETH, 0);
 
     address _v2Pool = IUniswapV2Factory(IUniswapV2Router02(V2_ROUTER).factory())
       .getPair(address(_indexFund), _pairedLpToken);

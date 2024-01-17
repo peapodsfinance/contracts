@@ -29,10 +29,10 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
   address immutable V2_POOL;
   address immutable WETH;
 
-  IndexType public override indexType;
-  uint256 public override created;
-  address public override lpStakingPool;
-  address public override lpRewardsToken;
+  IndexType public immutable override indexType;
+  uint256 public immutable override created;
+  address public immutable override lpStakingPool;
+  address public immutable override lpRewardsToken;
   address public override partner;
 
   Fees public fees;
@@ -82,6 +82,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
   constructor(
     string memory _name,
     string memory _symbol,
+    IndexType _idxType,
     Fees memory _fees,
     address _partner,
     address _pairedLpToken,
@@ -96,6 +97,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
     require(_fees.debond <= (DEN * 99) / 100, 'lt99%');
     require(_fees.partner <= (DEN * 5) / 100, 'lte5%');
 
+    indexType = _idxType;
     created = block.timestamp;
     fees = _fees;
     partner = _partner;

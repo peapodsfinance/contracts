@@ -34,6 +34,7 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
     DecentralizedIndex(
       _name,
       _symbol,
+      IndexType.UNWEIGHTED,
       _fees,
       _partner,
       _pairedLpToken,
@@ -42,7 +43,6 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
       _stakeRestriction
     )
   {
-    indexType = IndexType.UNWEIGHTED;
     V3_WETH_STABLE_POOL = _v3StableWETHPool;
     address _weth9 = IUniswapV2Router02(_v2Router).WETH();
     for (uint256 _i; _i < _pools.length; _i++) {
