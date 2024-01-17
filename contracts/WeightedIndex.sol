@@ -109,7 +109,8 @@ contract WeightedIndex is DecentralizedIndex {
 
   function bond(
     address _token,
-    uint256 _amount
+    uint256 _amount,
+    uint256 _amountMintMin
   ) external override lock noSwapOrFee {
     require(_isTokenInIndex[_token], 'INVALIDTOKEN');
     uint256 _tokenIdx = _fundTokenIdx[_token];
@@ -130,6 +131,7 @@ contract WeightedIndex is DecentralizedIndex {
     uint256 _feeTokens = _canWrapFeeFree(_msgSender())
       ? 0
       : (_tokensMinted * fees.bond) / DEN;
+    require(_tokensMinted - _feeTokens >= _amountMintMin, 'MIN');
     _mint(_msgSender(), _tokensMinted - _feeTokens);
     if (_feeTokens > 0) {
       _mint(address(this), _feeTokens);
@@ -160,7 +162,7 @@ contract WeightedIndex is DecentralizedIndex {
       : (_amount * (DEN - fees.debond)) / DEN;
     uint256 _percAfterFeeX96 = (_amountAfterFee * FixedPoint96.Q96) /
       totalSupply();
-    _transfer(_msgSender(), address(this), _amount);
+    super._transfer(_msgSender(), address(this), _amount);
     _burn(address(this), _amountAfterFee);
     _processBurnFee(_amount - _amountAfterFee);
     for (uint256 _i; _i < indexTokens.length; _i++) {

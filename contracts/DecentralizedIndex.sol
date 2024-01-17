@@ -160,7 +160,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
       uint256 _partnerAmt;
       if (fees.partner > 0 && partner != address(0)) {
         _partnerAmt = (_totalAmt * fees.partner) / DEN;
-        _transfer(address(this), partner, _partnerAmt);
+        super._transfer(address(this), partner, _partnerAmt);
       }
       _feeSwap(_totalAmt - _partnerAmt);
       _swapping = false;
@@ -180,15 +180,29 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
     path[1] = PAIRED_LP_TOKEN;
     _approve(address(this), V2_ROUTER, _amount);
     address _rewards = StakingPoolToken(lpStakingPool).poolRewards();
+    uint256 _pairedLpBalBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(_rewards);
+    address _recipient = PAIRED_LP_TOKEN == lpRewardsToken
+      ? address(this)
+      : _rewards;
     IUniswapV2Router02(V2_ROUTER)
       .swapExactTokensForTokensSupportingFeeOnTransferTokens(
         _amount,
         0,
         path,
-        _rewards,
+        _recipient,
         block.timestamp
       );
-    if (IERC20(PAIRED_LP_TOKEN).balanceOf(_rewards) > 0) {
+    if (PAIRED_LP_TOKEN == lpRewardsToken) {
+      uint256 _newPairedLpTkns = IERC20(PAIRED_LP_TOKEN).balanceOf(_rewards) -
+        _pairedLpBalBefore;
+      if (_newPairedLpTkns > 0) {
+        IERC20(PAIRED_LP_TOKEN).safeIncreaseAllowance(
+          _rewards,
+          _newPairedLpTkns
+        );
+        ITokenRewards(_rewards).depositRewards(_newPairedLpTkns);
+      }
+    } else if (IERC20(PAIRED_LP_TOKEN).balanceOf(_rewards) > 0) {
       ITokenRewards(_rewards).depositFromPairedLpToken(0, 0);
     }
   }
@@ -253,19 +267,20 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
     return indexTokens;
   }
 
-  function burn(uint256 _amount) external {
+  function burn(uint256 _amount) external lock {
     _burn(_msgSender(), _amount);
   }
 
   function addLiquidityV2(
     uint256 _idxLPTokens,
     uint256 _pairedLPTokens,
-    uint256 _slippage // 100 == 10%, 1000 == 100%
+    uint256 _slippage, // 100 == 10%, 1000 == 100%
+    uint256 _deadline
   ) external override lock noSwapOrFee {
     uint256 _idxTokensBefore = balanceOf(address(this));
     uint256 _pairedBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
 
-    _transfer(_msgSender(), address(this), _idxLPTokens);
+    super._transfer(_msgSender(), address(this), _idxLPTokens);
     _approve(address(this), V2_ROUTER, _idxLPTokens);
 
     IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
@@ -283,12 +298,12 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
       (_idxLPTokens * (1000 - _slippage)) / 1000,
       (_pairedLPTokens * (1000 - _slippage)) / 1000,
       _msgSender(),
-      block.timestamp
+      _deadline
     );
 
     // check & refund excess tokens from LPing
     if (balanceOf(address(this)) > _idxTokensBefore) {
-      _transfer(
+      super._transfer(
         address(this),
         _msgSender(),
         balanceOf(address(this)) - _idxTokensBefore
@@ -306,7 +321,8 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
   function removeLiquidityV2(
     uint256 _lpTokens,
     uint256 _minIdxTokens, // 0 == 100% slippage
-    uint256 _minPairedLpToken // 0 == 100% slippage
+    uint256 _minPairedLpToken, // 0 == 100% slippage
+    uint256 _deadline
   ) external override lock noSwapOrFee {
     _lpTokens = _lpTokens == 0
       ? IERC20(V2_POOL).balanceOf(_msgSender())
@@ -323,7 +339,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
       _minIdxTokens,
       _minPairedLpToken,
       _msgSender(),
-      block.timestamp
+      _deadline
     );
     if (IERC20(V2_POOL).balanceOf(address(this)) > _balBefore) {
       IERC20(V2_POOL).safeTransfer(

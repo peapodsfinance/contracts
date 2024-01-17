@@ -223,7 +223,8 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
 
   function bond(
     address _token,
-    uint256 _amount
+    uint256 _amount,
+    uint256 _amountMintMin
   ) external override lock noSwapOrFee {
     require(_isTokenInIndex[_token], 'INVALIDTOKEN');
     _transferFromAndValidate(IERC20(_token), _msgSender(), _amount);
@@ -239,6 +240,7 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
     uint256 _feeTokens = _canWrapFeeFree(_msgSender())
       ? 0
       : (_tokensMinted * fees.bond) / DEN;
+    require(_tokensMinted - _feeTokens >= _amountMintMin, 'MIN');
     _mint(_msgSender(), _tokensMinted - _feeTokens);
     if (_feeTokens > 0) {
       _mint(address(this), _feeTokens);
@@ -258,7 +260,7 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
     uint256 _amountAfterFee = _isLastOut(_amount)
       ? _amount
       : (_amount * (DEN - fees.debond)) / DEN;
-    _transfer(_msgSender(), address(this), _amount);
+    super._transfer(_msgSender(), address(this), _amount);
     _burn(address(this), _amountAfterFee);
     _processBurnFee(_amount - _amountAfterFee);
     (, uint256 _currentIdxPriceUSDX96) = getIdxPriceUSDX96();

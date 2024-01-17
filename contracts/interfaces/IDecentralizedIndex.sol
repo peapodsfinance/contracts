@@ -76,7 +76,7 @@ interface IDecentralizedIndex is IERC20 {
 
   function processPreSwapFeesAndSwap() external;
 
-  function bond(address token, uint256 amount) external;
+  function bond(address token, uint256 amount, uint256 amountMintMin) external;
 
   function debond(
     uint256 amount,
@@ -87,13 +87,15 @@ interface IDecentralizedIndex is IERC20 {
   function addLiquidityV2(
     uint256 idxTokens,
     uint256 daiTokens,
-    uint256 slippage
+    uint256 slippage,
+    uint256 deadline
   ) external;
 
   function removeLiquidityV2(
     uint256 lpTokens,
     uint256 minTokens,
-    uint256 minDAI
+    uint256 minDAI,
+    uint256 deadline
   ) external;
 
   function flash(

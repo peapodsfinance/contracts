@@ -135,10 +135,14 @@ contract TokenRewards is ITokenRewards, Context {
     }
     uint256 _amountTkn = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
     require(_amountTkn > 0, 'NEEDTKN');
+    uint256 _adminAmt;
     (uint256 _yieldAdminFee, ) = _getYieldFees();
-    uint256 _adminAmt = (_amountTkn * _yieldAdminFee) /
-      PROTOCOL_FEE_ROUTER.protocolFees().DEN();
-    _amountTkn -= _adminAmt;
+    if (_yieldAdminFee > 0) {
+      _adminAmt =
+        (_amountTkn * _yieldAdminFee) /
+        PROTOCOL_FEE_ROUTER.protocolFees().DEN();
+      _amountTkn -= _adminAmt;
+    }
     (address _token0, address _token1) = PAIRED_LP_TOKEN < rewardsToken
       ? (PAIRED_LP_TOKEN, rewardsToken)
       : (rewardsToken, PAIRED_LP_TOKEN);
@@ -215,12 +219,15 @@ contract TokenRewards is ITokenRewards, Context {
       return;
     }
 
+    uint256 _depositAmount = _amountTotal;
     (, uint256 _yieldBurnFee) = _getYieldFees();
-    uint256 _burnAmount = (_amountTotal * _yieldBurnFee) /
-      PROTOCOL_FEE_ROUTER.protocolFees().DEN();
-    uint256 _depositAmount = _amountTotal - _burnAmount;
-    if (_burnAmount > 0) {
-      _burnRewards(_burnAmount);
+    if (_yieldBurnFee > 0) {
+      uint256 _burnAmount = (_amountTotal * _yieldBurnFee) /
+        PROTOCOL_FEE_ROUTER.protocolFees().DEN();
+      if (_burnAmount > 0) {
+        _burnRewards(_burnAmount);
+        _depositAmount -= _burnAmount;
+      }
     }
     rewardsDeposited += _depositAmount;
     rewardsDepMonthly[beginningOfMonth(block.timestamp)] += _depositAmount;

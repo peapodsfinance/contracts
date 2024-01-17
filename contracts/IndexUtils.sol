@@ -27,18 +27,13 @@ contract IndexUtils is Context, Zapper {
   function bond(
     IDecentralizedIndex _indexFund,
     address _token,
-    uint256 _amount
+    uint256 _amount,
+    uint256 _amountMintMin
   ) external {
     if (_indexFund.indexType() == IDecentralizedIndex.IndexType.WEIGHTED) {
       IDecentralizedIndex.IndexAssetInfo[] memory _assets = _indexFund
         .getAllAssets();
       uint256[] memory _balsBefore = new uint256[](_assets.length);
-      uint256 _tokenIdx;
-      for (uint256 _i; _i < _assets.length; _i++) {
-        if (_assets[_i].token == _token) {
-          _tokenIdx = _i;
-        }
-      }
 
       uint256 _tokenCurSupply = IERC20(_token).balanceOf(address(_indexFund));
       uint256 _tokenAmtSupplyRatioX96 = _tokenCurSupply == 0
@@ -61,7 +56,7 @@ contract IndexUtils is Context, Zapper {
         );
       }
       uint256 _idxBalBefore = IERC20(_indexFund).balanceOf(address(this));
-      _indexFund.bond(_token, _amount);
+      _indexFund.bond(_token, _amount, _amountMintMin);
       IERC20(_indexFund).safeTransfer(
         _msgSender(),
         IERC20(_indexFund).balanceOf(address(this)) - _idxBalBefore
@@ -74,7 +69,7 @@ contract IndexUtils is Context, Zapper {
       IERC20(_token).safeTransferFrom(_msgSender(), address(this), _amount);
       IERC20(_token).safeIncreaseAllowance(address(_indexFund), _amount);
       uint256 _idxBalBefore = IERC20(_indexFund).balanceOf(address(this));
-      _indexFund.bond(_token, _amount);
+      _indexFund.bond(_token, _amount, _amountMintMin);
       IERC20(_indexFund).safeTransfer(
         _msgSender(),
         IERC20(_indexFund).balanceOf(address(this)) - _idxBalBefore
@@ -87,6 +82,7 @@ contract IndexUtils is Context, Zapper {
     uint256 _assetIdx,
     uint256 _amountTokensForAssetIdx,
     uint256 _slippage, // 1 == 0.1%, 10 == 1%, 1000 == 100%
+    uint256 _deadline,
     bool _stakeAsWell
   ) external payable {
     require(msg.value > 0, 'NATIVE');
@@ -120,6 +116,7 @@ contract IndexUtils is Context, Zapper {
       _indexFund,
       _assets[_assetIdx].token,
       _amountsReceived[_assetIdx],
+      0,
       _stakeAsWell ? address(this) : _msgSender()
     );
 
@@ -129,7 +126,8 @@ contract IndexUtils is Context, Zapper {
         _indexFund,
         _idxTokensGained,
         msg.value / 2,
-        _slippage
+        _slippage,
+        _deadline
       );
     }
 
@@ -157,6 +155,7 @@ contract IndexUtils is Context, Zapper {
     IDecentralizedIndex _indexFund,
     uint256 _poolIdx,
     uint256 _slippage, // 1 == 0.1%, 10 == 1%, 1000 == 100%
+    uint256 _deadline,
     bool _stakeAsWell
   ) external payable {
     require(msg.value > 0, 'NATIVE');
@@ -178,7 +177,8 @@ contract IndexUtils is Context, Zapper {
         _indexFund,
         _idxTokensGained,
         msg.value / 2,
-        _slippage
+        _slippage,
+        _deadline
       );
     }
   }
@@ -186,7 +186,8 @@ contract IndexUtils is Context, Zapper {
   function zapIndexTokensAndNative(
     IDecentralizedIndex _indexFund,
     uint256 _amount,
-    uint256 _slippage
+    uint256 _slippage,
+    uint256 _deadline
   ) external payable {
     require(msg.value > 0, 'NATIVE');
     IERC20(address(_indexFund)).safeTransferFrom(
@@ -199,7 +200,8 @@ contract IndexUtils is Context, Zapper {
       _indexFund,
       _amount,
       msg.value,
-      _slippage
+      _slippage,
+      _deadline
     );
   }
 
@@ -208,7 +210,8 @@ contract IndexUtils is Context, Zapper {
     uint256 _amountIdxTokens,
     address _pairedLpTokenProvided,
     uint256 _amountPairedLpToken,
-    uint256 _slippage
+    uint256 _slippage,
+    uint256 _deadline
   ) external {
     address _stakingPool = _indexFund.lpStakingPool();
     address _pairedLpToken = _indexFund.PAIRED_LP_TOKEN();
@@ -248,7 +251,8 @@ contract IndexUtils is Context, Zapper {
     _indexFund.addLiquidityV2(
       IERC20(address(_indexFund)).balanceOf(address(this)) - _idxTokensBefore,
       IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore,
-      _slippage
+      _slippage,
+      _deadline
     );
 
     IERC20(_v2Pool).safeIncreaseAllowance(
@@ -283,7 +287,8 @@ contract IndexUtils is Context, Zapper {
     IDecentralizedIndex _indexFund,
     uint256 _amountStakedTokens,
     uint256 _minLPTokens,
-    uint256 _minPairedLpToken
+    uint256 _minPairedLpToken,
+    uint256 _deadline
   ) external {
     address _stakingPool = _indexFund.lpStakingPool();
     address _pairedLpToken = _indexFund.PAIRED_LP_TOKEN();
@@ -301,7 +306,8 @@ contract IndexUtils is Context, Zapper {
       _stakingPool,
       IERC20(_stakingPool).balanceOf(address(this)) - _stakingBalBefore,
       _minLPTokens,
-      _minPairedLpToken
+      _minPairedLpToken,
+      _deadline
     );
     if (
       IERC20(address(_indexFund)).balanceOf(address(this)) > _indexBalBefore
@@ -433,6 +439,7 @@ contract IndexUtils is Context, Zapper {
         _indexFund,
         _assets[_poolIdx].token,
         _bondTokensGained,
+        0,
         _recipient
       );
   }
@@ -442,7 +449,8 @@ contract IndexUtils is Context, Zapper {
     address _stakingPool,
     uint256 _unstakeAmount,
     uint256 _minLPTokens,
-    uint256 _minPairedLpTokens
+    uint256 _minPairedLpTokens,
+    uint256 _deadline
   ) internal returns (uint256 _fundTokensBefore) {
     address _pairedLpToken = _indexFund.PAIRED_LP_TOKEN();
     address _v2Pool = IUniswapV2Factory(IUniswapV2Router02(V2_ROUTER).factory())
@@ -458,7 +466,8 @@ contract IndexUtils is Context, Zapper {
     _indexFund.removeLiquidityV2(
       IERC20(_v2Pool).balanceOf(address(this)) - _v2TokensBefore,
       _minLPTokens,
-      _minPairedLpTokens
+      _minPairedLpTokens,
+      _deadline
     );
   }
 
@@ -502,13 +511,14 @@ contract IndexUtils is Context, Zapper {
     IDecentralizedIndex _indexFund,
     address _indexToken,
     uint256 _bondTokens,
+    uint256 _amountMintMin,
     address _recipient
   ) internal returns (uint256) {
     uint256 _idxTokensBefore = IERC20(address(_indexFund)).balanceOf(
       address(this)
     );
     IERC20(_indexToken).safeIncreaseAllowance(address(_indexFund), _bondTokens);
-    _indexFund.bond(_indexToken, _bondTokens);
+    _indexFund.bond(_indexToken, _bondTokens, _amountMintMin);
     uint256 _idxTokensGained = IERC20(address(_indexFund)).balanceOf(
       address(this)
     ) - _idxTokensBefore;
@@ -523,7 +533,8 @@ contract IndexUtils is Context, Zapper {
     IDecentralizedIndex _indexFund,
     uint256 _amountTokens,
     uint256 _amountETH,
-    uint256 _slippage
+    uint256 _slippage,
+    uint256 _deadline
   ) internal {
     address _pairedLpToken = _indexFund.PAIRED_LP_TOKEN();
     uint256 _tokensBefore = IERC20(address(_indexFund)).balanceOf(
@@ -554,7 +565,8 @@ contract IndexUtils is Context, Zapper {
     _indexFund.addLiquidityV2(
       _amountTokens,
       IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore,
-      _slippage
+      _slippage,
+      _deadline
     );
     IERC20(_v2Pool).safeIncreaseAllowance(
       _stakingPool,
