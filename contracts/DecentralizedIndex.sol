@@ -16,6 +16,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
   using SafeERC20 for IERC20;
 
   uint256 constant DEN = 10000;
+  uint256 constant SWAP_DELAY = 10; // seconds
   address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
   address constant V3_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
   IProtocolFeeRouter constant PROTOCOL_FEE_ROUTER =
@@ -23,7 +24,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
   IV3TwapUtilities constant V3_TWAP_UTILS =
     IV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D);
 
-  uint256 public constant override FLASH_FEE = 10; // 10 PAIRED_LP_TOKEN
+  uint256 public constant override FLASH_FEE = 10; // 10 DAI
   address public immutable override PAIRED_LP_TOKEN;
   address immutable V2_ROUTER;
   address immutable V2_POOL;
@@ -42,6 +43,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
 
   uint256 _partnerFirstWrapped;
 
+  uint256 _lastSwap;
   bool _swapping;
   bool _swapAndFeeOn = true;
   bool _unlocked = true;
@@ -152,10 +154,12 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
   }
 
   function _processPreSwapFeesAndSwap() internal {
+    bool _passesSwapDelay = block.timestamp > _lastSwap + SWAP_DELAY;
     uint256 _bal = balanceOf(address(this));
     uint256 _min = totalSupply() / 10000; // 0.01%
-    if (_bal >= _min && balanceOf(V2_POOL) > 0) {
+    if (_passesSwapDelay && _bal >= _min && balanceOf(V2_POOL) > 0) {
       _swapping = true;
+      _lastSwap = block.timestamp;
       uint256 _totalAmt = _bal >= _min * 100 ? _min * 100 : _bal >= _min * 20
         ? _min * 20
         : _min;
@@ -302,6 +306,16 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
       _msgSender(),
       _deadline
     );
+    uint256 _remainingAllowance = IERC20(PAIRED_LP_TOKEN).allowance(
+      address(this),
+      V2_ROUTER
+    );
+    if (_remainingAllowance > 0) {
+      IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(
+        V2_ROUTER,
+        _remainingAllowance
+      );
+    }
 
     // check & refund excess tokens from LPing
     if (balanceOf(address(this)) > _idxTokensBefore) {
@@ -360,10 +374,13 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
   ) external override lock {
     require(_isTokenInIndex[_token], 'ONLYPODTKN');
     address _rewards = StakingPoolToken(lpStakingPool).poolRewards();
-    IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
+    address _feeRecipient = PAIRED_LP_TOKEN == DAI
+      ? _rewards
+      : Ownable(address(V3_TWAP_UTILS)).owner();
+    IERC20(DAI).safeTransferFrom(
       _msgSender(),
-      _rewards,
-      FLASH_FEE * 10 ** IERC20Metadata(PAIRED_LP_TOKEN).decimals()
+      _feeRecipient,
+      FLASH_FEE * 10 ** IERC20Metadata(DAI).decimals()
     );
     uint256 _balance = IERC20(_token).balanceOf(address(this));
     IERC20(_token).safeTransfer(_recipient, _amount);
