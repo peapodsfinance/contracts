@@ -42,6 +42,8 @@ contract WeightedIndex is DecentralizedIndex {
     V2_FACTORY = IUniswapV2Factory(IUniswapV2Router02(_v2Router).factory());
     require(_tokens.length == _weights.length, 'INIT');
     for (uint256 _i; _i < _tokens.length; _i++) {
+      require(!_isTokenInIndex[_tokens[_i]], 'DUP');
+      require(_weights[_i] > 0, 'WVAL');
       indexTokens.push(
         IndexAssetInfo({
           token: _tokens[_i],

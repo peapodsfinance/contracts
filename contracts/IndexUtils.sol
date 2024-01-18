@@ -392,7 +392,7 @@ contract IndexUtils is Context, Zapper {
       address(this),
       block.timestamp
     );
-    _newNativeLeft -= _nativeBefore - address(this).balance;
+    _newNativeLeft = _nativeLeft - (_nativeBefore - address(this).balance);
     _amountReceived =
       IERC20(_outToken).balanceOf(address(this)) -
       _amountBefore;

@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './interfaces/IDecentralizedIndex.sol';
 import './interfaces/IFlashLoanRecipient.sol';
@@ -12,7 +13,11 @@ import './interfaces/IUniswapV2Factory.sol';
 import './interfaces/IUniswapV2Router02.sol';
 import './StakingPoolToken.sol';
 
-abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
+abstract contract DecentralizedIndex is
+  IDecentralizedIndex,
+  ERC20,
+  ERC20Permit
+{
   using SafeERC20 for IERC20;
 
   uint256 constant DEN = 10000;
@@ -91,7 +96,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
     address _lpRewardsToken,
     address _v2Router,
     bool _stakeRestriction
-  ) ERC20(_name, _symbol) {
+  ) ERC20(_name, _symbol) ERC20Permit(_name) {
     require(_fees.buy <= (DEN * 20) / 100, 'lte20%');
     require(_fees.sell <= (DEN * 20) / 100, 'lte20%');
     require(_fees.burn <= (DEN * 70) / 100, 'lte70%');
