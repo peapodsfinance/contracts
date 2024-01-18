@@ -345,7 +345,6 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
       : _lpTokens;
     require(_lpTokens > 0, 'LPREM');
 
-    uint256 _balBefore = IERC20(V2_POOL).balanceOf(address(this));
     IERC20(V2_POOL).safeTransferFrom(_msgSender(), address(this), _lpTokens);
     IERC20(V2_POOL).safeIncreaseAllowance(V2_ROUTER, _lpTokens);
     IUniswapV2Router02(V2_ROUTER).removeLiquidity(
@@ -357,12 +356,6 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
       _msgSender(),
       _deadline
     );
-    if (IERC20(V2_POOL).balanceOf(address(this)) > _balBefore) {
-      IERC20(V2_POOL).safeTransfer(
-        _msgSender(),
-        IERC20(V2_POOL).balanceOf(address(this)) - _balBefore
-      );
-    }
     emit RemoveLiquidity(_msgSender(), _lpTokens);
   }
 
