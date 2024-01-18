@@ -16,7 +16,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
   using SafeERC20 for IERC20;
 
   uint256 constant DEN = 10000;
-  uint256 constant SWAP_DELAY = 10; // seconds
+  uint256 constant SWAP_DELAY = 20; // seconds
   address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
   address constant V3_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
   IProtocolFeeRouter constant PROTOCOL_FEE_ROUTER =
@@ -156,12 +156,13 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
   function _processPreSwapFeesAndSwap() internal {
     bool _passesSwapDelay = block.timestamp > _lastSwap + SWAP_DELAY;
     uint256 _bal = balanceOf(address(this));
-    uint256 _min = totalSupply() / 10000; // 0.01%
-    if (_passesSwapDelay && _bal >= _min && balanceOf(V2_POOL) > 0) {
+    uint256 _lpBal = balanceOf(V2_POOL);
+    uint256 _min = (_lpBal * 1) / 100; // 1% LP bal
+    if (_passesSwapDelay && _bal >= _min && _lpBal > 0) {
       _swapping = true;
       _lastSwap = block.timestamp;
-      uint256 _totalAmt = _bal >= _min * 100 ? _min * 100 : _bal >= _min * 20
-        ? _min * 20
+      uint256 _totalAmt = _bal >= _min * 40 ? _min * 40 : _bal >= _min * 10
+        ? _min * 10
         : _min;
       uint256 _partnerAmt;
       if (fees.partner > 0 && partner != address(0)) {
@@ -186,7 +187,9 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
     path[1] = PAIRED_LP_TOKEN;
     _approve(address(this), V2_ROUTER, _amount);
     address _rewards = StakingPoolToken(lpStakingPool).poolRewards();
-    uint256 _pairedLpBalBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(_rewards);
+    uint256 _pairedLpBalBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(
+      address(this)
+    );
     address _recipient = PAIRED_LP_TOKEN == lpRewardsToken
       ? address(this)
       : _rewards;
@@ -199,8 +202,9 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20 {
         block.timestamp
       );
     if (PAIRED_LP_TOKEN == lpRewardsToken) {
-      uint256 _newPairedLpTkns = IERC20(PAIRED_LP_TOKEN).balanceOf(_rewards) -
-        _pairedLpBalBefore;
+      uint256 _newPairedLpTkns = IERC20(PAIRED_LP_TOKEN).balanceOf(
+        address(this)
+      ) - _pairedLpBalBefore;
       if (_newPairedLpTkns > 0) {
         IERC20(PAIRED_LP_TOKEN).safeIncreaseAllowance(
           _rewards,
