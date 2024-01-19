@@ -117,11 +117,12 @@ contract WeightedIndex is DecentralizedIndex {
     require(_isTokenInIndex[_token], 'INVALIDTOKEN');
     uint256 _tokenIdx = _fundTokenIdx[_token];
     uint256 _tokenCurSupply = IERC20(_token).balanceOf(address(this));
-    uint256 _tokenAmtSupplyRatioX96 = _isFirstIn()
+    bool _firstIn = _isFirstIn();
+    uint256 _tokenAmtSupplyRatioX96 = _firstIn
       ? FixedPoint96.Q96
       : (_amount * FixedPoint96.Q96) / _tokenCurSupply;
     uint256 _tokensMinted;
-    if (_isFirstIn()) {
+    if (_firstIn) {
       _tokensMinted =
         (_amount * FixedPoint96.Q96 * 10 ** decimals()) /
         indexTokens[_tokenIdx].q1;
@@ -140,7 +141,7 @@ contract WeightedIndex is DecentralizedIndex {
       _processBurnFee(_feeTokens);
     }
     for (uint256 _i; _i < indexTokens.length; _i++) {
-      uint256 _transferAmt = _tokenAmtSupplyRatioX96 == FixedPoint96.Q96
+      uint256 _transferAmt = _firstIn
         ? getInitialAmount(_token, _amount, indexTokens[_i].token)
         : (IERC20(indexTokens[_i].token).balanceOf(address(this)) *
           _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
