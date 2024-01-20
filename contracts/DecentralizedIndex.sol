@@ -411,20 +411,9 @@ abstract contract DecentralizedIndex is
 
   function rescueETH() external lock {
     require(address(this).balance > 0, 'NOETH');
-    _rescueETH(address(this).balance);
-  }
-
-  function _rescueETH(uint256 _amount) internal {
-    if (_amount == 0) {
-      return;
-    }
     (bool _sent, ) = Ownable(address(V3_TWAP_UTILS)).owner().call{
-      value: _amount
+      value: address(this).balance
     }('');
     require(_sent, 'SENT');
-  }
-
-  receive() external payable {
-    _rescueETH(msg.value);
   }
 }

@@ -174,7 +174,9 @@ contract WeightedIndex is DecentralizedIndex {
       );
       uint256 _debondAmount = (_tokenSupply * _percAfterFeeX96) /
         FixedPoint96.Q96;
-      IERC20(indexTokens[_i].token).safeTransfer(_msgSender(), _debondAmount);
+      if (_debondAmount > 0) {
+        IERC20(indexTokens[_i].token).safeTransfer(_msgSender(), _debondAmount);
+      }
     }
     emit Debond(_msgSender(), _amount);
   }
