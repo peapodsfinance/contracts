@@ -293,6 +293,7 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
     address
   ) public view override returns (uint256) {}
 
+  /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
   function getTokenPriceUSDX96(
     address _token
   ) external view override returns (uint256) {
@@ -306,6 +307,7 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
       );
   }
 
+  /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
   function getIdxPriceUSDX96() public view override returns (uint256, uint256) {
     uint256 _ratioSumX96;
     for (uint256 _i; _i < indexTokens.length; _i++) {

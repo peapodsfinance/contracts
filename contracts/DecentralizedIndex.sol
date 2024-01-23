@@ -166,7 +166,7 @@ abstract contract DecentralizedIndex is
     if (_passesSwapDelay && _bal >= _min && _lpBal > 0) {
       _swapping = true;
       _lastSwap = block.timestamp;
-      uint256 _totalAmt = _bal >= _min * 40 ? _min * 40 : _bal >= _min * 10
+      uint256 _totalAmt = _bal >= _min * 25 ? _min * 25 : _bal >= _min * 10
         ? _min * 10
         : _min;
       uint256 _partnerAmt;
@@ -375,15 +375,18 @@ abstract contract DecentralizedIndex is
     bytes calldata _data
   ) external override lock {
     require(_isTokenInIndex[_token], 'ONLYPODTKN');
+    uint256 _amountDAI = FLASH_FEE * 10 ** IERC20Metadata(DAI).decimals();
     address _rewards = StakingPoolToken(lpStakingPool).poolRewards();
-    address _feeRecipient = PAIRED_LP_TOKEN == DAI
+    address _feeRecipient = lpRewardsToken == DAI
+      ? address(this)
+      : PAIRED_LP_TOKEN == DAI
       ? _rewards
       : Ownable(address(V3_TWAP_UTILS)).owner();
-    IERC20(DAI).safeTransferFrom(
-      _msgSender(),
-      _feeRecipient,
-      FLASH_FEE * 10 ** IERC20Metadata(DAI).decimals()
-    );
+    IERC20(DAI).safeTransferFrom(_msgSender(), _feeRecipient, _amountDAI);
+    if (lpRewardsToken == DAI) {
+      IERC20(DAI).safeIncreaseAllowance(_rewards, _amountDAI);
+      ITokenRewards(_rewards).depositRewards(_amountDAI);
+    }
     uint256 _balance = IERC20(_token).balanceOf(address(this));
     IERC20(_token).safeTransfer(_recipient, _amount);
     IFlashLoanRecipient(_recipient).callback(_data);

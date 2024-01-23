@@ -129,6 +129,7 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 _amountTknDepositing,
     uint256 _slippageOverride
   ) public override {
+    require(PAIRED_LP_TOKEN != rewardsToken, 'LPREWSAME');
     if (_amountTknDepositing > 0) {
       IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
         _msgSender(),

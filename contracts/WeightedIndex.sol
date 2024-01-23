@@ -128,7 +128,7 @@ contract WeightedIndex is DecentralizedIndex {
         indexTokens[_tokenIdx].q1;
     } else {
       _tokensMinted =
-        (totalSupply() * ((_amount * FixedPoint96.Q96) / _tokenCurSupply)) /
+        (totalSupply() * _tokenAmtSupplyRatioX96) /
         FixedPoint96.Q96;
     }
     uint256 _feeTokens = _canWrapFeeFree(_msgSender())
@@ -196,12 +196,14 @@ contract WeightedIndex is DecentralizedIndex {
       10 ** IERC20Metadata(_sourceToken).decimals();
   }
 
+  /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
   function getTokenPriceUSDX96(
     address _token
   ) external view override returns (uint256) {
     return _getTokenPriceUSDX96(_token);
   }
 
+  /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
   function getIdxPriceUSDX96() public view override returns (uint256, uint256) {
     uint256 _priceX96;
     uint256 _X96_2 = 2 ** (96 / 2);

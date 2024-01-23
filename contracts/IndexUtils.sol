@@ -40,7 +40,7 @@ contract IndexUtils is Context, Zapper {
         ? FixedPoint96.Q96
         : (_amount * FixedPoint96.Q96) / _tokenCurSupply;
       for (uint256 _i; _i < _assets.length; _i++) {
-        uint256 _amountNeeded = _tokenAmtSupplyRatioX96 == FixedPoint96.Q96
+        uint256 _amountNeeded = _indexFund.totalSupply() == 0
           ? _indexFund.getInitialAmount(_token, _amount, _assets[_i].token)
           : (IERC20(_assets[_i].token).balanceOf(address(_indexFund)) *
             _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
@@ -61,6 +61,17 @@ contract IndexUtils is Context, Zapper {
         _msgSender(),
         IERC20(_indexFund).balanceOf(address(this)) - _idxBalBefore
       );
+
+      // refund any excess tokens to user we didn't use to bond
+      for (uint256 _i; _i < _assets.length; _i++) {
+        uint256 _balNow = IERC20(_assets[_i].token).balanceOf(address(this));
+        if (_balNow > _balsBefore[_i]) {
+          IERC20(_assets[_i].token).safeTransfer(
+            _msgSender(),
+            _balNow - _balsBefore[_i]
+          );
+        }
+      }
     } else {
       require(
         _indexFund.indexType() == IDecentralizedIndex.IndexType.UNWEIGHTED,
@@ -81,6 +92,7 @@ contract IndexUtils is Context, Zapper {
     IDecentralizedIndex _indexFund,
     uint256 _assetIdx,
     uint256 _amountTokensForAssetIdx,
+    uint256 _amountMintMin,
     uint256 _slippage, // 1 == 0.1%, 10 == 1%, 1000 == 100%
     uint256 _deadline,
     bool _stakeAsWell
@@ -116,7 +128,7 @@ contract IndexUtils is Context, Zapper {
       _indexFund,
       _assets[_assetIdx].token,
       _amountsReceived[_assetIdx],
-      0,
+      _amountMintMin,
       _stakeAsWell ? address(this) : _msgSender()
     );
 
