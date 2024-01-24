@@ -391,7 +391,7 @@ contract IndexUtils is Context, Zapper {
   {
     uint256 _nativeBefore = address(this).balance;
     _amountBefore = IERC20(_outToken).balanceOf(address(this));
-    uint256 _amountOut = _tokenAmtSupplyRatioX96 == FixedPoint96.Q96
+    uint256 _amountOut = _indexFund.totalSupply() == 0
       ? _indexFund.getInitialAmount(_initToken, _initTokenAmount, _outToken)
       : (IERC20(_outToken).balanceOf(address(_indexFund)) *
         _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
