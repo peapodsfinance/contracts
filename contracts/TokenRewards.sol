@@ -34,8 +34,8 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 realized;
   }
 
-  address public override trackingToken;
-  address public override rewardsToken;
+  address public immutable override trackingToken;
+  address public immutable override rewardsToken;
   uint256 public override totalShares;
   uint256 public override totalStakers;
   mapping(address => uint256) public shares;
@@ -117,7 +117,10 @@ contract TokenRewards is ITokenRewards, Context {
 
   function _processFeesIfApplicable() internal {
     IDecentralizedIndex(INDEX_FUND).processPreSwapFeesAndSwap();
-    if (IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) > 0) {
+    if (
+      rewardsToken != PAIRED_LP_TOKEN &&
+      IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) > 0
+    ) {
       depositFromPairedLpToken(0, 0);
     }
   }
@@ -126,6 +129,7 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 _amountTknDepositing,
     uint256 _slippageOverride
   ) public override {
+    require(PAIRED_LP_TOKEN != rewardsToken, 'LPREWSAME');
     if (_amountTknDepositing > 0) {
       IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
         _msgSender(),
@@ -135,15 +139,13 @@ contract TokenRewards is ITokenRewards, Context {
     }
     uint256 _amountTkn = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
     require(_amountTkn > 0, 'NEEDTKN');
+    uint256 _adminAmt;
     (uint256 _yieldAdminFee, ) = _getYieldFees();
     if (_yieldAdminFee > 0) {
-      uint256 _adminAmt = (_amountTkn * _yieldAdminFee) /
+      _adminAmt =
+        (_amountTkn * _yieldAdminFee) /
         PROTOCOL_FEE_ROUTER.protocolFees().DEN();
-      IERC20(PAIRED_LP_TOKEN).safeTransfer(
-        Ownable(address(V3_TWAP_UTILS)).owner(),
-        _adminAmt
-      );
-      _amountTkn = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
+      _amountTkn -= _adminAmt;
     }
     (address _token0, address _token1) = PAIRED_LP_TOKEN < rewardsToken
       ? (PAIRED_LP_TOKEN, rewardsToken)
@@ -185,6 +187,12 @@ contract TokenRewards is ITokenRewards, Context {
         })
       )
     {
+      if (_adminAmt > 0) {
+        IERC20(PAIRED_LP_TOKEN).safeTransfer(
+          Ownable(address(V3_TWAP_UTILS)).owner(),
+          _adminAmt
+        );
+      }
       _rewardsSwapSlippage = 10;
       _depositRewards(
         IERC20(rewardsToken).balanceOf(address(this)) - _rewardsBalBefore
@@ -215,12 +223,15 @@ contract TokenRewards is ITokenRewards, Context {
       return;
     }
 
+    uint256 _depositAmount = _amountTotal;
     (, uint256 _yieldBurnFee) = _getYieldFees();
-    uint256 _burnAmount = (_amountTotal * _yieldBurnFee) /
-      PROTOCOL_FEE_ROUTER.protocolFees().DEN();
-    uint256 _depositAmount = _amountTotal - _burnAmount;
-    if (_burnAmount > 0) {
-      _burnRewards(_burnAmount);
+    if (_yieldBurnFee > 0) {
+      uint256 _burnAmount = (_amountTotal * _yieldBurnFee) /
+        PROTOCOL_FEE_ROUTER.protocolFees().DEN();
+      if (_burnAmount > 0) {
+        _burnRewards(_burnAmount);
+        _depositAmount -= _burnAmount;
+      }
     }
     rewardsDeposited += _depositAmount;
     rewardsDepMonthly[beginningOfMonth(block.timestamp)] += _depositAmount;

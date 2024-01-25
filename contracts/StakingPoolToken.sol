@@ -10,9 +10,9 @@ import './TokenRewards.sol';
 contract StakingPoolToken is IStakingPoolToken, ERC20 {
   using SafeERC20 for IERC20;
 
-  address public override indexFund;
-  address public override stakingToken;
-  address public override poolRewards;
+  address public immutable override indexFund;
+  address public immutable override stakingToken;
+  address public immutable override poolRewards;
   address public override stakeUserRestriction;
 
   modifier onlyRestricted() {

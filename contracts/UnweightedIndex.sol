@@ -34,6 +34,7 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
     DecentralizedIndex(
       _name,
       _symbol,
+      IndexType.UNWEIGHTED,
       _fees,
       _partner,
       _pairedLpToken,
@@ -42,7 +43,6 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
       _stakeRestriction
     )
   {
-    indexType = IndexType.UNWEIGHTED;
     V3_WETH_STABLE_POOL = _v3StableWETHPool;
     address _weth9 = IUniswapV2Router02(_v2Router).WETH();
     for (uint256 _i; _i < _pools.length; _i++) {
@@ -223,7 +223,8 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
 
   function bond(
     address _token,
-    uint256 _amount
+    uint256 _amount,
+    uint256 _amountMintMin
   ) external override lock noSwapOrFee {
     require(_isTokenInIndex[_token], 'INVALIDTOKEN');
     _transferFromAndValidate(IERC20(_token), _msgSender(), _amount);
@@ -236,12 +237,14 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
     uint256 _tokensMinted = (_tokenPriceUSDX96 * _amount * 10 ** decimals()) /
       _currentIdxPriceUSDX96 /
       10 ** IERC20Metadata(_token).decimals();
-    uint256 _feeTokens = _canWrapFeeFree()
+    uint256 _feeTokens = _canWrapFeeFree(_msgSender())
       ? 0
       : (_tokensMinted * fees.bond) / DEN;
+    require(_tokensMinted - _feeTokens >= _amountMintMin, 'MIN');
     _mint(_msgSender(), _tokensMinted - _feeTokens);
     if (_feeTokens > 0) {
       _mint(address(this), _feeTokens);
+      _processBurnFee(_feeTokens);
     }
     _rebalance();
     _bond();
@@ -257,8 +260,9 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
     uint256 _amountAfterFee = _isLastOut(_amount)
       ? _amount
       : (_amount * (DEN - fees.debond)) / DEN;
-    _transfer(_msgSender(), address(this), _amount);
+    super._transfer(_msgSender(), address(this), _amount);
     _burn(address(this), _amountAfterFee);
+    _processBurnFee(_amount - _amountAfterFee);
     (, uint256 _currentIdxPriceUSDX96) = getIdxPriceUSDX96();
     uint256 _usdToDebondX96 = (_currentIdxPriceUSDX96 * _amountAfterFee) /
       10 ** decimals();
@@ -289,6 +293,7 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
     address
   ) public view override returns (uint256) {}
 
+  /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
   function getTokenPriceUSDX96(
     address _token
   ) external view override returns (uint256) {
@@ -302,6 +307,7 @@ contract UnweightedIndex is DecentralizedIndex, Ownable {
       );
   }
 
+  /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
   function getIdxPriceUSDX96() public view override returns (uint256, uint256) {
     uint256 _ratioSumX96;
     for (uint256 _i; _i < indexTokens.length; _i++) {

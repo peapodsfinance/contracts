@@ -30,6 +30,7 @@ contract WeightedIndex is DecentralizedIndex {
     DecentralizedIndex(
       _name,
       _symbol,
+      IndexType.WEIGHTED,
       _fees,
       _partner,
       _pairedLpToken,
@@ -38,10 +39,11 @@ contract WeightedIndex is DecentralizedIndex {
       _stakeRestriction
     )
   {
-    indexType = IndexType.WEIGHTED;
     V2_FACTORY = IUniswapV2Factory(IUniswapV2Router02(_v2Router).factory());
     require(_tokens.length == _weights.length, 'INIT');
     for (uint256 _i; _i < _tokens.length; _i++) {
+      require(!_isTokenInIndex[_tokens[_i]], 'DUP');
+      require(_weights[_i] > 0, 'WVAL');
       indexTokens.push(
         IndexAssetInfo({
           token: _tokens[_i],
@@ -109,27 +111,37 @@ contract WeightedIndex is DecentralizedIndex {
 
   function bond(
     address _token,
-    uint256 _amount
+    uint256 _amount,
+    uint256 _amountMintMin
   ) external override lock noSwapOrFee {
     require(_isTokenInIndex[_token], 'INVALIDTOKEN');
     uint256 _tokenIdx = _fundTokenIdx[_token];
     uint256 _tokenCurSupply = IERC20(_token).balanceOf(address(this));
-    uint256 _tokenAmtSupplyRatioX96 = _isFirstIn()
+    bool _firstIn = _isFirstIn();
+    uint256 _tokenAmtSupplyRatioX96 = _firstIn
       ? FixedPoint96.Q96
       : (_amount * FixedPoint96.Q96) / _tokenCurSupply;
-    uint256 _tokensMinted = _tokenAmtSupplyRatioX96 == FixedPoint96.Q96
-      ? (_amount * FixedPoint96.Q96 * 10 ** decimals()) /
-        indexTokens[_tokenIdx].q1
-      : (totalSupply() * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
-    uint256 _feeTokens = _canWrapFeeFree()
+    uint256 _tokensMinted;
+    if (_firstIn) {
+      _tokensMinted =
+        (_amount * FixedPoint96.Q96 * 10 ** decimals()) /
+        indexTokens[_tokenIdx].q1;
+    } else {
+      _tokensMinted =
+        (totalSupply() * _tokenAmtSupplyRatioX96) /
+        FixedPoint96.Q96;
+    }
+    uint256 _feeTokens = _canWrapFeeFree(_msgSender())
       ? 0
       : (_tokensMinted * fees.bond) / DEN;
+    require(_tokensMinted - _feeTokens >= _amountMintMin, 'MIN');
     _mint(_msgSender(), _tokensMinted - _feeTokens);
     if (_feeTokens > 0) {
       _mint(address(this), _feeTokens);
+      _processBurnFee(_feeTokens);
     }
     for (uint256 _i; _i < indexTokens.length; _i++) {
-      uint256 _transferAmt = _tokenAmtSupplyRatioX96 == FixedPoint96.Q96
+      uint256 _transferAmt = _firstIn
         ? getInitialAmount(_token, _amount, indexTokens[_i].token)
         : (IERC20(indexTokens[_i].token).balanceOf(address(this)) *
           _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
@@ -153,20 +165,18 @@ contract WeightedIndex is DecentralizedIndex {
       : (_amount * (DEN - fees.debond)) / DEN;
     uint256 _percAfterFeeX96 = (_amountAfterFee * FixedPoint96.Q96) /
       totalSupply();
-    _transfer(_msgSender(), address(this), _amount);
+    super._transfer(_msgSender(), address(this), _amount);
     _burn(address(this), _amountAfterFee);
+    _processBurnFee(_amount - _amountAfterFee);
     for (uint256 _i; _i < indexTokens.length; _i++) {
       uint256 _tokenSupply = IERC20(indexTokens[_i].token).balanceOf(
         address(this)
       );
       uint256 _debondAmount = (_tokenSupply * _percAfterFeeX96) /
         FixedPoint96.Q96;
-      IERC20(indexTokens[_i].token).safeTransfer(_msgSender(), _debondAmount);
-      require(
-        IERC20(indexTokens[_i].token).balanceOf(address(this)) >=
-          _tokenSupply - _debondAmount,
-        'HEAVY'
-      );
+      if (_debondAmount > 0) {
+        IERC20(indexTokens[_i].token).safeTransfer(_msgSender(), _debondAmount);
+      }
     }
     emit Debond(_msgSender(), _amount);
   }
@@ -186,12 +196,14 @@ contract WeightedIndex is DecentralizedIndex {
       10 ** IERC20Metadata(_sourceToken).decimals();
   }
 
+  /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
   function getTokenPriceUSDX96(
     address _token
   ) external view override returns (uint256) {
     return _getTokenPriceUSDX96(_token);
   }
 
+  /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
   function getIdxPriceUSDX96() public view override returns (uint256, uint256) {
     uint256 _priceX96;
     uint256 _X96_2 = 2 ** (96 / 2);
