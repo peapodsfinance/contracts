@@ -3,12 +3,13 @@ pragma solidity ^0.8.19;
 
 interface IERC4626 {
   function deposit(
-    uint256 yETHAmount,
+    uint256 assets,
     address receiver
-  ) external returns (uint256 styETHAmount);
+  ) external returns (uint256 shares);
 
   function withdraw(
-    uint256 styETHAmount,
-    address receiver
-  ) external returns (uint256 yETHAmount);
+    uint256 assets,
+    address receiver,
+    address owner
+  ) external returns (uint256 shares);
 }

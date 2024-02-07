@@ -294,7 +294,11 @@ contract Zapper is IZapper, Context, Ownable {
     if (_isYethOnly) {
       _yethAmount = _stYethAmount;
     } else {
-      _yethAmount = IERC4626(STYETH).withdraw(_stYethAmount, address(this));
+      _yethAmount = IERC4626(STYETH).withdraw(
+        _stYethAmount,
+        address(this),
+        address(this)
+      );
     }
     return _swapCurve(WETH_YETH_POOL, 1, 0, _yethAmount, _minWethAmount);
   }
