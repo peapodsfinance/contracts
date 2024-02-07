@@ -9,15 +9,16 @@ contract wduiTEST is WeightedIndex {
     uint256[] memory _weights,
     address _rewardsToken,
     address _v2Router,
+    Config memory _config,
     Fees memory _fees
   )
     WeightedIndex(
       'zWeighted Blue Chip Idx',
       'wzTESTTTBC',
+      _config,
       _fees,
       _tokens,
       _weights,
-      address(0),
       address(0),
       _rewardsToken,
       _v2Router,

@@ -9,6 +9,12 @@ interface IDecentralizedIndex is IERC20 {
     UNWEIGHTED
   }
 
+  struct Config {
+    address partner;
+    bool hasTransferTax;
+    bool blacklistTKNpTKNPoolV2;
+  }
+
   // all fees: 1 == 0.01%, 10 == 0.1%, 100 == 1%
   struct Fees {
     uint256 burn;

@@ -41,7 +41,7 @@ contract TokenRewards is ITokenRewards, Context {
   mapping(address => uint256) public shares;
   mapping(address => Reward) public rewards;
 
-  uint256 _rewardsSwapSlippage = 10; // 1%
+  uint256 _rewardsSwapSlippage = 20; // 2%
   uint256 _rewardsPerShare;
   uint256 public rewardsDistributed;
   uint256 public rewardsDeposited;
@@ -130,6 +130,7 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 _slippageOverride
   ) public override {
     require(PAIRED_LP_TOKEN != rewardsToken, 'LPREWSAME');
+    require(_slippageOverride <= 200, 'MAXSLIP'); // 20%
     if (_amountTknDepositing > 0) {
       IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
         _msgSender(),
@@ -198,7 +199,7 @@ contract TokenRewards is ITokenRewards, Context {
         IERC20(rewardsToken).balanceOf(address(this)) - _rewardsBalBefore
       );
     } catch {
-      if (_rewardsSwapSlippage < 1000) {
+      if (_rewardsSwapSlippage < 200) {
         _rewardsSwapSlippage += 10;
       }
       IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(V3_ROUTER, _amountTkn);

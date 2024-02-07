@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 interface IZapper {
   enum PoolType {
+    CURVE,
     V2,
     V3
   }

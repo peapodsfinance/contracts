@@ -7,6 +7,9 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
+import './interfaces/ICurvePool.sol';
+import './interfaces/IDecentralizedIndex.sol';
+import './interfaces/IERC4626.sol';
 import './interfaces/IUniswapV2Pair.sol';
 import './interfaces/IUniswapV3Pool.sol';
 import './interfaces/IUniswapV2Router02.sol';
@@ -17,6 +20,10 @@ import './interfaces/IZapper.sol';
 contract Zapper is IZapper, Context, Ownable {
   using SafeERC20 for IERC20;
 
+  address constant OHM = 0x64aa3364F17a4D01c6f1751Fd97C2BD3D7e7f1D5;
+  address constant STYETH = 0x583019fF0f430721aDa9cfb4fac8F06cA104d0B4;
+  address constant YETH = 0x1BED97CBC3c24A4fb5C069C6E311a967386131f7;
+  address constant WETH_YETH_POOL = 0x69ACcb968B19a53790f43e57558F5E443A91aF22;
   address constant V3_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
   address immutable V2_ROUTER;
   address immutable WETH;
@@ -24,14 +31,23 @@ contract Zapper is IZapper, Context, Ownable {
 
   uint256 _slippage = 30; // 3%
 
+  address public pOHM;
+
   // token in => token out => swap pool(s)
   mapping(address => mapping(address => Pools)) public zapMap;
+  // curve pool => token => idx
+  mapping(address => mapping(address => int128)) public curveTokenIdx;
 
   constructor(address _v2Router, IV3TwapUtilities _v3TwapUtilities) {
     V2_ROUTER = _v2Router;
     V3_TWAP_UTILS = _v3TwapUtilities;
     WETH = IUniswapV2Router02(V2_ROUTER).WETH();
 
+    // WETH/YETH
+    _setZapMapFromPoolSingle(
+      PoolType.CURVE,
+      0x69ACcb968B19a53790f43e57558F5E443A91aF22
+    );
     // WETH/DAI
     _setZapMapFromPoolSingle(
       PoolType.V3,
@@ -64,34 +80,55 @@ contract Zapper is IZapper, Context, Ownable {
       _amountIn = _ethToWETH(_amountIn);
       _in = WETH;
     }
+    // handle pOHM separately through pod, modularize later
+    bool _isOutPOHM;
+    if (pOHM == _out) {
+      _isOutPOHM = true;
+      _out = OHM;
+    }
+    // handle yETH and st-yETH special through curve pool, modularize later
+    if (_out == YETH || _out == STYETH) {
+      require(_in == WETH, 'YETHIN');
+      return _wethToYeth(_amountIn, _amountOutMin, _out == STYETH);
+    } else if (_in == YETH || _in == STYETH) {
+      require(_out == WETH, 'YETHOUT');
+      return _styethToWeth(_amountIn, _amountOutMin, _in == YETH);
+    }
     Pools memory _poolInfo = zapMap[_in][_out];
     // no pool so just try to swap over one path univ2
     if (_poolInfo.pool1 == address(0)) {
       address[] memory _path = new address[](2);
       _path[0] = _in;
       _path[1] = _out;
-      return _swapV2(_path, _amountIn, _amountOutMin);
-    }
-
-    bool _twoHops = _poolInfo.pool2 != address(0);
-    if (_poolInfo.poolType == PoolType.V2) {
-      // univ2
-      address _token0 = IUniswapV2Pair(_poolInfo.pool1).token0();
-      address[] memory _path = new address[](_twoHops ? 3 : 2);
-      _path[0] = _in;
-      _path[1] = !_twoHops ? _out : _token0 == _in
-        ? IUniswapV2Pair(_poolInfo.pool1).token1()
-        : _token0;
-      if (_twoHops) {
-        _path[2] = _out;
-      }
-      return _swapV2(_path, _amountIn, _amountOutMin);
+      _amountOut = _swapV2(_path, _amountIn, _amountOutMin);
     } else {
-      // univ3
-      if (_twoHops) {
-        address _t0 = IUniswapV3Pool(_poolInfo.pool1).token0();
-        return
-          _swapV3Multi(
+      bool _twoHops = _poolInfo.pool2 != address(0);
+      if (_poolInfo.poolType == PoolType.CURVE) {
+        // curve
+        _amountOut = _swapCurve(
+          _poolInfo.pool1,
+          curveTokenIdx[_poolInfo.pool1][_in],
+          curveTokenIdx[_poolInfo.pool1][_out],
+          _amountIn,
+          _amountOutMin
+        );
+      } else if (_poolInfo.poolType == PoolType.V2) {
+        // univ2
+        address _token0 = IUniswapV2Pair(_poolInfo.pool1).token0();
+        address[] memory _path = new address[](_twoHops ? 3 : 2);
+        _path[0] = _in;
+        _path[1] = !_twoHops ? _out : _token0 == _in
+          ? IUniswapV2Pair(_poolInfo.pool1).token1()
+          : _token0;
+        if (_twoHops) {
+          _path[2] = _out;
+        }
+        _amountOut = _swapV2(_path, _amountIn, _amountOutMin);
+      } else {
+        // univ3
+        if (_twoHops) {
+          address _t0 = IUniswapV3Pool(_poolInfo.pool1).token0();
+          _amountOut = _swapV3Multi(
             _in,
             IUniswapV3Pool(_poolInfo.pool1).fee(),
             _t0 == _in ? IUniswapV3Pool(_poolInfo.pool1).token0() : _t0,
@@ -100,17 +137,24 @@ contract Zapper is IZapper, Context, Ownable {
             _amountIn,
             _amountOutMin
           );
-      } else {
-        return
-          _swapV3Single(
+        } else {
+          _amountOut = _swapV3Single(
             _in,
             IUniswapV3Pool(_poolInfo.pool1).fee(),
             _out,
             _amountIn,
             _amountOutMin
           );
+        }
       }
     }
+    if (!_isOutPOHM) {
+      return _amountOut;
+    }
+    uint256 _pOHMBefore = IERC20(pOHM).balanceOf(address(this));
+    IERC20(OHM).safeIncreaseAllowance(pOHM, _amountOut);
+    IDecentralizedIndex(pOHM).bond(OHM, _amountOut, 0);
+    return IERC20(pOHM).balanceOf(address(this)) - _pOHMBefore;
   }
 
   function _ethToWETH(uint256 _amountETH) internal returns (uint256) {
@@ -202,9 +246,71 @@ contract Zapper is IZapper, Context, Ownable {
     return IERC20(_out).balanceOf(address(this)) - _outBefore;
   }
 
+  function _swapCurve(
+    address _pool,
+    int128 _i,
+    int128 _j,
+    uint256 _amountIn,
+    uint256 _amountOutMin
+  ) internal returns (uint256) {
+    IERC20(ICurvePool(_pool).coins(uint128(_i))).safeIncreaseAllowance(
+      _pool,
+      _amountIn
+    );
+    return
+      ICurvePool(_pool).exchange(
+        _i,
+        _j,
+        _amountIn,
+        _amountOutMin,
+        address(this)
+      );
+  }
+
+  function _wethToYeth(
+    uint256 _ethAmount,
+    uint256 _minYethAmount,
+    bool _stakeToStyeth
+  ) internal returns (uint256 _amountOut) {
+    uint256 _boughtYeth = _swapCurve(
+      WETH_YETH_POOL,
+      0,
+      1,
+      _ethAmount,
+      _minYethAmount
+    );
+    if (_stakeToStyeth) {
+      return IERC4626(STYETH).deposit(_boughtYeth, address(this));
+    }
+    return _boughtYeth;
+  }
+
+  function _styethToWeth(
+    uint256 _stYethAmount,
+    uint256 _minWethAmount,
+    bool _isYethOnly
+  ) internal returns (uint256 _amountOut) {
+    uint256 _yethAmount;
+    if (_isYethOnly) {
+      _yethAmount = _stYethAmount;
+    } else {
+      _yethAmount = IERC4626(STYETH).withdraw(_stYethAmount, address(this));
+    }
+    return _swapCurve(WETH_YETH_POOL, 1, 0, _yethAmount, _minWethAmount);
+  }
+
   function _setZapMapFromPoolSingle(PoolType _type, address _pool) internal {
-    address _t0 = IUniswapV3Pool(_pool).token0();
-    address _t1 = IUniswapV3Pool(_pool).token1();
+    address _t0;
+    address _t1;
+    if (_type == PoolType.CURVE) {
+      _t0 = ICurvePool(_pool).coins(0);
+      _t1 = ICurvePool(_pool).coins(1);
+      curveTokenIdx[_pool][_t0] = 0;
+      curveTokenIdx[_pool][_t1] = 1;
+    } else {
+      _t0 = IUniswapV3Pool(_pool).token0();
+      _t1 = IUniswapV3Pool(_pool).token1();
+    }
     Pools memory _poolConf = Pools({
       poolType: _type,
       pool1: _pool,
@@ -212,6 +318,10 @@ contract Zapper is IZapper, Context, Ownable {
     });
     zapMap[_t0][_t1] = _poolConf;
     zapMap[_t1][_t0] = _poolConf;
+  }
+
+  function setPOHM(address _pOHM) external onlyOwner {
+    pOHM = _pOHM;
   }
 
   function setSlippage(uint256 _slip) external onlyOwner {
@@ -239,6 +349,7 @@ contract Zapper is IZapper, Context, Ownable {
   }
 
   function rescueERC20(IERC20 _token) external onlyOwner {
+    require(_token.balanceOf(address(this)) > 0);
     _token.safeTransfer(owner(), _token.balanceOf(address(this)));
   }
 

@@ -18,10 +18,10 @@ contract WeightedIndex is DecentralizedIndex {
   constructor(
     string memory _name,
     string memory _symbol,
+    Config memory _config,
     Fees memory _fees,
     address[] memory _tokens,
     uint256[] memory _weights,
-    address _partner,
     address _pairedLpToken,
     address _lpRewardsToken,
     address _v2Router,
@@ -31,8 +31,8 @@ contract WeightedIndex is DecentralizedIndex {
       _name,
       _symbol,
       IndexType.WEIGHTED,
+      _config,
       _fees,
-      _partner,
       _pairedLpToken,
       _lpRewardsToken,
       _v2Router,
@@ -56,6 +56,13 @@ contract WeightedIndex is DecentralizedIndex {
       _totalWeights += _weights[_i];
       _fundTokenIdx[_tokens[_i]] = _i;
       _isTokenInIndex[_tokens[_i]] = true;
+
+      if (_config.blacklistTKNpTKNPoolV2) {
+        address _blkPool = IUniswapV2Factory(
+          IUniswapV2Router02(_v2Router).factory()
+        ).createPair(address(this), _tokens[_i]);
+        _blacklist[_blkPool] = true;
+      }
     }
     // at idx == 0, need to find X in [1/X = tokenWeightAtIdx/totalWeights]
     // at idx > 0, need to find Y in (Y/X = tokenWeightAtIdx/totalWeights)

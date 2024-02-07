@@ -5,6 +5,7 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
 import './interfaces/IDecentralizedIndex.sol';
 import './interfaces/IFlashLoanRecipient.sol';
 import './interfaces/IProtocolFeeRouter.sol';
@@ -39,12 +40,13 @@ abstract contract DecentralizedIndex is
   uint256 public immutable override created;
   address public immutable override lpStakingPool;
   address public immutable override lpRewardsToken;
-  address public override partner;
 
+  Config public config;
   Fees public fees;
   IndexAssetInfo[] public indexTokens;
   mapping(address => bool) _isTokenInIndex;
   mapping(address => uint256) _fundTokenIdx;
+  mapping(address => bool) _blacklist;
 
   uint256 _partnerFirstWrapped;
 
@@ -68,7 +70,7 @@ abstract contract DecentralizedIndex is
   }
 
   modifier onlyPartner() {
-    require(_msgSender() == partner, 'PARTNER');
+    require(_msgSender() == config.partner, 'PARTNER');
     _;
   }
 
@@ -90,8 +92,8 @@ abstract contract DecentralizedIndex is
     string memory _name,
     string memory _symbol,
     IndexType _idxType,
+    Config memory _config,
     Fees memory _fees,
-    address _partner,
     address _pairedLpToken,
     address _lpRewardsToken,
     address _v2Router,
@@ -107,7 +109,7 @@ abstract contract DecentralizedIndex is
     indexType = _idxType;
     created = block.timestamp;
     fees = _fees;
-    partner = _partner;
+    config = _config;
     lpRewardsToken = _lpRewardsToken;
     V2_ROUTER = _v2Router;
     address _finalPairedLpToken = _pairedLpToken == address(0)
@@ -138,6 +140,7 @@ abstract contract DecentralizedIndex is
     address _to,
     uint256 _amount
   ) internal virtual override {
+    require(!_blacklist[_to], 'BLKLST');
     bool _buy = _from == V2_POOL && _to != address(V2_ROUTER);
     bool _sell = _to == V2_POOL;
     uint256 _fee;
@@ -153,6 +156,11 @@ abstract contract DecentralizedIndex is
         _fee = (_amount * fees.sell) / DEN;
         super._transfer(_from, address(this), _fee);
       }
+      if (config.hasTransferTax && !_buy && !_sell) {
+        _fee = _amount / 10000; // 0.01%
+        _fee = _fee == 0 ? 1 : _fee;
+        super._transfer(_from, address(this), _fee);
+      }
     }
     _processBurnFee(_fee);
     super._transfer(_from, _to, _amount - _fee);
@@ -161,18 +169,22 @@ abstract contract DecentralizedIndex is
   function _processPreSwapFeesAndSwap() internal {
     bool _passesSwapDelay = block.timestamp > _lastSwap + SWAP_DELAY;
     uint256 _bal = balanceOf(address(this));
+    if (_bal == 0) {
+      return;
+    }
     uint256 _lpBal = balanceOf(V2_POOL);
-    uint256 _min = (_lpBal * 1) / 100; // 1% LP bal
+    uint256 _min = (_lpBal * 25) / 100000; // 0.025% LP bal
     if (_passesSwapDelay && _bal >= _min && _lpBal > 0) {
+      _min = _min == 0 ? _bal : _min;
       _swapping = true;
       _lastSwap = block.timestamp;
-      uint256 _totalAmt = _bal >= _min * 25 ? _min * 25 : _bal >= _min * 10
-        ? _min * 10
+      uint256 _totalAmt = _bal >= _min * 10 ? _min * 10 : _bal >= _min * 5
+        ? _min * 5
         : _min;
       uint256 _partnerAmt;
-      if (fees.partner > 0 && partner != address(0)) {
+      if (fees.partner > 0 && config.partner != address(0)) {
         _partnerAmt = (_totalAmt * fees.partner) / DEN;
-        super._transfer(address(this), partner, _partnerAmt);
+        super._transfer(address(this), config.partner, _partnerAmt);
       }
       _feeSwap(_totalAmt - _partnerAmt);
       _swapping = false;
@@ -236,7 +248,7 @@ abstract contract DecentralizedIndex is
   }
 
   function _bond() internal {
-    if (_partnerFirstWrapped == 0 && _msgSender() == partner) {
+    if (_partnerFirstWrapped == 0 && _msgSender() == config.partner) {
       _partnerFirstWrapped = block.timestamp;
     }
   }
@@ -244,7 +256,7 @@ abstract contract DecentralizedIndex is
   function _canWrapFeeFree(address _wrapper) internal view returns (bool) {
     return
       _isFirstIn() ||
-      (_wrapper == partner &&
+      (_wrapper == config.partner &&
         _partnerFirstWrapped == 0 &&
         block.timestamp <= created + 7 days);
   }
@@ -259,6 +271,10 @@ abstract contract DecentralizedIndex is
 
   function processPreSwapFeesAndSwap() external override onlyRewards {
     _processPreSwapFeesAndSwap();
+  }
+
+  function partner() external view override returns (address) {
+    return config.partner;
   }
 
   function BOND_FEE() external view override returns (uint256) {
@@ -284,6 +300,15 @@ abstract contract DecentralizedIndex is
 
   function burn(uint256 _amount) external lock {
     _burn(_msgSender(), _amount);
+  }
+
+  function manualProcessFee(uint256 _slip) external {
+    _transfer(address(this), address(this), 0);
+    address _rewards = StakingPoolToken(lpStakingPool).poolRewards();
+    ITokenRewards(_rewards).depositFromPairedLpToken(
+      0,
+      _slip > 50 ? 50 : _slip // 5% max
+    );
   }
 
   function addLiquidityV2(
@@ -395,7 +420,7 @@ abstract contract DecentralizedIndex is
   }
 
   function setPartner(address _partner) external onlyPartner {
-    partner = _partner;
+    config.partner = _partner;
   }
 
   function setPartnerFee(uint256 _fee) external onlyPartner {
