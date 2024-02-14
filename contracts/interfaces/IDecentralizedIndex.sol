@@ -17,12 +17,12 @@ interface IDecentralizedIndex is IERC20 {
 
   // all fees: 1 == 0.01%, 10 == 0.1%, 100 == 1%
   struct Fees {
-    uint256 burn;
-    uint256 bond;
-    uint256 debond;
-    uint256 buy;
-    uint256 sell;
-    uint256 partner;
+    uint16 burn;
+    uint16 bond;
+    uint16 debond;
+    uint16 buy;
+    uint16 sell;
+    uint16 partner;
   }
 
   struct IndexAssetInfo {
@@ -48,11 +48,11 @@ interface IDecentralizedIndex is IERC20 {
   );
   event RemoveLiquidity(address indexed wallet, uint256 amountLiquidity);
 
-  function BOND_FEE() external view returns (uint256);
+  function BOND_FEE() external view returns (uint16);
 
-  function DEBOND_FEE() external view returns (uint256);
+  function DEBOND_FEE() external view returns (uint16);
 
-  function FLASH_FEE() external view returns (uint256);
+  function FLASH_FEE() external view returns (uint64);
 
   function PAIRED_LP_TOKEN() external view returns (address);
 

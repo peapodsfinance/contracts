@@ -156,40 +156,6 @@ contract IndexUtils is Context, Zapper {
     }
   }
 
-  // function bondUnweightedFromNative(
-  //   IDecentralizedIndex _indexFund,
-  //   uint256 _poolIdx,
-  //   uint256 _amountPairedLpTokenMin,
-  //   uint256 _slippage, // 1 == 0.1%, 10 == 1%, 1000 == 100%
-  //   uint256 _deadline,
-  //   bool _stakeAsWell
-  // ) external payable {
-  //   require(msg.value > 0, 'NATIVE');
-  //   uint256 _wethBalBefore = IERC20(WETH).balanceOf(address(this));
-  //   IWETH(WETH).deposit{ value: _stakeAsWell ? msg.value / 2 : msg.value }();
-  //   uint256 _wethToBond = IERC20(WETH).balanceOf(address(this)) -
-  //     _wethBalBefore;
-  //   uint256 _idxTokensGained = _bondUnweightedFromWrappedNative(
-  //     _indexFund,
-  //     _stakeAsWell ? address(this) : _msgSender(),
-  //     _poolIdx,
-  //     _wethToBond,
-  //     _slippage
-  //   );
-
-  //   if (_stakeAsWell) {
-  //     _zapIndexTokensAndNative(
-  //       _msgSender(),
-  //       _indexFund,
-  //       _idxTokensGained,
-  //       msg.value / 2,
-  //       _amountPairedLpTokenMin,
-  //       _slippage,
-  //       _deadline
-  //     );
-  //   }
-  // }
-
   function addLPAndStake(
     IDecentralizedIndex _indexFund,
     uint256 _amountIdxTokens,
@@ -199,8 +165,10 @@ contract IndexUtils is Context, Zapper {
     uint256 _slippage,
     uint256 _deadline
   ) external payable {
-    address _v2Pool = IUniswapV2Factory(IUniswapV2Router02(V2_ROUTER).factory())
-      .getPair(address(_indexFund), _indexFund.PAIRED_LP_TOKEN());
+    address _v2Pool = IUniswapV2Factory(V2_FACTORY).getPair(
+      address(_indexFund),
+      _indexFund.PAIRED_LP_TOKEN()
+    );
     uint256 _idxTokensBefore = IERC20(address(_indexFund)).balanceOf(
       address(this)
     );
@@ -384,52 +352,6 @@ contract IndexUtils is Context, Zapper {
       _amountBefore;
   }
 
-  // function _bondUnweightedFromWrappedNative(
-  //   IDecentralizedIndex _indexFund,
-  //   address _recipient,
-  //   uint256 _poolIdx,
-  //   uint256 _wethToBond,
-  //   uint256 _slippage // 1 == 0.1%, 10 == 1%, 1000 == 100%
-  // ) internal returns (uint256) {
-  //   IDecentralizedIndex.IndexAssetInfo[] memory _assets = _indexFund
-  //     .getAllAssets();
-
-  //   uint256 _bondTokensGained;
-  //   if (_assets[_poolIdx].token == WETH) {
-  //     _bondTokensGained = _wethToBond;
-  //   } else {
-  //     uint256 _poolPriceX96 = V3_TWAP_UTILS.priceX96FromSqrtPriceX96(
-  //       V3_TWAP_UTILS.sqrtPriceX96FromPoolAndInterval(_assets[_poolIdx].c1)
-  //     );
-  //     address _token0 = WETH < address(_indexFund) ? WETH : address(_indexFund);
-  //     uint256 _amountOut = _token0 == WETH
-  //       ? (_poolPriceX96 * _wethToBond) / FixedPoint96.Q96
-  //       : (_wethToBond * FixedPoint96.Q96) / _poolPriceX96;
-
-  //     IERC20(WETH).safeIncreaseAllowance(V3_ROUTER, _wethToBond);
-  //     _bondTokensGained = ISwapRouter(V3_ROUTER).exactInputSingle(
-  //       ISwapRouter.ExactInputSingleParams({
-  //         tokenIn: WETH,
-  //         tokenOut: _assets[_poolIdx].token,
-  //         fee: IUniswapV3Pool(_assets[_poolIdx].c1).fee(),
-  //         recipient: address(this),
-  //         deadline: block.timestamp,
-  //         amountIn: _wethToBond,
-  //         amountOutMinimum: (_amountOut * (1000 - _slippage)) / 1000,
-  //         sqrtPriceLimitX96: 0
-  //       })
-  //     );
-  //   }
-  //   return
-  //     _bondToRecipient(
-  //       _indexFund,
-  //       _assets[_poolIdx].token,
-  //       _bondTokensGained,
-  //       0,
-  //       _recipient
-  //     );
-  // }
-
   function _unstakeAndRemoveLP(
     IDecentralizedIndex _indexFund,
     address _stakingPool,
@@ -439,8 +361,10 @@ contract IndexUtils is Context, Zapper {
     uint256 _deadline
   ) internal returns (uint256 _fundTokensBefore) {
     address _pairedLpToken = _indexFund.PAIRED_LP_TOKEN();
-    address _v2Pool = IUniswapV2Factory(IUniswapV2Router02(V2_ROUTER).factory())
-      .getPair(address(_indexFund), _pairedLpToken);
+    address _v2Pool = IUniswapV2Factory(V2_FACTORY).getPair(
+      address(_indexFund),
+      _pairedLpToken
+    );
     uint256 _v2TokensBefore = IERC20(_v2Pool).balanceOf(address(this));
     IStakingPoolToken(_stakingPool).unstake(_unstakeAmount);
 
@@ -498,8 +422,10 @@ contract IndexUtils is Context, Zapper {
 
     _zap(address(0), _pairedLpToken, _amountETH, _amtPairedLpTokenMin);
 
-    address _v2Pool = IUniswapV2Factory(IUniswapV2Router02(V2_ROUTER).factory())
-      .getPair(address(_indexFund), _pairedLpToken);
+    address _v2Pool = IUniswapV2Factory(V2_FACTORY).getPair(
+      address(_indexFund),
+      _pairedLpToken
+    );
     uint256 _lpTokensBefore = IERC20(_v2Pool).balanceOf(address(this));
     IERC20(_pairedLpToken).safeIncreaseAllowance(
       address(_indexFund),

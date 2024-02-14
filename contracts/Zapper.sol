@@ -26,6 +26,7 @@ contract Zapper is IZapper, Context, Ownable {
   address constant WETH_YETH_POOL = 0x69ACcb968B19a53790f43e57558F5E443A91aF22;
   address constant V3_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
   address immutable V2_ROUTER;
+  address immutable V2_FACTORY;
   address immutable WETH;
   IV3TwapUtilities immutable V3_TWAP_UTILS;
 
@@ -40,8 +41,9 @@ contract Zapper is IZapper, Context, Ownable {
 
   constructor(address _v2Router, IV3TwapUtilities _v3TwapUtilities) {
     V2_ROUTER = _v2Router;
+    V2_FACTORY = IUniswapV2Router02(_v2Router).factory();
     V3_TWAP_UTILS = _v3TwapUtilities;
-    WETH = IUniswapV2Router02(V2_ROUTER).WETH();
+    WETH = IUniswapV2Router02(_v2Router).WETH();
 
     // WETH/YETH
     _setZapMapFromPoolSingle(

@@ -21,8 +21,8 @@ abstract contract DecentralizedIndex is
 {
   using SafeERC20 for IERC20;
 
-  uint256 constant DEN = 10000;
-  uint256 constant SWAP_DELAY = 20; // seconds
+  uint16 constant DEN = 10000;
+  uint8 constant SWAP_DELAY = 20; // seconds
   address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
   address constant V3_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
   IProtocolFeeRouter constant PROTOCOL_FEE_ROUTER =
@@ -30,7 +30,7 @@ abstract contract DecentralizedIndex is
   IV3TwapUtilities constant V3_TWAP_UTILS =
     IV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D);
 
-  uint256 public constant override FLASH_FEE = 10; // 10 DAI
+  uint64 public constant override FLASH_FEE = 10; // 10 DAI
   address public immutable override PAIRED_LP_TOKEN;
   address immutable V2_ROUTER;
   address immutable V2_POOL;
@@ -45,15 +45,15 @@ abstract contract DecentralizedIndex is
   Fees public fees;
   IndexAssetInfo[] public indexTokens;
   mapping(address => bool) _isTokenInIndex;
-  mapping(address => uint256) _fundTokenIdx;
+  mapping(address => uint8) _fundTokenIdx;
   mapping(address => bool) _blacklist;
 
-  uint256 _partnerFirstWrapped;
+  uint64 _partnerFirstWrapped;
 
-  uint256 _lastSwap;
-  bool _swapping;
-  bool _swapAndFeeOn = true;
-  bool _unlocked = true;
+  uint64 _lastSwap;
+  uint8 _swapping;
+  uint8 _swapAndFeeOn = 1;
+  uint8 _unlocked = 1;
 
   event FlashLoan(
     address indexed executor,
@@ -63,10 +63,10 @@ abstract contract DecentralizedIndex is
   );
 
   modifier lock() {
-    require(_unlocked, 'LOCKED');
-    _unlocked = false;
+    require(_unlocked == 1, 'LOCKED');
+    _unlocked = 0;
     _;
-    _unlocked = true;
+    _unlocked = 1;
   }
 
   modifier onlyPartner() {
@@ -83,9 +83,9 @@ abstract contract DecentralizedIndex is
   }
 
   modifier noSwapOrFee() {
-    _swapAndFeeOn = false;
+    _swapAndFeeOn = 0;
     _;
-    _swapAndFeeOn = true;
+    _swapAndFeeOn = 1;
   }
 
   constructor(
@@ -144,7 +144,7 @@ abstract contract DecentralizedIndex is
     bool _buy = _from == V2_POOL && _to != address(V2_ROUTER);
     bool _sell = _to == V2_POOL;
     uint256 _fee;
-    if (!_swapping && _swapAndFeeOn) {
+    if (_swapping == 0 && _swapAndFeeOn == 1) {
       if (_from != V2_POOL) {
         _processPreSwapFeesAndSwap();
       }
@@ -176,8 +176,8 @@ abstract contract DecentralizedIndex is
     uint256 _min = (_lpBal * 25) / 100000; // 0.025% LP bal
     if (_passesSwapDelay && _bal >= _min && _lpBal > 0) {
       _min = _min == 0 ? _bal : _min;
-      _swapping = true;
-      _lastSwap = block.timestamp;
+      _swapping = 1;
+      _lastSwap = uint64(block.timestamp);
       uint256 _totalAmt = _bal >= _min * 10 ? _min * 10 : _bal >= _min * 5
         ? _min * 5
         : _min;
@@ -187,7 +187,7 @@ abstract contract DecentralizedIndex is
         super._transfer(address(this), config.partner, _partnerAmt);
       }
       _feeSwap(_totalAmt - _partnerAmt);
-      _swapping = false;
+      _swapping = 0;
     }
   }
 
@@ -249,7 +249,7 @@ abstract contract DecentralizedIndex is
 
   function _bond() internal {
     if (_partnerFirstWrapped == 0 && _msgSender() == config.partner) {
-      _partnerFirstWrapped = block.timestamp;
+      _partnerFirstWrapped = uint64(block.timestamp);
     }
   }
 
@@ -277,11 +277,11 @@ abstract contract DecentralizedIndex is
     return config.partner;
   }
 
-  function BOND_FEE() external view override returns (uint256) {
+  function BOND_FEE() external view override returns (uint16) {
     return fees.bond;
   }
 
-  function DEBOND_FEE() external view override returns (uint256) {
+  function DEBOND_FEE() external view override returns (uint16) {
     return fees.debond;
   }
 
@@ -423,7 +423,7 @@ abstract contract DecentralizedIndex is
     config.partner = _partner;
   }
 
-  function setPartnerFee(uint256 _fee) external onlyPartner {
+  function setPartnerFee(uint16 _fee) external onlyPartner {
     require(_fee < fees.partner, 'LTCUR');
     fees.partner = _fee;
   }
