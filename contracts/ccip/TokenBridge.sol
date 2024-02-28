@@ -128,6 +128,10 @@ contract TokenBridge is ICCIPTokenBridge, CCIPReceiver, Context {
       _tokenTransferInfo.targetToken,
       _message.sourceChainSelector
     );
+    require(
+      abi.decode(_message.sender, (address)) == _bridgeConf.targetBridge,
+      'AUTH'
+    );
     address _user = _tokenTransferInfo.tokenReceiver;
     address _token = _tokenTransferInfo.targetToken;
     uint256 _amount = _tokenTransferInfo.amount;
