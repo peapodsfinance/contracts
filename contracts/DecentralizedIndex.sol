@@ -174,13 +174,11 @@ abstract contract DecentralizedIndex is
     }
     uint256 _lpBal = balanceOf(V2_POOL);
     uint256 _min = (_lpBal * 25) / 100000; // 0.025% LP bal
+    uint256 _max = _lpBal / 100; // 1%
     if (_passesSwapDelay && _bal >= _min && _lpBal > 0) {
-      _min = _min == 0 ? _bal : _min;
       _swapping = 1;
       _lastSwap = uint64(block.timestamp);
-      uint256 _totalAmt = _bal >= _min * 10 ? _min * 10 : _bal >= _min * 5
-        ? _min * 5
-        : _min;
+      uint256 _totalAmt = _bal > _max ? _max : _bal;
       uint256 _partnerAmt;
       if (fees.partner > 0 && config.partner != address(0)) {
         _partnerAmt = (_totalAmt * fees.partner) / DEN;

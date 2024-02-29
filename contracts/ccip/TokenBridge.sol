@@ -36,7 +36,7 @@ contract TokenBridge is ICCIPTokenBridge, CCIPReceiver, Context {
       _chainSelector
     );
     require(_bridgeConf.enabled, 'BRDISABLED');
-    _processInboundTokens(
+    uint256 _amountActual = _processInboundTokens(
       _token,
       _msgSender(),
       _amount,
@@ -45,7 +45,7 @@ contract TokenBridge is ICCIPTokenBridge, CCIPReceiver, Context {
     (
       Client.EVM2AnyMessage memory _evm2AnyMessage,
       uint256 _nativeFees
-    ) = _getMessageFee(_bridgeConf, _tokenReceiver, _amount);
+    ) = _getMessageFee(_bridgeConf, _tokenReceiver, _amountActual);
     require(msg.value >= _nativeFees, 'FEES');
 
     uint256 _refund = msg.value - _nativeFees;
@@ -63,6 +63,7 @@ contract TokenBridge is ICCIPTokenBridge, CCIPReceiver, Context {
       _tokenReceiver,
       _token,
       _amount,
+      _amountActual,
       _nativeFees
     );
     return _messageId;
@@ -155,11 +156,15 @@ contract TokenBridge is ICCIPTokenBridge, CCIPReceiver, Context {
     address _user,
     uint256 _amount,
     bool _isMintBurn
-  ) internal {
+  ) internal returns (uint256) {
+    uint256 _bal = IERC20Bridgeable(_token).balanceOf(address(this));
     IERC20Bridgeable(_token).safeTransferFrom(_user, address(this), _amount);
+    uint256 _amountAfter = IERC20Bridgeable(_token).balanceOf(address(this)) -
+      _bal;
     if (_isMintBurn) {
       IERC20Bridgeable(_token).burn(_amount);
     }
+    return _amountAfter;
   }
 
   function _processOutboundTokens(
