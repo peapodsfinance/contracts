@@ -173,12 +173,23 @@ contract Zapper is IZapper, Context, Ownable {
     uint256 _amountOutMin
   ) internal returns (uint256 _amountOut) {
     if (_amountOutMin == 0) {
-      address _v3Pool = V3_TWAP_UTILS.getV3Pool(
-        IPeripheryImmutableState(V3_ROUTER).factory(),
-        _in,
-        _out,
-        _fee
-      );
+      address _v3Pool;
+      try
+        V3_TWAP_UTILS.getV3Pool(
+          IPeripheryImmutableState(V3_ROUTER).factory(),
+          _in,
+          _out,
+          _fee
+        )
+      returns (address __v3Pool) {
+        _v3Pool = __v3Pool;
+      } catch {
+        _v3Pool = V3_TWAP_UTILS.getV3Pool(
+          IPeripheryImmutableState(V3_ROUTER).factory(),
+          _in,
+          _out
+        );
+      }
       address _token0 = _in < _out ? _in : _out;
       uint256 _poolPriceX96 = V3_TWAP_UTILS.priceX96FromSqrtPriceX96(
         V3_TWAP_UTILS.sqrtPriceX96FromPoolAndInterval(_v3Pool)
