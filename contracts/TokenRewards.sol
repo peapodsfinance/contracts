@@ -12,18 +12,17 @@ import './interfaces/IDecentralizedIndex.sol';
 import './interfaces/IPEAS.sol';
 import './interfaces/IProtocolFees.sol';
 import './interfaces/IProtocolFeeRouter.sol';
+import './interfaces/ISwapRouterAlgebra.sol';
 import './interfaces/ITokenRewards.sol';
 import './interfaces/IV3TwapUtilities.sol';
-import './interfaces/IUniswapV2Router02.sol';
 import './libraries/BokkyPooBahsDateTimeLibrary.sol';
-import './libraries/PoolAddress.sol';
 
 contract TokenRewards is ITokenRewards, Context {
   using SafeERC20 for IERC20;
 
-  address constant V3_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
   uint256 constant PRECISION = 10 ** 36;
   uint24 constant REWARDS_POOL_FEE = 10000; // 1%
+  address immutable V3_ROUTER;
   address immutable INDEX_FUND;
   address immutable PAIRED_LP_TOKEN;
   IProtocolFeeRouter immutable PROTOCOL_FEE_ROUTER;
@@ -55,6 +54,7 @@ contract TokenRewards is ITokenRewards, Context {
   constructor(
     IProtocolFeeRouter _feeRouter,
     IV3TwapUtilities _v3TwapUtilities,
+    address _v3Router,
     address _indexFund,
     address _pairedLpToken,
     address _trackingToken,
@@ -62,6 +62,7 @@ contract TokenRewards is ITokenRewards, Context {
   ) {
     PROTOCOL_FEE_ROUTER = _feeRouter;
     V3_TWAP_UTILS = _v3TwapUtilities;
+    V3_ROUTER = _v3Router;
     INDEX_FUND = _indexFund;
     PAIRED_LP_TOKEN = _pairedLpToken;
     trackingToken = _trackingToken;
@@ -151,15 +152,23 @@ contract TokenRewards is ITokenRewards, Context {
     (address _token0, address _token1) = PAIRED_LP_TOKEN < rewardsToken
       ? (PAIRED_LP_TOKEN, rewardsToken)
       : (rewardsToken, PAIRED_LP_TOKEN);
-    PoolAddress.PoolKey memory _poolKey = PoolAddress.PoolKey({
-      token0: _token0,
-      token1: _token1,
-      fee: REWARDS_POOL_FEE
-    });
-    address _pool = PoolAddress.computeAddress(
-      IPeripheryImmutableState(V3_ROUTER).factory(),
-      _poolKey
-    );
+    address _pool;
+    try
+      V3_TWAP_UTILS.getV3Pool(
+        IPeripheryImmutableState(V3_ROUTER).factory(),
+        _token0,
+        _token1,
+        REWARDS_POOL_FEE
+      )
+    returns (address __pool) {
+      _pool = __pool;
+    } catch {
+      _pool = V3_TWAP_UTILS.getV3Pool(
+        IPeripheryImmutableState(V3_ROUTER).factory(),
+        _token0,
+        _token1
+      );
+    }
     uint160 _rewardsSqrtPriceX96 = V3_TWAP_UTILS
       .sqrtPriceX96FromPoolAndInterval(_pool);
     uint256 _rewardsPriceX96 = V3_TWAP_UTILS.priceX96FromSqrtPriceX96(
@@ -169,41 +178,11 @@ contract TokenRewards is ITokenRewards, Context {
       ? (_rewardsPriceX96 * _amountTkn) / FixedPoint96.Q96
       : (_amountTkn * FixedPoint96.Q96) / _rewardsPriceX96;
 
-    uint256 _rewardsBalBefore = IERC20(rewardsToken).balanceOf(address(this));
     IERC20(PAIRED_LP_TOKEN).safeIncreaseAllowance(V3_ROUTER, _amountTkn);
     uint256 _slippage = _slippageOverride > 0
       ? _slippageOverride
       : _rewardsSwapSlippage;
-    try
-      ISwapRouter(V3_ROUTER).exactInputSingle(
-        ISwapRouter.ExactInputSingleParams({
-          tokenIn: PAIRED_LP_TOKEN,
-          tokenOut: rewardsToken,
-          fee: REWARDS_POOL_FEE,
-          recipient: address(this),
-          deadline: block.timestamp,
-          amountIn: _amountTkn,
-          amountOutMinimum: (_amountOut * (1000 - _slippage)) / 1000,
-          sqrtPriceLimitX96: 0
-        })
-      )
-    {
-      if (_adminAmt > 0) {
-        IERC20(PAIRED_LP_TOKEN).safeTransfer(
-          Ownable(address(V3_TWAP_UTILS)).owner(),
-          _adminAmt
-        );
-      }
-      _rewardsSwapSlippage = 10;
-      _depositRewards(
-        IERC20(rewardsToken).balanceOf(address(this)) - _rewardsBalBefore
-      );
-    } catch {
-      if (_rewardsSwapSlippage < 200) {
-        _rewardsSwapSlippage += 10;
-      }
-      IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(V3_ROUTER, _amountTkn);
-    }
+    _swapForRewards(_amountTkn, _amountOut, _slippage, _adminAmt);
   }
 
   function depositRewards(uint256 _amount) external override {
@@ -269,6 +248,77 @@ contract TokenRewards is ITokenRewards, Context {
     if (address(_fees) != address(0)) {
       _admin = _fees.yieldAdmin();
       _burn = _fees.yieldBurn();
+    }
+  }
+
+  function _swapForRewards(
+    uint256 _amountIn,
+    uint256 _amountOut,
+    uint256 _slippage,
+    uint256 _adminAmt
+  ) internal {
+    uint256 _rewardsBalBefore = IERC20(rewardsToken).balanceOf(address(this));
+    if (block.chainid == 42161) {
+      try
+        ISwapRouterAlgebra(V3_ROUTER).exactInputSingle(
+          ISwapRouterAlgebra.ExactInputSingleParams({
+            tokenIn: PAIRED_LP_TOKEN,
+            tokenOut: rewardsToken,
+            recipient: address(this),
+            deadline: block.timestamp,
+            amountIn: _amountIn,
+            amountOutMinimum: (_amountOut * (1000 - _slippage)) / 1000,
+            limitSqrtPrice: 0
+          })
+        )
+      {
+        if (_adminAmt > 0) {
+          IERC20(PAIRED_LP_TOKEN).safeTransfer(
+            Ownable(address(V3_TWAP_UTILS)).owner(),
+            _adminAmt
+          );
+        }
+        _rewardsSwapSlippage = 10;
+        _depositRewards(
+          IERC20(rewardsToken).balanceOf(address(this)) - _rewardsBalBefore
+        );
+      } catch {
+        if (_rewardsSwapSlippage < 200) {
+          _rewardsSwapSlippage += 10;
+        }
+        IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(V3_ROUTER, _amountIn);
+      }
+    } else {
+      try
+        ISwapRouter(V3_ROUTER).exactInputSingle(
+          ISwapRouter.ExactInputSingleParams({
+            tokenIn: PAIRED_LP_TOKEN,
+            tokenOut: rewardsToken,
+            fee: REWARDS_POOL_FEE,
+            recipient: address(this),
+            deadline: block.timestamp,
+            amountIn: _amountIn,
+            amountOutMinimum: (_amountOut * (1000 - _slippage)) / 1000,
+            sqrtPriceLimitX96: 0
+          })
+        )
+      {
+        if (_adminAmt > 0) {
+          IERC20(PAIRED_LP_TOKEN).safeTransfer(
+            Ownable(address(V3_TWAP_UTILS)).owner(),
+            _adminAmt
+          );
+        }
+        _rewardsSwapSlippage = 10;
+        _depositRewards(
+          IERC20(rewardsToken).balanceOf(address(this)) - _rewardsBalBefore
+        );
+      } catch {
+        if (_rewardsSwapSlippage < 200) {
+          _rewardsSwapSlippage += 10;
+        }
+        IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(V3_ROUTER, _amountIn);
+      }
     }
   }
 

@@ -6,6 +6,7 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
+import './interfaces/ICamelotRouter.sol';
 import './interfaces/IDecentralizedIndex.sol';
 import './interfaces/IFlashLoanRecipient.sol';
 import './interfaces/IProtocolFeeRouter.sol';
@@ -126,6 +127,7 @@ abstract contract DecentralizedIndex is
         _v2Pool,
         _lpRewardsToken,
         _stakeRestriction ? _msgSender() : address(0),
+        V3_ROUTER,
         PROTOCOL_FEE_ROUTER,
         V3_TWAP_UTILS
       )
@@ -208,14 +210,26 @@ abstract contract DecentralizedIndex is
     address _recipient = PAIRED_LP_TOKEN == lpRewardsToken
       ? address(this)
       : _rewards;
-    IUniswapV2Router02(V2_ROUTER)
-      .swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        _amount,
-        0,
-        path,
-        _recipient,
-        block.timestamp
-      );
+    if (block.chainid == 42161) {
+      ICamelotRouter(V2_ROUTER)
+        .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+          _amount,
+          0,
+          path,
+          _recipient,
+          Ownable(address(V3_TWAP_UTILS)).owner(),
+          block.timestamp
+        );
+    } else {
+      IUniswapV2Router02(V2_ROUTER)
+        .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+          _amount,
+          0,
+          path,
+          _recipient,
+          block.timestamp
+        );
+    }
     if (PAIRED_LP_TOKEN == lpRewardsToken) {
       uint256 _newPairedLpTkns = IERC20(PAIRED_LP_TOKEN).balanceOf(
         address(this)
