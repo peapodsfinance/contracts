@@ -45,31 +45,33 @@ contract Zapper is IZapper, Context, Ownable {
     V3_TWAP_UTILS = _v3TwapUtilities;
     WETH = IUniswapV2Router02(_v2Router).WETH();
 
-    // WETH/YETH
-    _setZapMapFromPoolSingle(
-      PoolType.CURVE,
-      0x69ACcb968B19a53790f43e57558F5E443A91aF22
-    );
-    // WETH/DAI
-    _setZapMapFromPoolSingle(
-      PoolType.V3,
-      0x60594a405d53811d3BC4766596EFD80fd545A270
-    );
-    // WETH/USDC
-    _setZapMapFromPoolSingle(
-      PoolType.V3,
-      0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640
-    );
-    // WETH/OHM
-    _setZapMapFromPoolSingle(
-      PoolType.V3,
-      0x88051B0eea095007D3bEf21aB287Be961f3d8598
-    );
-    // USDC/OHM
-    _setZapMapFromPoolSingle(
-      PoolType.V3,
-      0x893f503FaC2Ee1e5B78665db23F9c94017Aae97D
-    );
+    if (block.chainid == 1) {
+      // WETH/YETH
+      _setZapMapFromPoolSingle(
+        PoolType.CURVE,
+        0x69ACcb968B19a53790f43e57558F5E443A91aF22
+      );
+      // WETH/DAI
+      _setZapMapFromPoolSingle(
+        PoolType.V3,
+        0x60594a405d53811d3BC4766596EFD80fd545A270
+      );
+      // WETH/USDC
+      _setZapMapFromPoolSingle(
+        PoolType.V3,
+        0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640
+      );
+      // WETH/OHM
+      _setZapMapFromPoolSingle(
+        PoolType.V3,
+        0x88051B0eea095007D3bEf21aB287Be961f3d8598
+      );
+      // USDC/OHM
+      _setZapMapFromPoolSingle(
+        PoolType.V3,
+        0x893f503FaC2Ee1e5B78665db23F9c94017Aae97D
+      );
+    }
   }
 
   function _zap(

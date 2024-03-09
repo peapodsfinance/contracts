@@ -34,6 +34,7 @@ interface IDecentralizedIndex is IERC20 {
   }
 
   event Create(address indexed newIdx, address indexed wallet);
+  event Initialize(address indexed wallet, address v2Pool);
   event Bond(
     address indexed wallet,
     address indexed token,

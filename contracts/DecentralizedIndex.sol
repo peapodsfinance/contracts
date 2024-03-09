@@ -10,6 +10,7 @@ import './interfaces/ICamelotRouter.sol';
 import './interfaces/IDecentralizedIndex.sol';
 import './interfaces/IFlashLoanRecipient.sol';
 import './interfaces/IProtocolFeeRouter.sol';
+import './interfaces/IRewardsWhitelister.sol';
 import './interfaces/ITokenRewards.sol';
 import './interfaces/IUniswapV2Factory.sol';
 import './interfaces/IUniswapV2Router02.sol';
@@ -28,19 +29,21 @@ abstract contract DecentralizedIndex is
   address constant V3_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
   IProtocolFeeRouter constant PROTOCOL_FEE_ROUTER =
     IProtocolFeeRouter(0x7d544DD34ABbE24C8832db27820Ff53C151e949b);
+  IRewardsWhitelister constant REWARDS_WHITELIST =
+    IRewardsWhitelister(address(0)); // TODO
   IV3TwapUtilities constant V3_TWAP_UTILS =
     IV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D);
 
   uint64 public constant override FLASH_FEE = 10; // 10 DAI
   address public immutable override PAIRED_LP_TOKEN;
   address immutable V2_ROUTER;
-  address immutable V2_POOL;
   address immutable WETH;
+  address V2_POOL;
 
   IndexType public immutable override indexType;
   uint256 public immutable override created;
-  address public immutable override lpStakingPool;
   address public immutable override lpRewardsToken;
+  address public override lpStakingPool;
 
   Config public config;
   Fees public fees;
@@ -55,6 +58,8 @@ abstract contract DecentralizedIndex is
   uint8 _swapping;
   uint8 _swapAndFeeOn = 1;
   uint8 _unlocked = 1;
+  bool _stakeRestriction;
+  bool _initialized;
 
   event FlashLoan(
     address indexed executor,
@@ -98,43 +103,59 @@ abstract contract DecentralizedIndex is
     address _pairedLpToken,
     address _lpRewardsToken,
     address _v2Router,
-    bool _stakeRestriction
+    bool __stakeRestriction
   ) ERC20(_name, _symbol) ERC20Permit(_name) {
-    require(_fees.buy <= (DEN * 20) / 100, 'lte20%');
-    require(_fees.sell <= (DEN * 20) / 100, 'lte20%');
-    require(_fees.burn <= (DEN * 70) / 100, 'lte70%');
-    require(_fees.bond <= (DEN * 99) / 100, 'lt99%');
-    require(_fees.debond <= (DEN * 99) / 100, 'lt99%');
-    require(_fees.partner <= (DEN * 5) / 100, 'lte5%');
+    require(_fees.buy <= (uint256(DEN) * 20) / 100, 'lte20%');
+    require(_fees.sell <= (uint256(DEN) * 20) / 100, 'lte20%');
+    require(_fees.burn <= (uint256(DEN) * 70) / 100, 'lte70%');
+    require(_fees.bond <= (uint256(DEN) * 99) / 100, 'lt99%');
+    require(_fees.debond <= (uint256(DEN) * 99) / 100, 'lt99%');
+    require(_fees.partner <= (uint256(DEN) * 5) / 100, 'lte5%');
 
     indexType = _idxType;
     created = block.timestamp;
     fees = _fees;
     config = _config;
     lpRewardsToken = _lpRewardsToken;
+    _stakeRestriction = __stakeRestriction;
     V2_ROUTER = _v2Router;
     address _finalPairedLpToken = _pairedLpToken == address(0)
       ? DAI
       : _pairedLpToken;
     PAIRED_LP_TOKEN = _finalPairedLpToken;
-    address _v2Pool = IUniswapV2Factory(IUniswapV2Router02(_v2Router).factory())
-      .createPair(address(this), _finalPairedLpToken);
     lpStakingPool = address(
       new StakingPoolToken(
-        string(abi.encodePacked('Staked ', _name)),
-        string(abi.encodePacked('s', _symbol)),
-        _finalPairedLpToken,
-        _v2Pool,
-        _lpRewardsToken,
+        string(abi.encodePacked('Staked ', name())),
+        string(abi.encodePacked('s', symbol())),
+        PAIRED_LP_TOKEN,
+        lpRewardsToken,
         _stakeRestriction ? _msgSender() : address(0),
         V3_ROUTER,
         PROTOCOL_FEE_ROUTER,
+        REWARDS_WHITELIST,
         V3_TWAP_UTILS
       )
     );
-    V2_POOL = _v2Pool;
+    if (block.chainid != 42161) {
+      _initialize();
+    }
     WETH = IUniswapV2Router02(_v2Router).WETH();
     emit Create(address(this), _msgSender());
+  }
+
+  function initialize() external {
+    _initialize();
+  }
+
+  function _initialize() internal {
+    require(!_initialized, 'ONCE');
+    _initialized = true;
+    address _v2Pool = IUniswapV2Factory(IUniswapV2Router02(V2_ROUTER).factory())
+      .createPair(address(this), PAIRED_LP_TOKEN);
+    StakingPoolToken(lpStakingPool).setStakingToken(_v2Pool);
+    StakingPoolToken(lpStakingPool).renounceOwnership();
+    V2_POOL = _v2Pool;
+    emit Initialize(_msgSender(), _v2Pool);
   }
 
   function _transfer(
@@ -142,6 +163,7 @@ abstract contract DecentralizedIndex is
     address _to,
     uint256 _amount
   ) internal virtual override {
+    require(_initialized, 'INIT');
     require(!_blacklist[_to], 'BLKLST');
     bool _buy = _from == V2_POOL && _to != address(V2_ROUTER);
     bool _sell = _to == V2_POOL;
@@ -239,7 +261,10 @@ abstract contract DecentralizedIndex is
           _rewards,
           _newPairedLpTkns
         );
-        ITokenRewards(_rewards).depositRewards(_newPairedLpTkns);
+        ITokenRewards(_rewards).depositRewards(
+          PAIRED_LP_TOKEN,
+          _newPairedLpTkns
+        );
       }
     } else if (IERC20(PAIRED_LP_TOKEN).balanceOf(_rewards) > 0) {
       ITokenRewards(_rewards).depositFromPairedLpToken(0, 0);
@@ -260,6 +285,7 @@ abstract contract DecentralizedIndex is
   }
 
   function _bond() internal {
+    require(_initialized, 'INIT');
     if (_partnerFirstWrapped == 0 && _msgSender() == config.partner) {
       _partnerFirstWrapped = uint64(block.timestamp);
     }
@@ -422,7 +448,7 @@ abstract contract DecentralizedIndex is
     IERC20(DAI).safeTransferFrom(_msgSender(), _feeRecipient, _amountDAI);
     if (lpRewardsToken == DAI) {
       IERC20(DAI).safeIncreaseAllowance(_rewards, _amountDAI);
-      ITokenRewards(_rewards).depositRewards(_amountDAI);
+      ITokenRewards(_rewards).depositRewards(DAI, _amountDAI);
     }
     uint256 _balance = IERC20(_token).balanceOf(address(this));
     IERC20(_token).safeTransfer(_recipient, _amount);

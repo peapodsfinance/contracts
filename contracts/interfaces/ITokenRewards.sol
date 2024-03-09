@@ -8,9 +8,17 @@ interface ITokenRewards {
 
   event ClaimReward(address indexed wallet);
 
-  event DistributeReward(address indexed wallet, uint256 amount);
+  event DistributeReward(
+    address indexed wallet,
+    address indexed token,
+    uint256 amount
+  );
 
-  event DepositRewards(address indexed wallet, uint256 amount);
+  event DepositRewards(
+    address indexed wallet,
+    address indexed token,
+    uint256 amount
+  );
 
   function totalShares() external view returns (uint256);
 
@@ -25,7 +33,7 @@ interface ITokenRewards {
     uint256 slippageOverride
   ) external;
 
-  function depositRewards(uint256 amount) external;
+  function depositRewards(address token, uint256 amount) external;
 
   function claimReward(address wallet) external;
 
