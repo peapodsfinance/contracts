@@ -185,6 +185,9 @@ contract WeightedIndex is DecentralizedIndex {
         IERC20(indexTokens[_i].token).safeTransfer(_msgSender(), _debondAmount);
       }
     }
+    // an arbitrage path of buy pTKN > debond > sell TKN does not trigger rewards
+    // so let's trigger processing here at debond to keep things moving along
+    _processPreSwapFeesAndSwap();
     emit Debond(_msgSender(), _amount);
   }
 

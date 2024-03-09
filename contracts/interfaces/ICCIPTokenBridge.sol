@@ -14,7 +14,8 @@ interface ICCIPTokenBridge {
     uint64 indexed chainSelector,
     address receiver,
     address token,
-    uint256 amount,
+    uint256 amountDesired,
+    uint256 amountActual,
     uint256 fees
   );
 

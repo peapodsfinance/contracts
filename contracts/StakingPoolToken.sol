@@ -27,6 +27,7 @@ contract StakingPoolToken is IStakingPoolToken, ERC20 {
     address _stakingToken,
     address _rewardsToken,
     address _stakeUserRestriction,
+    address _v3Router,
     IProtocolFeeRouter _feeRouter,
     IV3TwapUtilities _v3TwapUtilities
   ) ERC20(_name, _symbol) {
@@ -37,6 +38,7 @@ contract StakingPoolToken is IStakingPoolToken, ERC20 {
       new TokenRewards(
         _feeRouter,
         _v3TwapUtilities,
+        _v3Router,
         indexFund,
         _pairedLpToken,
         address(this),

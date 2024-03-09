@@ -6,6 +6,7 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
+import './interfaces/ICamelotRouter.sol';
 import './interfaces/IDecentralizedIndex.sol';
 import './interfaces/IFlashLoanRecipient.sol';
 import './interfaces/IProtocolFeeRouter.sol';
@@ -126,6 +127,7 @@ abstract contract DecentralizedIndex is
         _v2Pool,
         _lpRewardsToken,
         _stakeRestriction ? _msgSender() : address(0),
+        V3_ROUTER,
         PROTOCOL_FEE_ROUTER,
         V3_TWAP_UTILS
       )
@@ -174,13 +176,11 @@ abstract contract DecentralizedIndex is
     }
     uint256 _lpBal = balanceOf(V2_POOL);
     uint256 _min = (_lpBal * 25) / 100000; // 0.025% LP bal
+    uint256 _max = _lpBal / 100; // 1%
     if (_passesSwapDelay && _bal >= _min && _lpBal > 0) {
-      _min = _min == 0 ? _bal : _min;
       _swapping = 1;
       _lastSwap = uint64(block.timestamp);
-      uint256 _totalAmt = _bal >= _min * 10 ? _min * 10 : _bal >= _min * 5
-        ? _min * 5
-        : _min;
+      uint256 _totalAmt = _bal > _max ? _max : _bal;
       uint256 _partnerAmt;
       if (fees.partner > 0 && config.partner != address(0)) {
         _partnerAmt = (_totalAmt * fees.partner) / DEN;
@@ -210,14 +210,26 @@ abstract contract DecentralizedIndex is
     address _recipient = PAIRED_LP_TOKEN == lpRewardsToken
       ? address(this)
       : _rewards;
-    IUniswapV2Router02(V2_ROUTER)
-      .swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        _amount,
-        0,
-        path,
-        _recipient,
-        block.timestamp
-      );
+    if (block.chainid == 42161) {
+      ICamelotRouter(V2_ROUTER)
+        .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+          _amount,
+          0,
+          path,
+          _recipient,
+          Ownable(address(V3_TWAP_UTILS)).owner(),
+          block.timestamp
+        );
+    } else {
+      IUniswapV2Router02(V2_ROUTER)
+        .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+          _amount,
+          0,
+          path,
+          _recipient,
+          block.timestamp
+        );
+    }
     if (PAIRED_LP_TOKEN == lpRewardsToken) {
       uint256 _newPairedLpTkns = IERC20(PAIRED_LP_TOKEN).balanceOf(
         address(this)
