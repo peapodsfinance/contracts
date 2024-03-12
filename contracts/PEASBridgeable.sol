@@ -15,11 +15,6 @@ contract PEASBridgeable is IERC20Bridgeable, PEAS, ERC20Permit, Ownable {
   event Mint(address indexed minter, address indexed wallet, uint256 amount);
   event SetMinter(address indexed wallet, bool isMinter);
 
-  modifier onlyMinter() {
-    require(minter[_msgSender()], 'MINTER');
-    _;
-  }
-
   constructor() PEAS('Wrapped PEAS', 'wPEAS') ERC20Permit('Wrapped PEAS') {
     _burn(_msgSender(), balanceOf(_msgSender()));
   }
@@ -29,7 +24,8 @@ contract PEASBridgeable is IERC20Bridgeable, PEAS, ERC20Permit, Ownable {
     emit Burn(_msgSender(), _amount);
   }
 
-  function mint(address _wallet, uint256 _amount) external override onlyMinter {
+  function mint(address _wallet, uint256 _amount) external override {
+    require(minter[_msgSender()], 'MINTER');
     require(totalSupply() + _amount <= MAX_SUPPLY, 'MAXSUP');
     _mint(_wallet, _amount);
     emit Mint(_msgSender(), _wallet, _amount);

@@ -135,7 +135,7 @@ contract Zapper is IZapper, Context, Ownable {
           _amountOut = _swapV3Multi(
             _in,
             IUniswapV3Pool(_poolInfo.pool1).fee(),
-            _t0 == _in ? IUniswapV3Pool(_poolInfo.pool1).token0() : _t0,
+            _t0 == _in ? IUniswapV3Pool(_poolInfo.pool1).token1() : _t0,
             IUniswapV3Pool(_poolInfo.pool2).fee(),
             _out,
             _amountIn,
@@ -173,7 +173,7 @@ contract Zapper is IZapper, Context, Ownable {
     address _out,
     uint256 _amountIn,
     uint256 _amountOutMin
-  ) internal returns (uint256 _amountOut) {
+  ) internal returns (uint256) {
     if (_amountOutMin == 0) {
       address _v3Pool;
       try
@@ -286,7 +286,7 @@ contract Zapper is IZapper, Context, Ownable {
     uint256 _ethAmount,
     uint256 _minYethAmount,
     bool _stakeToStyeth
-  ) internal returns (uint256 _amountOut) {
+  ) internal returns (uint256) {
     uint256 _boughtYeth = _swapCurve(
       WETH_YETH_POOL,
       0,
@@ -295,6 +295,7 @@ contract Zapper is IZapper, Context, Ownable {
       _minYethAmount
     );
     if (_stakeToStyeth) {
+      IERC20(YETH).safeIncreaseAllowance(STYETH, _boughtYeth);
       return IERC4626(STYETH).deposit(_boughtYeth, address(this));
     }
     return _boughtYeth;
@@ -304,12 +305,12 @@ contract Zapper is IZapper, Context, Ownable {
     uint256 _stYethAmount,
     uint256 _minWethAmount,
     bool _isYethOnly
-  ) internal returns (uint256 _amountOut) {
+  ) internal returns (uint256) {
     uint256 _yethAmount;
     if (_isYethOnly) {
       _yethAmount = _stYethAmount;
     } else {
-      _yethAmount = IERC4626(STYETH).withdraw(
+      _yethAmount = IERC4626(STYETH).redeem(
         _stYethAmount,
         address(this),
         address(this)
@@ -344,6 +345,7 @@ contract Zapper is IZapper, Context, Ownable {
   }
 
   function setSlippage(uint256 _slip) external onlyOwner {
+    require(_slip >= 0 && _slip <= 1000, 'BOUNDS');
     _slippage = _slip;
   }
 

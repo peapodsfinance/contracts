@@ -56,11 +56,6 @@ contract TokenRewards is ITokenRewards, Context {
   address[] _allRewardsTokens;
   mapping(address => bool) _depositedRewardsToken;
 
-  modifier onlyTrackingToken() {
-    require(_msgSender() == trackingToken, 'UNAUTHORIZED');
-    _;
-  }
-
   constructor(
     IProtocolFeeRouter _feeRouter,
     IRewardsWhitelister _rewardsWhitelist,
@@ -85,7 +80,8 @@ contract TokenRewards is ITokenRewards, Context {
     address _wallet,
     uint256 _amount,
     bool _sharesRemoving
-  ) external override onlyTrackingToken {
+  ) external override {
+    require(_msgSender() == trackingToken, 'UNAUTHORIZED');
     _setShares(_wallet, _amount, _sharesRemoving);
   }
 
@@ -128,12 +124,6 @@ contract TokenRewards is ITokenRewards, Context {
 
   function _processFeesIfApplicable() internal {
     IDecentralizedIndex(INDEX_FUND).processPreSwapFeesAndSwap();
-    if (
-      rewardsToken != PAIRED_LP_TOKEN &&
-      IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) > 0
-    ) {
-      depositFromPairedLpToken(0, 0);
-    }
   }
 
   function depositFromPairedLpToken(
@@ -163,20 +153,18 @@ contract TokenRewards is ITokenRewards, Context {
       ? (PAIRED_LP_TOKEN, rewardsToken)
       : (rewardsToken, PAIRED_LP_TOKEN);
     address _pool;
-    try
-      V3_TWAP_UTILS.getV3Pool(
-        IPeripheryImmutableState(V3_ROUTER).factory(),
-        _token0,
-        _token1,
-        REWARDS_POOL_FEE
-      )
-    returns (address __pool) {
-      _pool = __pool;
-    } catch {
+    if (block.chainid == 42161) {
       _pool = V3_TWAP_UTILS.getV3Pool(
         IPeripheryImmutableState(V3_ROUTER).factory(),
         _token0,
         _token1
+      );
+    } else {
+      _pool = V3_TWAP_UTILS.getV3Pool(
+        IPeripheryImmutableState(V3_ROUTER).factory(),
+        _token0,
+        _token1,
+        REWARDS_POOL_FEE
       );
     }
     uint160 _rewardsSqrtPriceX96 = V3_TWAP_UTILS
@@ -192,7 +180,13 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 _slippage = _slippageOverride > 0
       ? _slippageOverride
       : _rewardsSwapSlippage;
-    _swapForRewards(_amountTkn, _amountOut, _slippage, _adminAmt);
+    _swapForRewards(
+      _amountTkn,
+      _amountOut,
+      _slippage,
+      _slippageOverride > 0,
+      _adminAmt
+    );
   }
 
   function depositRewards(address _token, uint256 _amount) external override {
@@ -254,10 +248,6 @@ contract TokenRewards is ITokenRewards, Context {
         IERC20(_token).safeTransfer(_wallet, _amount);
         emit DistributeReward(_wallet, _token, _amount);
       }
-      rewards[_token][_wallet].excluded = _cumulativeRewards(
-        _token,
-        shares[_wallet]
-      );
     }
   }
 
@@ -287,6 +277,7 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 _amountIn,
     uint256 _amountOut,
     uint256 _slippage,
+    bool _isSlipOverride,
     uint256 _adminAmt
   ) internal {
     uint256 _rewardsBalBefore = IERC20(rewardsToken).balanceOf(address(this));
@@ -310,13 +301,13 @@ contract TokenRewards is ITokenRewards, Context {
             _adminAmt
           );
         }
-        _rewardsSwapSlippage = 10;
+        _rewardsSwapSlippage = 20;
         _depositRewards(
           rewardsToken,
           IERC20(rewardsToken).balanceOf(address(this)) - _rewardsBalBefore
         );
       } catch {
-        if (_rewardsSwapSlippage < 200) {
+        if (!_isSlipOverride && _rewardsSwapSlippage < 200) {
           _rewardsSwapSlippage += 10;
         }
         IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(V3_ROUTER, _amountIn);

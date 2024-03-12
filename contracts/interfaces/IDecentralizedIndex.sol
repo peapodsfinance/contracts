@@ -48,12 +48,14 @@ interface IDecentralizedIndex is IERC20 {
     uint256 amountDAI
   );
   event RemoveLiquidity(address indexed wallet, uint256 amountLiquidity);
+  event SetPartner(address indexed wallet, address newPartner);
+  event SetPartnerFee(address indexed wallet, uint16 newFee);
 
   function BOND_FEE() external view returns (uint16);
 
   function DEBOND_FEE() external view returns (uint16);
 
-  function FLASH_FEE() external view returns (uint64);
+  function FLASH_FEE_AMOUNT_DAI() external view returns (uint256);
 
   function PAIRED_LP_TOKEN() external view returns (address);
 

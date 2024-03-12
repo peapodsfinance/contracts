@@ -11,6 +11,15 @@ interface ICCIPTokenRouter {
     address targetToken;
   }
 
+  event SetConfigEnabled(
+    address indexed wallet,
+    address sourceToken,
+    uint64 targetChain,
+    bool isEnabled
+  );
+  event SetGlobalEnabled(address indexed wallet, bool isEnabled);
+  event SetTargetGasChainLimit(address indexed wallet, uint256 newLimit);
+
   function globalEnabled() external view returns (bool);
 
   function targetChainGasLimit() external view returns (uint256);

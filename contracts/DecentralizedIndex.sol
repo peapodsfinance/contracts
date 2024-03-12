@@ -30,11 +30,11 @@ abstract contract DecentralizedIndex is
   IProtocolFeeRouter constant PROTOCOL_FEE_ROUTER =
     IProtocolFeeRouter(0x7d544DD34ABbE24C8832db27820Ff53C151e949b);
   IRewardsWhitelister constant REWARDS_WHITELIST =
-    IRewardsWhitelister(address(0)); // TODO
+    IRewardsWhitelister(0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F);
   IV3TwapUtilities constant V3_TWAP_UTILS =
     IV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D);
 
-  uint64 public constant override FLASH_FEE = 10; // 10 DAI
+  uint256 public immutable override FLASH_FEE_AMOUNT_DAI; // 10 DAI
   address public immutable override PAIRED_LP_TOKEN;
   address immutable V2_ROUTER;
   address immutable WETH;
@@ -58,7 +58,6 @@ abstract contract DecentralizedIndex is
   uint8 _swapping;
   uint8 _swapAndFeeOn = 1;
   uint8 _unlocked = 1;
-  bool _stakeRestriction;
   bool _initialized;
 
   event FlashLoan(
@@ -69,22 +68,14 @@ abstract contract DecentralizedIndex is
   );
 
   modifier lock() {
-    require(_unlocked == 1, 'LOCKED');
+    require(_unlocked == 1, 'L');
     _unlocked = 0;
     _;
     _unlocked = 1;
   }
 
   modifier onlyPartner() {
-    require(_msgSender() == config.partner, 'PARTNER');
-    _;
-  }
-
-  modifier onlyRewards() {
-    require(
-      _msgSender() == StakingPoolToken(lpStakingPool).poolRewards(),
-      'REWARDS'
-    );
+    require(_msgSender() == config.partner, 'P');
     _;
   }
 
@@ -103,31 +94,31 @@ abstract contract DecentralizedIndex is
     address _pairedLpToken,
     address _lpRewardsToken,
     address _v2Router,
-    bool __stakeRestriction
+    bool _stakeRestriction
   ) ERC20(_name, _symbol) ERC20Permit(_name) {
-    require(_fees.buy <= (uint256(DEN) * 20) / 100, 'lte20%');
-    require(_fees.sell <= (uint256(DEN) * 20) / 100, 'lte20%');
-    require(_fees.burn <= (uint256(DEN) * 70) / 100, 'lte70%');
-    require(_fees.bond <= (uint256(DEN) * 99) / 100, 'lt99%');
-    require(_fees.debond <= (uint256(DEN) * 99) / 100, 'lt99%');
-    require(_fees.partner <= (uint256(DEN) * 5) / 100, 'lte5%');
+    require(_fees.buy <= (uint256(DEN) * 20) / 100);
+    require(_fees.sell <= (uint256(DEN) * 20) / 100);
+    require(_fees.burn <= (uint256(DEN) * 70) / 100);
+    require(_fees.bond <= (uint256(DEN) * 99) / 100);
+    require(_fees.debond <= (uint256(DEN) * 99) / 100);
+    require(_fees.partner <= (uint256(DEN) * 5) / 100);
 
     indexType = _idxType;
     created = block.timestamp;
     fees = _fees;
     config = _config;
     lpRewardsToken = _lpRewardsToken;
-    _stakeRestriction = __stakeRestriction;
     V2_ROUTER = _v2Router;
     address _finalPairedLpToken = _pairedLpToken == address(0)
       ? DAI
       : _pairedLpToken;
     PAIRED_LP_TOKEN = _finalPairedLpToken;
+    FLASH_FEE_AMOUNT_DAI = 10 * 10 ** IERC20Metadata(DAI).decimals(); // 10 DAI
     lpStakingPool = address(
       new StakingPoolToken(
-        string(abi.encodePacked('Staked ', name())),
-        string(abi.encodePacked('s', symbol())),
-        PAIRED_LP_TOKEN,
+        string.concat('Staked ', _name),
+        string.concat('s', _symbol),
+        _finalPairedLpToken,
         lpRewardsToken,
         _stakeRestriction ? _msgSender() : address(0),
         V3_ROUTER,
@@ -148,10 +139,14 @@ abstract contract DecentralizedIndex is
   }
 
   function _initialize() internal {
-    require(!_initialized, 'ONCE');
+    require(!_initialized, 'O');
     _initialized = true;
     address _v2Pool = IUniswapV2Factory(IUniswapV2Router02(V2_ROUTER).factory())
-      .createPair(address(this), PAIRED_LP_TOKEN);
+      .getPair(address(this), PAIRED_LP_TOKEN);
+    if (_v2Pool == address(0)) {
+      _v2Pool = IUniswapV2Factory(IUniswapV2Router02(V2_ROUTER).factory())
+        .createPair(address(this), PAIRED_LP_TOKEN);
+    }
     StakingPoolToken(lpStakingPool).setStakingToken(_v2Pool);
     StakingPoolToken(lpStakingPool).renounceOwnership();
     V2_POOL = _v2Pool;
@@ -163,9 +158,8 @@ abstract contract DecentralizedIndex is
     address _to,
     uint256 _amount
   ) internal virtual override {
-    require(_initialized, 'INIT');
-    require(!_blacklist[_to], 'BLKLST');
-    bool _buy = _from == V2_POOL && _to != address(V2_ROUTER);
+    require(!_blacklist[_to], 'BK');
+    bool _buy = _from == V2_POOL && _to != V2_ROUTER;
     bool _sell = _to == V2_POOL;
     uint256 _fee;
     if (_swapping == 0 && _swapAndFeeOn == 1) {
@@ -180,9 +174,9 @@ abstract contract DecentralizedIndex is
         _fee = (_amount * fees.sell) / DEN;
         super._transfer(_from, address(this), _fee);
       }
-      if (config.hasTransferTax && !_buy && !_sell) {
+      if (!_buy && !_sell && config.hasTransferTax) {
         _fee = _amount / 10000; // 0.01%
-        _fee = _fee == 0 ? 1 : _fee;
+        _fee = _fee == 0 && _amount > 0 ? 1 : _fee;
         super._transfer(_from, address(this), _fee);
       }
     }
@@ -192,19 +186,26 @@ abstract contract DecentralizedIndex is
 
   function _processPreSwapFeesAndSwap() internal {
     bool _passesSwapDelay = block.timestamp > _lastSwap + SWAP_DELAY;
+    if (!_passesSwapDelay) {
+      return;
+    }
     uint256 _bal = balanceOf(address(this));
     if (_bal == 0) {
       return;
     }
     uint256 _lpBal = balanceOf(V2_POOL);
-    uint256 _min = (_lpBal * 25) / 100000; // 0.025% LP bal
+    uint256 _min = block.chainid == 1 ? _lpBal / 1000 : _lpBal / 4000; // 0.1%/0.025% LP bal
     uint256 _max = _lpBal / 100; // 1%
-    if (_passesSwapDelay && _bal >= _min && _lpBal > 0) {
+    if (_bal >= _min && _lpBal > 0) {
       _swapping = 1;
       _lastSwap = uint64(block.timestamp);
       uint256 _totalAmt = _bal > _max ? _max : _bal;
       uint256 _partnerAmt;
-      if (fees.partner > 0 && config.partner != address(0)) {
+      if (
+        fees.partner > 0 &&
+        config.partner != address(0) &&
+        !_blacklist[config.partner]
+      ) {
         _partnerAmt = (_totalAmt * fees.partner) / DEN;
         super._transfer(address(this), config.partner, _partnerAmt);
       }
@@ -278,14 +279,11 @@ abstract contract DecentralizedIndex is
   ) internal {
     uint256 _balanceBefore = _token.balanceOf(address(this));
     _token.safeTransferFrom(_sender, address(this), _amount);
-    require(
-      _token.balanceOf(address(this)) >= _balanceBefore + _amount,
-      'TFRVAL'
-    );
+    require(_token.balanceOf(address(this)) >= _balanceBefore + _amount, 'TV');
   }
 
   function _bond() internal {
-    require(_initialized, 'INIT');
+    require(_initialized, 'I');
     if (_partnerFirstWrapped == 0 && _msgSender() == config.partner) {
       _partnerFirstWrapped = uint64(block.timestamp);
     }
@@ -307,7 +305,8 @@ abstract contract DecentralizedIndex is
     return _debondAmount >= (totalSupply() * 98) / 100;
   }
 
-  function processPreSwapFeesAndSwap() external override onlyRewards {
+  function processPreSwapFeesAndSwap() external override {
+    require(_msgSender() == StakingPoolToken(lpStakingPool).poolRewards(), 'R');
     _processPreSwapFeesAndSwap();
   }
 
@@ -415,7 +414,7 @@ abstract contract DecentralizedIndex is
     _lpTokens = _lpTokens == 0
       ? IERC20(V2_POOL).balanceOf(_msgSender())
       : _lpTokens;
-    require(_lpTokens > 0, 'LPREM');
+    require(_lpTokens > 0, 'LT');
 
     IERC20(V2_POOL).safeTransferFrom(_msgSender(), address(this), _lpTokens);
     IERC20(V2_POOL).safeIncreaseAllowance(V2_ROUTER, _lpTokens);
@@ -437,38 +436,43 @@ abstract contract DecentralizedIndex is
     uint256 _amount,
     bytes calldata _data
   ) external override lock {
-    require(_isTokenInIndex[_token], 'ONLYPODTKN');
-    uint256 _amountDAI = FLASH_FEE * 10 ** IERC20Metadata(DAI).decimals();
+    require(_isTokenInIndex[_token], 'X');
     address _rewards = StakingPoolToken(lpStakingPool).poolRewards();
     address _feeRecipient = lpRewardsToken == DAI
       ? address(this)
       : PAIRED_LP_TOKEN == DAI
       ? _rewards
       : Ownable(address(V3_TWAP_UTILS)).owner();
-    IERC20(DAI).safeTransferFrom(_msgSender(), _feeRecipient, _amountDAI);
+    IERC20(DAI).safeTransferFrom(
+      _msgSender(),
+      _feeRecipient,
+      FLASH_FEE_AMOUNT_DAI
+    );
     if (lpRewardsToken == DAI) {
-      IERC20(DAI).safeIncreaseAllowance(_rewards, _amountDAI);
-      ITokenRewards(_rewards).depositRewards(DAI, _amountDAI);
+      IERC20(DAI).safeIncreaseAllowance(_rewards, FLASH_FEE_AMOUNT_DAI);
+      ITokenRewards(_rewards).depositRewards(DAI, FLASH_FEE_AMOUNT_DAI);
     }
     uint256 _balance = IERC20(_token).balanceOf(address(this));
     IERC20(_token).safeTransfer(_recipient, _amount);
     IFlashLoanRecipient(_recipient).callback(_data);
-    require(IERC20(_token).balanceOf(address(this)) >= _balance, 'FLASHAFTER');
+    require(IERC20(_token).balanceOf(address(this)) >= _balance, 'FA');
     emit FlashLoan(_msgSender(), _recipient, _token, _amount);
   }
 
   function setPartner(address _partner) external onlyPartner {
     config.partner = _partner;
+    emit SetPartner(_msgSender(), _partner);
   }
 
   function setPartnerFee(uint16 _fee) external onlyPartner {
-    require(_fee < fees.partner, 'LTCUR');
+    require(_fee < fees.partner, 'L');
     fees.partner = _fee;
+    emit SetPartnerFee(_msgSender(), _fee);
   }
 
   function rescueERC20(address _token) external lock {
     // cannot withdraw tokens/assets that belong to the index
-    require(!isAsset(_token) && _token != address(this), 'UNAVAILABLE');
+    require(!isAsset(_token) && _token != address(this), 'U');
     IERC20(_token).safeTransfer(
       Ownable(address(V3_TWAP_UTILS)).owner(),
       IERC20(_token).balanceOf(address(this))
@@ -476,10 +480,10 @@ abstract contract DecentralizedIndex is
   }
 
   function rescueETH() external lock {
-    require(address(this).balance > 0, 'NOETH');
+    require(address(this).balance > 0, 'E');
     (bool _sent, ) = Ownable(address(V3_TWAP_UTILS)).owner().call{
       value: address(this).balance
     }('');
-    require(_sent, 'SENT');
+    require(_sent, 'S');
   }
 }

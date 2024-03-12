@@ -4,7 +4,6 @@ pragma solidity ^0.8.19;
 interface ICCIPTokenBridge {
   struct TokenTransfer {
     address tokenReceiver;
-    address sourceToken;
     address targetToken;
     uint256 amount;
   }
