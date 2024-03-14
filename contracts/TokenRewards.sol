@@ -190,12 +190,12 @@ contract TokenRewards is ITokenRewards, Context {
   }
 
   function depositRewards(address _token, uint256 _amount) external override {
+    require(_amount > 0, 'DEPAM');
     require(_isValidRewardsToken(_token), 'VALID');
     if (!_depositedRewardsToken[_token]) {
       _depositedRewardsToken[_token] = true;
       _allRewardsTokens.push(_token);
     }
-    require(_amount > 0, 'DEPAM');
     uint256 _rewardsBalBefore = IERC20(_token).balanceOf(address(this));
     IERC20(_token).safeTransferFrom(_msgSender(), address(this), _amount);
     _depositRewards(
@@ -209,18 +209,21 @@ contract TokenRewards is ITokenRewards, Context {
       return;
     }
     if (totalShares == 0) {
+      require(_token == rewardsToken, 'MAIN');
       _burnRewards(_amountTotal);
       return;
     }
 
     uint256 _depositAmount = _amountTotal;
-    (, uint256 _yieldBurnFee) = _getYieldFees();
-    if (_yieldBurnFee > 0) {
-      uint256 _burnAmount = (_amountTotal * _yieldBurnFee) /
-        PROTOCOL_FEE_ROUTER.protocolFees().DEN();
-      if (_burnAmount > 0) {
-        _burnRewards(_burnAmount);
-        _depositAmount -= _burnAmount;
+    if (_token == rewardsToken) {
+      (, uint256 _yieldBurnFee) = _getYieldFees();
+      if (_yieldBurnFee > 0) {
+        uint256 _burnAmount = (_amountTotal * _yieldBurnFee) /
+          PROTOCOL_FEE_ROUTER.protocolFees().DEN();
+        if (_burnAmount > 0) {
+          _burnRewards(_burnAmount);
+          _depositAmount -= _burnAmount;
+        }
       }
     }
     rewardsDeposited[_token] += _depositAmount;
