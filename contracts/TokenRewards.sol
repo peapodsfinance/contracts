@@ -6,14 +6,12 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Context.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
 import './interfaces/IDecentralizedIndex.sol';
+import './interfaces/IDexAdapter.sol';
 import './interfaces/IPEAS.sol';
 import './interfaces/IRewardsWhitelister.sol';
 import './interfaces/IProtocolFees.sol';
 import './interfaces/IProtocolFeeRouter.sol';
-import './interfaces/ISwapRouterAlgebra.sol';
 import './interfaces/ITokenRewards.sol';
 import './interfaces/IV3TwapUtilities.sol';
 import './libraries/BokkyPooBahsDateTimeLibrary.sol';
@@ -23,11 +21,11 @@ contract TokenRewards is ITokenRewards, Context {
 
   uint256 constant PRECISION = 10 ** 36;
   uint24 constant REWARDS_POOL_FEE = 10000; // 1%
-  address immutable V3_ROUTER;
   address immutable INDEX_FUND;
   address immutable PAIRED_LP_TOKEN;
   IProtocolFeeRouter immutable PROTOCOL_FEE_ROUTER;
   IRewardsWhitelister immutable REWARDS_WHITELISTER;
+  IDexAdapter immutable DEX_HANDLER;
   IV3TwapUtilities immutable V3_TWAP_UTILS;
 
   struct Reward {
@@ -59,8 +57,8 @@ contract TokenRewards is ITokenRewards, Context {
   constructor(
     IProtocolFeeRouter _feeRouter,
     IRewardsWhitelister _rewardsWhitelist,
+    IDexAdapter _dexHandler,
     IV3TwapUtilities _v3TwapUtilities,
-    address _v3Router,
     address _indexFund,
     address _pairedLpToken,
     address _trackingToken,
@@ -68,8 +66,8 @@ contract TokenRewards is ITokenRewards, Context {
   ) {
     PROTOCOL_FEE_ROUTER = _feeRouter;
     REWARDS_WHITELISTER = _rewardsWhitelist;
+    DEX_HANDLER = _dexHandler;
     V3_TWAP_UTILS = _v3TwapUtilities;
-    V3_ROUTER = _v3Router;
     INDEX_FUND = _indexFund;
     PAIRED_LP_TOKEN = _pairedLpToken;
     trackingToken = _trackingToken;
@@ -110,16 +108,18 @@ contract TokenRewards is ITokenRewards, Context {
     if (sharesBefore == 0 && shares[_wallet] > 0) {
       totalStakers++;
     }
+    _resetExcluded(_wallet);
   }
 
   function _removeShares(address _wallet, uint256 _amount) internal {
-    require(shares[_wallet] > 0 && _amount <= shares[_wallet], 'REMOVE');
+    require(shares[_wallet] > 0 && _amount <= shares[_wallet], 'RE');
     _distributeReward(_wallet);
     totalShares -= _amount;
     shares[_wallet] -= _amount;
     if (shares[_wallet] == 0) {
       totalStakers--;
     }
+    _resetExcluded(_wallet);
   }
 
   function _processFeesIfApplicable() internal {
@@ -130,8 +130,8 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 _amountTknDepositing,
     uint256 _slippageOverride
   ) public override {
-    require(PAIRED_LP_TOKEN != rewardsToken, 'LPREWSAME');
-    require(_slippageOverride <= 200, 'MAXSLIP'); // 20%
+    require(PAIRED_LP_TOKEN != rewardsToken, 'R');
+    require(_slippageOverride <= 200, 'MS'); // 20%
     if (_amountTknDepositing > 0) {
       IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
         _msgSender(),
@@ -140,33 +140,13 @@ contract TokenRewards is ITokenRewards, Context {
       );
     }
     uint256 _amountTkn = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
-    require(_amountTkn > 0, 'NEEDTKN');
-    uint256 _adminAmt;
-    (uint256 _yieldAdminFee, ) = _getYieldFees();
-    if (_yieldAdminFee > 0) {
-      _adminAmt =
-        (_amountTkn * _yieldAdminFee) /
-        PROTOCOL_FEE_ROUTER.protocolFees().DEN();
-      _amountTkn -= _adminAmt;
-    }
+    require(_amountTkn > 0, 'A');
+    uint256 _adminAmt = _getAdminFeeFromAmount(_amountTkn);
+    _amountTkn -= _adminAmt;
     (address _token0, address _token1) = PAIRED_LP_TOKEN < rewardsToken
       ? (PAIRED_LP_TOKEN, rewardsToken)
       : (rewardsToken, PAIRED_LP_TOKEN);
-    address _pool;
-    if (block.chainid == 42161) {
-      _pool = V3_TWAP_UTILS.getV3Pool(
-        IPeripheryImmutableState(V3_ROUTER).factory(),
-        _token0,
-        _token1
-      );
-    } else {
-      _pool = V3_TWAP_UTILS.getV3Pool(
-        IPeripheryImmutableState(V3_ROUTER).factory(),
-        _token0,
-        _token1,
-        REWARDS_POOL_FEE
-      );
-    }
+    address _pool = DEX_HANDLER.getV3Pool(_token0, _token1, REWARDS_POOL_FEE);
     uint160 _rewardsSqrtPriceX96 = V3_TWAP_UTILS
       .sqrtPriceX96FromPoolAndInterval(_pool);
     uint256 _rewardsPriceX96 = V3_TWAP_UTILS.priceX96FromSqrtPriceX96(
@@ -176,7 +156,6 @@ contract TokenRewards is ITokenRewards, Context {
       ? (_rewardsPriceX96 * _amountTkn) / FixedPoint96.Q96
       : (_amountTkn * FixedPoint96.Q96) / _rewardsPriceX96;
 
-    IERC20(PAIRED_LP_TOKEN).safeIncreaseAllowance(V3_ROUTER, _amountTkn);
     uint256 _slippage = _slippageOverride > 0
       ? _slippageOverride
       : _rewardsSwapSlippage;
@@ -190,26 +169,52 @@ contract TokenRewards is ITokenRewards, Context {
   }
 
   function depositRewards(address _token, uint256 _amount) external override {
-    require(_amount > 0, 'DEPAM');
-    require(_isValidRewardsToken(_token), 'VALID');
+    _depositRewardsFromToken(_msgSender(), _token, _amount, true);
+  }
+
+  function depositRewardsNoTransfer(
+    address _token,
+    uint256 _amount
+  ) external override {
+    require(_msgSender() == INDEX_FUND, 'AUTH');
+    _depositRewardsFromToken(_msgSender(), _token, _amount, false);
+  }
+
+  function _depositRewardsFromToken(
+    address _user,
+    address _token,
+    uint256 _amount,
+    bool _shouldTransfer
+  ) internal {
+    require(_amount > 0, 'A');
+    require(_isValidRewardsToken(_token), 'V');
+    uint256 _finalAmt = _amount;
+    if (_shouldTransfer) {
+      uint256 _balBefore = IERC20(_token).balanceOf(address(this));
+      IERC20(_token).safeTransferFrom(_user, address(this), _finalAmt);
+      _finalAmt = IERC20(_token).balanceOf(address(this)) - _balBefore;
+    }
+    uint256 _adminAmt = _getAdminFeeFromAmount(_finalAmt);
+    if (_adminAmt > 0) {
+      IERC20(_token).safeTransfer(
+        Ownable(address(V3_TWAP_UTILS)).owner(),
+        _adminAmt
+      );
+      _finalAmt -= _adminAmt;
+    }
+    _depositRewards(_token, _finalAmt);
+  }
+
+  function _depositRewards(address _token, uint256 _amountTotal) internal {
     if (!_depositedRewardsToken[_token]) {
       _depositedRewardsToken[_token] = true;
       _allRewardsTokens.push(_token);
     }
-    uint256 _rewardsBalBefore = IERC20(_token).balanceOf(address(this));
-    IERC20(_token).safeTransferFrom(_msgSender(), address(this), _amount);
-    _depositRewards(
-      _token,
-      IERC20(_token).balanceOf(address(this)) - _rewardsBalBefore
-    );
-  }
-
-  function _depositRewards(address _token, uint256 _amountTotal) internal {
     if (_amountTotal == 0) {
       return;
     }
     if (totalShares == 0) {
-      require(_token == rewardsToken, 'MAIN');
+      require(_token == rewardsToken, 'R');
       _burnRewards(_amountTotal);
       return;
     }
@@ -254,6 +259,16 @@ contract TokenRewards is ITokenRewards, Context {
     }
   }
 
+  function _resetExcluded(address _wallet) internal {
+    for (uint256 _i; _i < _allRewardsTokens.length; _i++) {
+      address _token = _allRewardsTokens[_i];
+      rewards[_token][_wallet].excluded = _cumulativeRewards(
+        _token,
+        shares[_wallet]
+      );
+    }
+  }
+
   function _burnRewards(uint256 _burnAmount) internal {
     try IPEAS(rewardsToken).burn(_burnAmount) {} catch {
       IERC20(rewardsToken).safeTransfer(address(0xdead), _burnAmount);
@@ -262,6 +277,17 @@ contract TokenRewards is ITokenRewards, Context {
 
   function _isValidRewardsToken(address _token) internal view returns (bool) {
     return _token == rewardsToken || REWARDS_WHITELISTER.whitelist(_token);
+  }
+
+  function _getAdminFeeFromAmount(
+    uint256 _amount
+  ) internal view returns (uint256) {
+    (uint256 _yieldAdminFee, ) = _getYieldFees();
+    if (_yieldAdminFee == 0) {
+      return 0;
+    }
+    return
+      (_amount * _yieldAdminFee) / PROTOCOL_FEE_ROUTER.protocolFees().DEN();
   }
 
   function _getYieldFees()
@@ -283,70 +309,40 @@ contract TokenRewards is ITokenRewards, Context {
     bool _isSlipOverride,
     uint256 _adminAmt
   ) internal {
-    uint256 _rewardsBalBefore = IERC20(rewardsToken).balanceOf(address(this));
-    if (block.chainid == 42161) {
-      try
-        ISwapRouterAlgebra(V3_ROUTER).exactInputSingle(
-          ISwapRouterAlgebra.ExactInputSingleParams({
-            tokenIn: PAIRED_LP_TOKEN,
-            tokenOut: rewardsToken,
-            recipient: address(this),
-            deadline: block.timestamp,
-            amountIn: _amountIn,
-            amountOutMinimum: (_amountOut * (1000 - _slippage)) / 1000,
-            limitSqrtPrice: 0
-          })
-        )
-      {
-        if (_adminAmt > 0) {
-          IERC20(PAIRED_LP_TOKEN).safeTransfer(
-            Ownable(address(V3_TWAP_UTILS)).owner(),
-            _adminAmt
-          );
-        }
-        _rewardsSwapSlippage = 20;
-        _depositRewards(
-          rewardsToken,
-          IERC20(rewardsToken).balanceOf(address(this)) - _rewardsBalBefore
+    uint256 _balBefore = IERC20(rewardsToken).balanceOf(address(this));
+    IERC20(PAIRED_LP_TOKEN).safeIncreaseAllowance(
+      address(DEX_HANDLER),
+      _amountIn
+    );
+    try
+      DEX_HANDLER.swapV3Single(
+        PAIRED_LP_TOKEN,
+        rewardsToken,
+        REWARDS_POOL_FEE,
+        _amountIn,
+        (_amountOut * (1000 - _slippage)) / 1000,
+        address(this)
+      )
+    {
+      if (_adminAmt > 0) {
+        IERC20(PAIRED_LP_TOKEN).safeTransfer(
+          Ownable(address(V3_TWAP_UTILS)).owner(),
+          _adminAmt
         );
-      } catch {
-        if (!_isSlipOverride && _rewardsSwapSlippage < 200) {
-          _rewardsSwapSlippage += 10;
-        }
-        IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(V3_ROUTER, _amountIn);
       }
-    } else {
-      try
-        ISwapRouter(V3_ROUTER).exactInputSingle(
-          ISwapRouter.ExactInputSingleParams({
-            tokenIn: PAIRED_LP_TOKEN,
-            tokenOut: rewardsToken,
-            fee: REWARDS_POOL_FEE,
-            recipient: address(this),
-            deadline: block.timestamp,
-            amountIn: _amountIn,
-            amountOutMinimum: (_amountOut * (1000 - _slippage)) / 1000,
-            sqrtPriceLimitX96: 0
-          })
-        )
-      {
-        if (_adminAmt > 0) {
-          IERC20(PAIRED_LP_TOKEN).safeTransfer(
-            Ownable(address(V3_TWAP_UTILS)).owner(),
-            _adminAmt
-          );
-        }
-        _rewardsSwapSlippage = 10;
-        _depositRewards(
-          rewardsToken,
-          IERC20(rewardsToken).balanceOf(address(this)) - _rewardsBalBefore
-        );
-      } catch {
-        if (_rewardsSwapSlippage < 200) {
-          _rewardsSwapSlippage += 10;
-        }
-        IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(V3_ROUTER, _amountIn);
+      _rewardsSwapSlippage = 20;
+      _depositRewards(
+        rewardsToken,
+        IERC20(rewardsToken).balanceOf(address(this)) - _balBefore
+      );
+    } catch {
+      if (!_isSlipOverride && _rewardsSwapSlippage < 200) {
+        _rewardsSwapSlippage += 10;
       }
+      IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(
+        address(DEX_HANDLER),
+        _amountIn
+      );
     }
   }
 
@@ -360,18 +356,6 @@ contract TokenRewards is ITokenRewards, Context {
   function claimReward(address _wallet) external override {
     _distributeReward(_wallet);
     emit ClaimReward(_wallet);
-  }
-
-  function getUnpaid(address _wallet) external view returns (uint256) {
-    if (shares[_wallet] == 0) {
-      return 0;
-    }
-    uint256 earnedRewards = _cumulativeRewards(rewardsToken, shares[_wallet]);
-    uint256 rewardsExcluded = rewards[rewardsToken][_wallet].excluded;
-    if (earnedRewards <= rewardsExcluded) {
-      return 0;
-    }
-    return earnedRewards - rewardsExcluded;
   }
 
   function getUnpaid(

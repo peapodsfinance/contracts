@@ -35,6 +35,8 @@ interface ITokenRewards {
 
   function depositRewards(address token, uint256 amount) external;
 
+  function depositRewardsNoTransfer(address token, uint256 amount) external;
+
   function claimReward(address wallet) external;
 
   function setShares(

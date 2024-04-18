@@ -10,6 +10,8 @@ import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import './interfaces/ICurvePool.sol';
 import './interfaces/IDecentralizedIndex.sol';
 import './interfaces/IERC4626.sol';
+import './interfaces/ICamelotRouter.sol';
+import './interfaces/ISwapRouterAlgebra.sol';
 import './interfaces/IUniswapV2Pair.sol';
 import './interfaces/IUniswapV3Pool.sol';
 import './interfaces/IUniswapV2Router02.sol';
@@ -20,7 +22,6 @@ import './interfaces/IZapper.sol';
 contract Zapper is IZapper, Context, Ownable {
   using SafeERC20 for IERC20;
 
-  address constant OHM = 0x64aa3364F17a4D01c6f1751Fd97C2BD3D7e7f1D5;
   address constant STYETH = 0x583019fF0f430721aDa9cfb4fac8F06cA104d0B4;
   address constant YETH = 0x1BED97CBC3c24A4fb5C069C6E311a967386131f7;
   address constant WETH_YETH_POOL = 0x69ACcb968B19a53790f43e57558F5E443A91aF22;
@@ -32,6 +33,7 @@ contract Zapper is IZapper, Context, Ownable {
 
   uint256 _slippage = 30; // 3%
 
+  address public OHM = 0x64aa3364F17a4D01c6f1751Fd97C2BD3D7e7f1D5;
   address public pOHM;
 
   // token in => token out => swap pool(s)
@@ -83,6 +85,9 @@ contract Zapper is IZapper, Context, Ownable {
     if (_in == address(0)) {
       _amountIn = _ethToWETH(_amountIn);
       _in = WETH;
+      if (_out == WETH) {
+        return _amountIn;
+      }
     }
     // handle pOHM separately through pod, modularize later
     bool _isOutPOHM;
@@ -134,9 +139,9 @@ contract Zapper is IZapper, Context, Ownable {
           address _t0 = IUniswapV3Pool(_poolInfo.pool1).token0();
           _amountOut = _swapV3Multi(
             _in,
-            IUniswapV3Pool(_poolInfo.pool1).fee(),
+            _getPoolFee(_poolInfo.pool1),
             _t0 == _in ? IUniswapV3Pool(_poolInfo.pool1).token1() : _t0,
-            IUniswapV3Pool(_poolInfo.pool2).fee(),
+            _getPoolFee(_poolInfo.pool2),
             _out,
             _amountIn,
             _amountOutMin
@@ -144,7 +149,7 @@ contract Zapper is IZapper, Context, Ownable {
         } else {
           _amountOut = _swapV3Single(
             _in,
-            IUniswapV3Pool(_poolInfo.pool1).fee(),
+            _getPoolFee(_poolInfo.pool1),
             _out,
             _amountIn,
             _amountOutMin
@@ -159,6 +164,10 @@ contract Zapper is IZapper, Context, Ownable {
     IERC20(OHM).safeIncreaseAllowance(pOHM, _amountOut);
     IDecentralizedIndex(pOHM).bond(OHM, _amountOut, 0);
     return IERC20(pOHM).balanceOf(address(this)) - _pOHMBefore;
+  }
+
+  function _getPoolFee(address _pool) internal view returns (uint24) {
+    return block.chainid == 42161 ? 0 : IUniswapV3Pool(_pool).fee();
   }
 
   function _ethToWETH(uint256 _amountETH) internal returns (uint256) {
@@ -203,18 +212,32 @@ contract Zapper is IZapper, Context, Ownable {
 
     uint256 _outBefore = IERC20(_out).balanceOf(address(this));
     IERC20(_in).safeIncreaseAllowance(V3_ROUTER, _amountIn);
-    ISwapRouter(V3_ROUTER).exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: _in,
-        tokenOut: _out,
-        fee: _fee,
-        recipient: address(this),
-        deadline: block.timestamp,
-        amountIn: _amountIn,
-        amountOutMinimum: (_amountOutMin * (1000 - _slippage)) / 1000,
-        sqrtPriceLimitX96: 0
-      })
-    );
+    if (block.chainid == 42161) {
+      ISwapRouterAlgebra(V3_ROUTER).exactInputSingle(
+        ISwapRouterAlgebra.ExactInputSingleParams({
+          tokenIn: _in,
+          tokenOut: _out,
+          recipient: address(this),
+          deadline: block.timestamp,
+          amountIn: _amountIn,
+          amountOutMinimum: (_amountOutMin * (1000 - _slippage)) / 1000,
+          limitSqrtPrice: 0
+        })
+      );
+    } else {
+      ISwapRouter(V3_ROUTER).exactInputSingle(
+        ISwapRouter.ExactInputSingleParams({
+          tokenIn: _in,
+          tokenOut: _out,
+          fee: _fee,
+          recipient: address(this),
+          deadline: block.timestamp,
+          amountIn: _amountIn,
+          amountOutMinimum: (_amountOutMin * (1000 - _slippage)) / 1000,
+          sqrtPriceLimitX96: 0
+        })
+      );
+    }
     return IERC20(_out).balanceOf(address(this)) - _outBefore;
   }
 
@@ -250,14 +273,26 @@ contract Zapper is IZapper, Context, Ownable {
     address _out = _path.length == 3 ? _path[2] : _path[1];
     uint256 _outBefore = IERC20(_out).balanceOf(address(this));
     IERC20(_path[0]).safeIncreaseAllowance(V2_ROUTER, _amountIn);
-    IUniswapV2Router02(V2_ROUTER)
-      .swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        _amountIn,
-        _amountOutMin,
-        _path,
-        address(this),
-        block.timestamp
-      );
+    if (block.chainid == 42161) {
+      ICamelotRouter(V2_ROUTER)
+        .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+          _amountIn,
+          _amountOutMin,
+          _path,
+          address(this),
+          Ownable(address(V3_TWAP_UTILS)).owner(),
+          block.timestamp
+        );
+    } else {
+      IUniswapV2Router02(V2_ROUTER)
+        .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+          _amountIn,
+          _amountOutMin,
+          _path,
+          address(this),
+          block.timestamp
+        );
+    }
     return IERC20(_out).balanceOf(address(this)) - _outBefore;
   }
 
@@ -340,8 +375,9 @@ contract Zapper is IZapper, Context, Ownable {
     zapMap[_t1][_t0] = _poolConf;
   }
 
-  function setPOHM(address _pOHM) external onlyOwner {
-    pOHM = _pOHM;
+  function setOHM(address _OHM, address _pOHM) external onlyOwner {
+    OHM = _OHM == address(0) ? OHM : _OHM;
+    pOHM = _pOHM == address(0) ? pOHM : _pOHM;
   }
 
   function setSlippage(uint256 _slip) external onlyOwner {

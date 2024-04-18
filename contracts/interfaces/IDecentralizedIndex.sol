@@ -98,7 +98,7 @@ interface IDecentralizedIndex is IERC20 {
     uint256 daiTokens,
     uint256 slippage,
     uint256 deadline
-  ) external;
+  ) external returns (uint256);
 
   function removeLiquidityV2(
     uint256 lpTokens,

@@ -8,6 +8,7 @@ import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol'
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import './interfaces/IDecentralizedIndex.sol';
 import './interfaces/IERC20Metadata.sol';
+import './interfaces/IIndexUtils.sol';
 import './interfaces/IStakingPoolToken.sol';
 import './interfaces/ITokenRewards.sol';
 import './interfaces/IUniswapV2Factory.sol';
@@ -16,7 +17,7 @@ import './interfaces/IUniswapV2Router02.sol';
 import './interfaces/IWETH.sol';
 import './Zapper.sol';
 
-contract IndexUtils is Context, Zapper {
+contract IndexUtils is Context, IIndexUtils, Zapper {
   using SafeERC20 for IERC20;
 
   constructor(
@@ -150,7 +151,7 @@ contract IndexUtils is Context, Zapper {
     uint256 _amountPairedLpTokenMin,
     uint256 _slippage,
     uint256 _deadline
-  ) external payable {
+  ) external payable override returns (uint256 _amountOut) {
     address _v2Pool = IUniswapV2Factory(V2_FACTORY).getPair(
       address(_indexFund),
       _indexFund.PAIRED_LP_TOKEN()
@@ -161,7 +162,6 @@ contract IndexUtils is Context, Zapper {
     uint256 _pairedLpTokenBefore = IERC20(_indexFund.PAIRED_LP_TOKEN())
       .balanceOf(address(this));
     uint256 _ethBefore = address(this).balance - msg.value;
-    uint256 _v2PoolBefore = IERC20(_v2Pool).balanceOf(address(this));
     IERC20(address(_indexFund)).safeTransferFrom(
       _msgSender(),
       address(this),
@@ -191,7 +191,7 @@ contract IndexUtils is Context, Zapper {
       IERC20(_indexFund.PAIRED_LP_TOKEN()).balanceOf(address(this)) -
         _pairedLpTokenBefore
     );
-    _indexFund.addLiquidityV2(
+    _amountOut = _indexFund.addLiquidityV2(
       IERC20(address(_indexFund)).balanceOf(address(this)) - _idxTokensBefore,
       IERC20(_indexFund.PAIRED_LP_TOKEN()).balanceOf(address(this)) -
         _pairedLpTokenBefore,
@@ -201,11 +201,11 @@ contract IndexUtils is Context, Zapper {
 
     IERC20(_v2Pool).safeIncreaseAllowance(
       _indexFund.lpStakingPool(),
-      IERC20(_v2Pool).balanceOf(address(this)) - _v2PoolBefore
+      _amountOut
     );
     IStakingPoolToken(_indexFund.lpStakingPool()).stake(
       _msgSender(),
-      IERC20(_v2Pool).balanceOf(address(this)) - _v2PoolBefore
+      _amountOut
     );
 
     // refunds if needed for index tokens and pairedLpToken
@@ -221,6 +221,7 @@ contract IndexUtils is Context, Zapper {
       _indexFund.PAIRED_LP_TOKEN(),
       _pairedLpTokenBefore
     );
+    return _amountOut;
   }
 
   function unstakeAndRemoveLP(
