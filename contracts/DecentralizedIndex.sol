@@ -333,8 +333,13 @@ abstract contract DecentralizedIndex is
     uint256 _pairedLPTokens,
     uint256 _slippage, // 100 == 10%, 1000 == 100%
     uint256 _deadline
+<<<<<<< Updated upstream
   ) external override lock noSwapOrFee returns (uint256) {
     uint256 _idxTokensBefore = balanceOf(address(this));
+=======
+  ) external override lock noSwapOrFee {
+    uint256 _idxTokensBefore = balanceOf(address(this)); // 10
+>>>>>>> Stashed changes
     uint256 _pairedBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
 
     super._transfer(_msgSender(), address(this), _idxLPTokens);
