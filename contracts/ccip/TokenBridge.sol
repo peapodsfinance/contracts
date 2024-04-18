@@ -13,8 +13,8 @@ import '../interfaces/ICCIPTokenBridge.sol';
 contract TokenBridge is ICCIPTokenBridge, CCIPReceiver, Context {
   using SafeERC20 for IERC20Bridgeable;
 
-  IRouterClient public ccipRouter;
-  ICCIPTokenRouter public tokenRouter;
+  IRouterClient public immutable ccipRouter;
+  ICCIPTokenRouter public immutable tokenRouter;
 
   constructor(
     IRouterClient _ccipRouter,
@@ -104,7 +104,6 @@ contract TokenBridge is ICCIPTokenBridge, CCIPReceiver, Context {
       data: abi.encode(
         TokenTransfer({
           tokenReceiver: _tokenReceiver,
-          sourceToken: _bridgeConf.sourceToken,
           targetToken: _bridgeConf.targetToken,
           amount: _amount
         })
@@ -121,6 +120,7 @@ contract TokenBridge is ICCIPTokenBridge, CCIPReceiver, Context {
   function _ccipReceive(
     Client.Any2EVMMessage memory _message
   ) internal override {
+    require(tokenRouter.globalEnabled(), 'GLDISABLED');
     TokenTransfer memory _tokenTransferInfo = abi.decode(
       _message.data,
       (TokenTransfer)
@@ -129,6 +129,7 @@ contract TokenBridge is ICCIPTokenBridge, CCIPReceiver, Context {
       _tokenTransferInfo.targetToken,
       _message.sourceChainSelector
     );
+    require(_bridgeConf.enabled, 'BRDISABLED');
     require(
       abi.decode(_message.sender, (address)) == _bridgeConf.targetBridge,
       'AUTH'

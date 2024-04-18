@@ -40,10 +40,11 @@ contract WeightedIndex is DecentralizedIndex {
     )
   {
     V2_FACTORY = IUniswapV2Factory(IUniswapV2Router02(_v2Router).factory());
-    require(_tokens.length == _weights.length, 'INIT');
-    for (uint8 _i; _i < _tokens.length; _i++) {
-      require(!_isTokenInIndex[_tokens[_i]], 'DUP');
-      require(_weights[_i] > 0, 'WVAL');
+    require(_tokens.length == _weights.length, 'V');
+    uint256 _tl = _tokens.length;
+    for (uint8 _i; _i < _tl; _i++) {
+      require(!_isTokenInIndex[_tokens[_i]], 'D');
+      require(_weights[_i] > 0, 'W');
       indexTokens.push(
         IndexAssetInfo({
           token: _tokens[_i],
@@ -57,7 +58,7 @@ contract WeightedIndex is DecentralizedIndex {
       _fundTokenIdx[_tokens[_i]] = _i;
       _isTokenInIndex[_tokens[_i]] = true;
 
-      if (_config.blacklistTKNpTKNPoolV2) {
+      if (_config.blacklistTKNpTKNPoolV2 && _tokens[_i] != _pairedLpToken) {
         address _blkPool = IUniswapV2Factory(
           IUniswapV2Router02(_v2Router).factory()
         ).createPair(address(this), _tokens[_i]);
@@ -67,7 +68,7 @@ contract WeightedIndex is DecentralizedIndex {
     // at idx == 0, need to find X in [1/X = tokenWeightAtIdx/totalWeights]
     // at idx > 0, need to find Y in (Y/X = tokenWeightAtIdx/totalWeights)
     uint256 _xX96 = (FixedPoint96.Q96 * _totalWeights) / _weights[0];
-    for (uint256 _i; _i < _tokens.length; _i++) {
+    for (uint256 _i; _i < _tl; _i++) {
       indexTokens[_i].q1 =
         (_weights[_i] * _xX96 * 10 ** IERC20Metadata(_tokens[_i]).decimals()) /
         _totalWeights;
@@ -121,7 +122,7 @@ contract WeightedIndex is DecentralizedIndex {
     uint256 _amount,
     uint256 _amountMintMin
   ) external override lock noSwapOrFee {
-    require(_isTokenInIndex[_token], 'INVALIDTOKEN');
+    require(_isTokenInIndex[_token], 'IT');
     uint256 _tokenIdx = _fundTokenIdx[_token];
     uint256 _tokenCurSupply = IERC20(_token).balanceOf(address(this));
     bool _firstIn = _isFirstIn();
@@ -141,13 +142,14 @@ contract WeightedIndex is DecentralizedIndex {
     uint256 _feeTokens = _canWrapFeeFree(_msgSender())
       ? 0
       : (_tokensMinted * fees.bond) / DEN;
-    require(_tokensMinted - _feeTokens >= _amountMintMin, 'MIN');
+    require(_tokensMinted - _feeTokens >= _amountMintMin, 'M');
     _mint(_msgSender(), _tokensMinted - _feeTokens);
     if (_feeTokens > 0) {
       _mint(address(this), _feeTokens);
       _processBurnFee(_feeTokens);
     }
-    for (uint256 _i; _i < indexTokens.length; _i++) {
+    uint256 _il = indexTokens.length;
+    for (uint256 _i; _i < _il; _i++) {
       uint256 _transferAmt = _firstIn
         ? getInitialAmount(_token, _amount, indexTokens[_i].token)
         : (IERC20(indexTokens[_i].token).balanceOf(address(this)) *
@@ -175,7 +177,8 @@ contract WeightedIndex is DecentralizedIndex {
     super._transfer(_msgSender(), address(this), _amount);
     _burn(address(this), _amountAfterFee);
     _processBurnFee(_amount - _amountAfterFee);
-    for (uint256 _i; _i < indexTokens.length; _i++) {
+    uint256 _il = indexTokens.length;
+    for (uint256 _i; _i < _il; _i++) {
       uint256 _tokenSupply = IERC20(indexTokens[_i].token).balanceOf(
         address(this)
       );
@@ -214,10 +217,16 @@ contract WeightedIndex is DecentralizedIndex {
   }
 
   /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
-  function getIdxPriceUSDX96() public view override returns (uint256, uint256) {
+  function getIdxPriceUSDX96()
+    external
+    view
+    override
+    returns (uint256, uint256)
+  {
     uint256 _priceX96;
     uint256 _X96_2 = 2 ** (96 / 2);
-    for (uint256 _i; _i < indexTokens.length; _i++) {
+    uint256 _il = indexTokens.length;
+    for (uint256 _i; _i < _il; _i++) {
       uint256 _tokenPriceUSDX96_2 = _getTokenPriceUSDX96(
         indexTokens[_i].token
       ) / _X96_2;

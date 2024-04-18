@@ -30,55 +30,41 @@ contract IndexUtils is Context, Zapper {
     uint256 _amount,
     uint256 _amountMintMin
   ) external {
-    if (_indexFund.indexType() == IDecentralizedIndex.IndexType.WEIGHTED) {
-      IDecentralizedIndex.IndexAssetInfo[] memory _assets = _indexFund
-        .getAllAssets();
-      uint256[] memory _balsBefore = new uint256[](_assets.length);
+    IDecentralizedIndex.IndexAssetInfo[] memory _assets = _indexFund
+      .getAllAssets();
+    uint256[] memory _balsBefore = new uint256[](_assets.length);
 
-      uint256 _tokenCurSupply = IERC20(_token).balanceOf(address(_indexFund));
-      uint256 _tokenAmtSupplyRatioX96 = _indexFund.totalSupply() == 0
-        ? FixedPoint96.Q96
-        : (_amount * FixedPoint96.Q96) / _tokenCurSupply;
-      for (uint256 _i; _i < _assets.length; _i++) {
-        uint256 _amountNeeded = _indexFund.totalSupply() == 0
-          ? _indexFund.getInitialAmount(_token, _amount, _assets[_i].token)
-          : (IERC20(_assets[_i].token).balanceOf(address(_indexFund)) *
-            _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
-        _balsBefore[_i] = IERC20(_assets[_i].token).balanceOf(address(this));
-        IERC20(_assets[_i].token).safeTransferFrom(
-          _msgSender(),
-          address(this),
-          _amountNeeded
-        );
-        IERC20(_assets[_i].token).safeIncreaseAllowance(
-          address(_indexFund),
-          _amountNeeded
-        );
-      }
-      uint256 _idxBalBefore = IERC20(_indexFund).balanceOf(address(this));
-      _indexFund.bond(_token, _amount, _amountMintMin);
-      IERC20(_indexFund).safeTransfer(
+    uint256 _tokenCurSupply = IERC20(_token).balanceOf(address(_indexFund));
+    uint256 _tokenAmtSupplyRatioX96 = _indexFund.totalSupply() == 0
+      ? FixedPoint96.Q96
+      : (_amount * FixedPoint96.Q96) / _tokenCurSupply;
+    uint256 _al = _assets.length;
+    for (uint256 _i; _i < _al; _i++) {
+      uint256 _amountNeeded = _indexFund.totalSupply() == 0
+        ? _indexFund.getInitialAmount(_token, _amount, _assets[_i].token)
+        : (IERC20(_assets[_i].token).balanceOf(address(_indexFund)) *
+          _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+      _balsBefore[_i] = IERC20(_assets[_i].token).balanceOf(address(this));
+      IERC20(_assets[_i].token).safeTransferFrom(
         _msgSender(),
-        IERC20(_indexFund).balanceOf(address(this)) - _idxBalBefore
+        address(this),
+        _amountNeeded
       );
+      IERC20(_assets[_i].token).safeIncreaseAllowance(
+        address(_indexFund),
+        _amountNeeded
+      );
+    }
+    uint256 _idxBalBefore = IERC20(_indexFund).balanceOf(address(this));
+    _indexFund.bond(_token, _amount, _amountMintMin);
+    IERC20(_indexFund).safeTransfer(
+      _msgSender(),
+      IERC20(_indexFund).balanceOf(address(this)) - _idxBalBefore
+    );
 
-      // refund any excess tokens to user we didn't use to bond
-      for (uint256 _i; _i < _assets.length; _i++) {
-        _checkAndRefundERC20(_msgSender(), _assets[_i].token, _balsBefore[_i]);
-      }
-    } else {
-      require(
-        _indexFund.indexType() == IDecentralizedIndex.IndexType.UNWEIGHTED,
-        'UW'
-      );
-      IERC20(_token).safeTransferFrom(_msgSender(), address(this), _amount);
-      IERC20(_token).safeIncreaseAllowance(address(_indexFund), _amount);
-      uint256 _idxBalBefore = IERC20(_indexFund).balanceOf(address(this));
-      _indexFund.bond(_token, _amount, _amountMintMin);
-      IERC20(_indexFund).safeTransfer(
-        _msgSender(),
-        IERC20(_indexFund).balanceOf(address(this)) - _idxBalBefore
-      );
+    // refund any excess tokens to user we didn't use to bond
+    for (uint256 _i; _i < _al; _i++) {
+      _checkAndRefundERC20(_msgSender(), _assets[_i].token, _balsBefore[_i]);
     }
   }
 
@@ -282,7 +268,8 @@ contract IndexUtils is Context, Zapper {
   }
 
   function claimRewardsMulti(address[] memory _rewards) external {
-    for (uint256 _i; _i < _rewards.length; _i++) {
+    uint256 _rl = _rewards.length;
+    for (uint256 _i; _i < _rl; _i++) {
       ITokenRewards(_rewards[_i]).claimReward(_msgSender());
     }
   }
@@ -303,7 +290,8 @@ contract IndexUtils is Context, Zapper {
       ? FixedPoint96.Q96
       : (_amountForPoolIdx * FixedPoint96.Q96) / _tokenCurSupply;
     uint256 _nativeLeft = _amountNative;
-    for (uint256 _i; _i < _assets.length; _i++) {
+    uint256 _al = _assets.length;
+    for (uint256 _i; _i < _al; _i++) {
       (_nativeLeft, _amountBefore[_i], _amountReceived[_i]) = _swapForIdxToken(
         _indexFund,
         _assets[_poolIdx].token,

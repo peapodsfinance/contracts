@@ -39,6 +39,7 @@ contract TokenRouter is ICCIPTokenRouter, Ownable {
   function setTargetChainGasLimit(uint256 _gasLimit) external onlyOwner {
     require(targetChainGasLimit != _gasLimit, 'CHANGE');
     targetChainGasLimit = _gasLimit;
+    emit SetTargetGasChainLimit(_msgSender(), _gasLimit);
   }
 
   function toggleConfigEnabled(
@@ -48,10 +49,12 @@ contract TokenRouter is ICCIPTokenRouter, Ownable {
   ) external onlyOwner {
     require(_configs[_sourceToken][_targetChain].enabled != _isEnabled);
     _configs[_sourceToken][_targetChain].enabled = _isEnabled;
+    emit SetConfigEnabled(_msgSender(), _sourceToken, _targetChain, _isEnabled);
   }
 
   function toggleGlobalEnabled(bool _isEnabled) external onlyOwner {
     require(globalEnabled != _isEnabled);
     globalEnabled = _isEnabled;
+    emit SetGlobalEnabled(_msgSender(), _isEnabled);
   }
 }

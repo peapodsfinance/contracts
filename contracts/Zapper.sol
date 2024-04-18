@@ -45,31 +45,33 @@ contract Zapper is IZapper, Context, Ownable {
     V3_TWAP_UTILS = _v3TwapUtilities;
     WETH = IUniswapV2Router02(_v2Router).WETH();
 
-    // WETH/YETH
-    _setZapMapFromPoolSingle(
-      PoolType.CURVE,
-      0x69ACcb968B19a53790f43e57558F5E443A91aF22
-    );
-    // WETH/DAI
-    _setZapMapFromPoolSingle(
-      PoolType.V3,
-      0x60594a405d53811d3BC4766596EFD80fd545A270
-    );
-    // WETH/USDC
-    _setZapMapFromPoolSingle(
-      PoolType.V3,
-      0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640
-    );
-    // WETH/OHM
-    _setZapMapFromPoolSingle(
-      PoolType.V3,
-      0x88051B0eea095007D3bEf21aB287Be961f3d8598
-    );
-    // USDC/OHM
-    _setZapMapFromPoolSingle(
-      PoolType.V3,
-      0x893f503FaC2Ee1e5B78665db23F9c94017Aae97D
-    );
+    if (block.chainid == 1) {
+      // WETH/YETH
+      _setZapMapFromPoolSingle(
+        PoolType.CURVE,
+        0x69ACcb968B19a53790f43e57558F5E443A91aF22
+      );
+      // WETH/DAI
+      _setZapMapFromPoolSingle(
+        PoolType.V3,
+        0x60594a405d53811d3BC4766596EFD80fd545A270
+      );
+      // WETH/USDC
+      _setZapMapFromPoolSingle(
+        PoolType.V3,
+        0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640
+      );
+      // WETH/OHM
+      _setZapMapFromPoolSingle(
+        PoolType.V3,
+        0x88051B0eea095007D3bEf21aB287Be961f3d8598
+      );
+      // USDC/OHM
+      _setZapMapFromPoolSingle(
+        PoolType.V3,
+        0x893f503FaC2Ee1e5B78665db23F9c94017Aae97D
+      );
+    }
   }
 
   function _zap(
@@ -133,7 +135,7 @@ contract Zapper is IZapper, Context, Ownable {
           _amountOut = _swapV3Multi(
             _in,
             IUniswapV3Pool(_poolInfo.pool1).fee(),
-            _t0 == _in ? IUniswapV3Pool(_poolInfo.pool1).token0() : _t0,
+            _t0 == _in ? IUniswapV3Pool(_poolInfo.pool1).token1() : _t0,
             IUniswapV3Pool(_poolInfo.pool2).fee(),
             _out,
             _amountIn,
@@ -171,7 +173,7 @@ contract Zapper is IZapper, Context, Ownable {
     address _out,
     uint256 _amountIn,
     uint256 _amountOutMin
-  ) internal returns (uint256 _amountOut) {
+  ) internal returns (uint256) {
     if (_amountOutMin == 0) {
       address _v3Pool;
       try
@@ -284,7 +286,7 @@ contract Zapper is IZapper, Context, Ownable {
     uint256 _ethAmount,
     uint256 _minYethAmount,
     bool _stakeToStyeth
-  ) internal returns (uint256 _amountOut) {
+  ) internal returns (uint256) {
     uint256 _boughtYeth = _swapCurve(
       WETH_YETH_POOL,
       0,
@@ -293,6 +295,7 @@ contract Zapper is IZapper, Context, Ownable {
       _minYethAmount
     );
     if (_stakeToStyeth) {
+      IERC20(YETH).safeIncreaseAllowance(STYETH, _boughtYeth);
       return IERC4626(STYETH).deposit(_boughtYeth, address(this));
     }
     return _boughtYeth;
@@ -302,12 +305,12 @@ contract Zapper is IZapper, Context, Ownable {
     uint256 _stYethAmount,
     uint256 _minWethAmount,
     bool _isYethOnly
-  ) internal returns (uint256 _amountOut) {
+  ) internal returns (uint256) {
     uint256 _yethAmount;
     if (_isYethOnly) {
       _yethAmount = _stYethAmount;
     } else {
-      _yethAmount = IERC4626(STYETH).withdraw(
+      _yethAmount = IERC4626(STYETH).redeem(
         _stYethAmount,
         address(this),
         address(this)
@@ -342,6 +345,7 @@ contract Zapper is IZapper, Context, Ownable {
   }
 
   function setSlippage(uint256 _slip) external onlyOwner {
+    require(_slip >= 0 && _slip <= 1000, 'BOUNDS');
     _slippage = _slip;
   }
 

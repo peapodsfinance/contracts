@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import './interfaces/IRewardsWhitelister.sol';
 import './interfaces/IProtocolFeeRouter.sol';
 import './interfaces/IStakingPoolToken.sol';
 import './TokenRewards.sol';
 
-contract StakingPoolToken is IStakingPoolToken, ERC20 {
+contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
   using SafeERC20 for IERC20;
 
   address public immutable override indexFund;
-  address public immutable override stakingToken;
   address public immutable override poolRewards;
   address public override stakeUserRestriction;
+  address public override stakingToken;
 
   modifier onlyRestricted() {
     require(_msgSender() == stakeUserRestriction, 'RESUSERAUTH');
@@ -24,19 +26,19 @@ contract StakingPoolToken is IStakingPoolToken, ERC20 {
     string memory _name,
     string memory _symbol,
     address _pairedLpToken,
-    address _stakingToken,
     address _rewardsToken,
     address _stakeUserRestriction,
     address _v3Router,
     IProtocolFeeRouter _feeRouter,
+    IRewardsWhitelister _rewardsWhitelist,
     IV3TwapUtilities _v3TwapUtilities
   ) ERC20(_name, _symbol) {
     indexFund = _msgSender();
-    stakingToken = _stakingToken;
     stakeUserRestriction = _stakeUserRestriction;
     poolRewards = address(
       new TokenRewards(
         _feeRouter,
+        _rewardsWhitelist,
         _v3TwapUtilities,
         _v3Router,
         indexFund,
@@ -48,6 +50,7 @@ contract StakingPoolToken is IStakingPoolToken, ERC20 {
   }
 
   function stake(address _user, uint256 _amount) external override {
+    require(stakingToken != address(0), 'INIT');
     if (stakeUserRestriction != address(0)) {
       require(_user == stakeUserRestriction, 'RESTRICT');
     }
@@ -60,6 +63,11 @@ contract StakingPoolToken is IStakingPoolToken, ERC20 {
     _burn(_msgSender(), _amount);
     IERC20(stakingToken).safeTransfer(_msgSender(), _amount);
     emit Unstake(_msgSender(), _amount);
+  }
+
+  function setStakingToken(address _stakingToken) external onlyOwner {
+    require(stakingToken == address(0), 'SET');
+    stakingToken = _stakingToken;
   }
 
   function removeStakeUserRestriction() external onlyRestricted {
