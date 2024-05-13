@@ -34,17 +34,22 @@ contract V3TwapAerodromeUtilities is IV3TwapUtilities, Ownable {
     address,
     uint24
   ) external pure override returns (address) {
-    require(false, 'INVALID0');
+    require(false, 'I0');
     return address(0);
   }
 
   function getV3Pool(
-    address,
-    address,
-    address
-  ) external pure override returns (address) {
-    require(false, 'INVALID1');
-    return address(0);
+    address _v3Factory,
+    address _t0,
+    address _t1
+  ) external view override returns (address) {
+    (address _token0, address _token1) = _t0 < _t1 ? (_t0, _t1) : (_t1, _t0);
+    PoolAddressSlipstream.PoolKey memory _key = PoolAddressSlipstream.PoolKey({
+      token0: _token0,
+      token1: _token1,
+      tickSpacing: int24(200)
+    });
+    return PoolAddressSlipstream.computeAddress(_v3Factory, _key);
   }
 
   function getPoolPriceUSDX96(

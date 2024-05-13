@@ -31,6 +31,19 @@ contract UniswapDexAdapter is IDexAdapter, Context {
     ASYNC_INITIALIZE = _asyncInit;
   }
 
+  function WETH() external view virtual override returns (address) {
+    return IUniswapV2Router02(V2_ROUTER).WETH();
+  }
+
+  function getV3Pool(
+    address,
+    address,
+    int24
+  ) external view virtual override returns (address _p) {
+    _p;
+    require(false, 'I0');
+  }
+
   function getV3Pool(
     address _token0,
     address _token1,
@@ -201,5 +214,18 @@ contract UniswapDexAdapter is IDexAdapter, Context {
         IERC20(_pool).balanceOf(address(this)) - _lpBefore
       );
     }
+  }
+
+  function extraRewardsHook(
+    address,
+    address
+  )
+    external
+    virtual
+    override
+    returns (address[] memory _t, uint256[] memory _a)
+  {
+    _t;
+    _a;
   }
 }

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import '@openzeppelin/contracts/access/Ownable.sol';
+import '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
@@ -9,12 +10,9 @@ import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol'
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import './interfaces/ICurvePool.sol';
 import './interfaces/IDecentralizedIndex.sol';
-import './interfaces/IERC4626.sol';
-import './interfaces/ICamelotRouter.sol';
-import './interfaces/ISwapRouterAlgebra.sol';
+import './interfaces/IDexAdapter.sol';
 import './interfaces/IUniswapV2Pair.sol';
 import './interfaces/IUniswapV3Pool.sol';
-import './interfaces/IUniswapV2Router02.sol';
 import './interfaces/IV3TwapUtilities.sol';
 import './interfaces/IWETH.sol';
 import './interfaces/IZapper.sol';
@@ -27,9 +25,9 @@ contract Zapper is IZapper, Context, Ownable {
   address constant WETH_YETH_POOL = 0x69ACcb968B19a53790f43e57558F5E443A91aF22;
   address constant V3_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
   address immutable V2_ROUTER;
-  address immutable V2_FACTORY;
   address immutable WETH;
   IV3TwapUtilities immutable V3_TWAP_UTILS;
+  IDexAdapter immutable DEX_ADAPTER;
 
   uint256 _slippage = 30; // 3%
 
@@ -41,11 +39,11 @@ contract Zapper is IZapper, Context, Ownable {
   // curve pool => token => idx
   mapping(address => mapping(address => int128)) public curveTokenIdx;
 
-  constructor(address _v2Router, IV3TwapUtilities _v3TwapUtilities) {
-    V2_ROUTER = _v2Router;
-    V2_FACTORY = IUniswapV2Router02(_v2Router).factory();
+  constructor(IV3TwapUtilities _v3TwapUtilities, IDexAdapter _dexAdapter) {
+    V2_ROUTER = _dexAdapter.V2_ROUTER();
     V3_TWAP_UTILS = _v3TwapUtilities;
-    WETH = IUniswapV2Router02(_v2Router).WETH();
+    DEX_ADAPTER = _dexAdapter;
+    WETH = _dexAdapter.WETH();
 
     if (block.chainid == 1) {
       // WETH/YETH
@@ -185,21 +183,12 @@ contract Zapper is IZapper, Context, Ownable {
   ) internal returns (uint256) {
     if (_amountOutMin == 0) {
       address _v3Pool;
-      try
-        V3_TWAP_UTILS.getV3Pool(
-          IPeripheryImmutableState(V3_ROUTER).factory(),
-          _in,
-          _out,
-          _fee
-        )
-      returns (address __v3Pool) {
+      try DEX_ADAPTER.getV3Pool(_in, _out, uint24(10000)) returns (
+        address __v3Pool
+      ) {
         _v3Pool = __v3Pool;
       } catch {
-        _v3Pool = V3_TWAP_UTILS.getV3Pool(
-          IPeripheryImmutableState(V3_ROUTER).factory(),
-          _in,
-          _out
-        );
+        _v3Pool = DEX_ADAPTER.getV3Pool(_in, _out, int24(200));
       }
       address _token0 = _in < _out ? _in : _out;
       uint256 _poolPriceX96 = V3_TWAP_UTILS.priceX96FromSqrtPriceX96(
@@ -211,33 +200,15 @@ contract Zapper is IZapper, Context, Ownable {
     }
 
     uint256 _outBefore = IERC20(_out).balanceOf(address(this));
-    IERC20(_in).safeIncreaseAllowance(V3_ROUTER, _amountIn);
-    if (block.chainid == 42161) {
-      ISwapRouterAlgebra(V3_ROUTER).exactInputSingle(
-        ISwapRouterAlgebra.ExactInputSingleParams({
-          tokenIn: _in,
-          tokenOut: _out,
-          recipient: address(this),
-          deadline: block.timestamp,
-          amountIn: _amountIn,
-          amountOutMinimum: (_amountOutMin * (1000 - _slippage)) / 1000,
-          limitSqrtPrice: 0
-        })
-      );
-    } else {
-      ISwapRouter(V3_ROUTER).exactInputSingle(
-        ISwapRouter.ExactInputSingleParams({
-          tokenIn: _in,
-          tokenOut: _out,
-          fee: _fee,
-          recipient: address(this),
-          deadline: block.timestamp,
-          amountIn: _amountIn,
-          amountOutMinimum: (_amountOutMin * (1000 - _slippage)) / 1000,
-          sqrtPriceLimitX96: 0
-        })
-      );
-    }
+    IERC20(_in).safeIncreaseAllowance(address(DEX_ADAPTER), _amountIn);
+    DEX_ADAPTER.swapV3Single(
+      _in,
+      _out,
+      _fee,
+      _amountIn,
+      (_amountOutMin * (1000 - _slippage)) / 1000,
+      address(this)
+    );
     return IERC20(_out).balanceOf(address(this)) - _outBefore;
   }
 
@@ -272,27 +243,14 @@ contract Zapper is IZapper, Context, Ownable {
   ) internal returns (uint256) {
     address _out = _path.length == 3 ? _path[2] : _path[1];
     uint256 _outBefore = IERC20(_out).balanceOf(address(this));
-    IERC20(_path[0]).safeIncreaseAllowance(V2_ROUTER, _amountIn);
-    if (block.chainid == 42161) {
-      ICamelotRouter(V2_ROUTER)
-        .swapExactTokensForTokensSupportingFeeOnTransferTokens(
-          _amountIn,
-          _amountOutMin,
-          _path,
-          address(this),
-          Ownable(address(V3_TWAP_UTILS)).owner(),
-          block.timestamp
-        );
-    } else {
-      IUniswapV2Router02(V2_ROUTER)
-        .swapExactTokensForTokensSupportingFeeOnTransferTokens(
-          _amountIn,
-          _amountOutMin,
-          _path,
-          address(this),
-          block.timestamp
-        );
-    }
+    IERC20(_path[0]).safeIncreaseAllowance(address(DEX_ADAPTER), _amountIn);
+    DEX_ADAPTER.swapV2Single(
+      _path[0],
+      _path[1],
+      _amountIn,
+      _amountOutMin,
+      address(this)
+    );
     return IERC20(_out).balanceOf(address(this)) - _outBefore;
   }
 

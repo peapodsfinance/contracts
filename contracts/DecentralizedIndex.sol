@@ -5,15 +5,12 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
-import './interfaces/ICamelotRouter.sol';
 import './interfaces/IDecentralizedIndex.sol';
 import './interfaces/IDexAdapter.sol';
 import './interfaces/IFlashLoanRecipient.sol';
 import './interfaces/IProtocolFeeRouter.sol';
 import './interfaces/IRewardsWhitelister.sol';
 import './interfaces/ITokenRewards.sol';
-import './interfaces/IUniswapV2Router02.sol';
 import './StakingPoolToken.sol';
 
 abstract contract DecentralizedIndex is
@@ -134,7 +131,7 @@ abstract contract DecentralizedIndex is
     if (!DEX_HANDLER.ASYNC_INITIALIZE()) {
       _initialize();
     }
-    WETH = IUniswapV2Router02(_v2Router).WETH();
+    WETH = IDexAdapter(_dexHandler).WETH();
     emit Create(address(this), _msgSender());
   }
 
@@ -225,7 +222,7 @@ abstract contract DecentralizedIndex is
 
   function _feeSwap(uint256 _amount) internal {
     _approve(address(this), address(DEX_HANDLER), _amount);
-    address _rewards = StakingPoolToken(lpStakingPool).poolRewards();
+    address _rewards = StakingPoolToken(lpStakingPool).POOL_REWARDS();
     uint256 _pairedLpBalBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(_rewards);
     DEX_HANDLER.swapV2Single(
       address(this),
@@ -283,7 +280,10 @@ abstract contract DecentralizedIndex is
   }
 
   function processPreSwapFeesAndSwap() external override {
-    require(_msgSender() == StakingPoolToken(lpStakingPool).poolRewards(), 'R');
+    require(
+      _msgSender() == StakingPoolToken(lpStakingPool).POOL_REWARDS(),
+      'R'
+    );
     _processPreSwapFeesAndSwap();
   }
 
@@ -316,15 +316,6 @@ abstract contract DecentralizedIndex is
     _burn(_msgSender(), _amount);
   }
 
-  function manualProcessFee(uint256 _slip) external {
-    _transfer(address(this), address(this), 0);
-    address _rewards = StakingPoolToken(lpStakingPool).poolRewards();
-    ITokenRewards(_rewards).depositFromPairedLpToken(
-      0,
-      _slip > 50 ? 50 : _slip // 5% max
-    );
-  }
-
   function addLiquidityV2(
     uint256 _idxLPTokens,
     uint256 _pairedLPTokens,
@@ -335,16 +326,22 @@ abstract contract DecentralizedIndex is
     uint256 _pairedBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
 
     super._transfer(_msgSender(), address(this), _idxLPTokens);
-    _approve(address(this), V2_ROUTER, _idxLPTokens);
+    _approve(address(this), address(DEX_HANDLER), _idxLPTokens);
 
     IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
       _msgSender(),
       address(this),
       _pairedLPTokens
     );
-    IERC20(PAIRED_LP_TOKEN).safeIncreaseAllowance(V2_ROUTER, _pairedLPTokens);
+    IERC20(PAIRED_LP_TOKEN).safeIncreaseAllowance(
+      address(DEX_HANDLER),
+      _pairedLPTokens
+    );
 
-    (, , uint256 _liquidity) = IUniswapV2Router02(V2_ROUTER).addLiquidity(
+    uint256 _poolBalBefore = IERC20(
+      DEX_HANDLER.getV2Pool(address(this), PAIRED_LP_TOKEN)
+    ).balanceOf(_msgSender());
+    DEX_HANDLER.addLiquidity(
       address(this),
       PAIRED_LP_TOKEN,
       _idxLPTokens,
@@ -354,7 +351,7 @@ abstract contract DecentralizedIndex is
       _msgSender(),
       _deadline
     );
-    IERC20(PAIRED_LP_TOKEN).safeApprove(V2_ROUTER, 0);
+    IERC20(PAIRED_LP_TOKEN).safeApprove(address(DEX_HANDLER), 0);
 
     // check & refund excess tokens from LPing
     if (balanceOf(address(this)) > _idxTokensBefore) {
@@ -371,7 +368,10 @@ abstract contract DecentralizedIndex is
       );
     }
     emit AddLiquidity(_msgSender(), _idxLPTokens, _pairedLPTokens);
-    return _liquidity;
+    return
+      IERC20(DEX_HANDLER.getV2Pool(address(this), PAIRED_LP_TOKEN)).balanceOf(
+        _msgSender()
+      ) - _poolBalBefore;
   }
 
   function removeLiquidityV2(
@@ -386,8 +386,8 @@ abstract contract DecentralizedIndex is
     require(_lpTokens > 0, 'LT');
 
     IERC20(V2_POOL).safeTransferFrom(_msgSender(), address(this), _lpTokens);
-    IERC20(V2_POOL).safeIncreaseAllowance(V2_ROUTER, _lpTokens);
-    IUniswapV2Router02(V2_ROUTER).removeLiquidity(
+    IERC20(V2_POOL).safeIncreaseAllowance(address(DEX_HANDLER), _lpTokens);
+    DEX_HANDLER.removeLiquidity(
       address(this),
       PAIRED_LP_TOKEN,
       _lpTokens,
@@ -406,12 +406,12 @@ abstract contract DecentralizedIndex is
     bytes calldata _data
   ) external override lock {
     require(_isTokenInIndex[_token], 'X');
-    address _rewards = StakingPoolToken(lpStakingPool).poolRewards();
+    address _rewards = StakingPoolToken(lpStakingPool).POOL_REWARDS();
     address _feeRecipient = lpRewardsToken == DAI
       ? address(this)
       : PAIRED_LP_TOKEN == DAI
-        ? _rewards
-        : Ownable(address(V3_TWAP_UTILS)).owner();
+      ? _rewards
+      : Ownable(address(V3_TWAP_UTILS)).owner();
     IERC20(DAI).safeTransferFrom(
       _msgSender(),
       _feeRecipient,
@@ -455,4 +455,6 @@ abstract contract DecentralizedIndex is
     }('');
     require(_sent, 'S');
   }
+
+  receive() external payable {}
 }

@@ -34,7 +34,7 @@ contract V3TwapUtilities is IV3TwapUtilities, Ownable {
     address,
     int24
   ) external pure override returns (address) {
-    require(false, 'INVALID0');
+    require(false, 'I0');
     return address(0);
   }
 
@@ -43,7 +43,7 @@ contract V3TwapUtilities is IV3TwapUtilities, Ownable {
     address,
     address
   ) external pure override returns (address) {
-    require(false, 'INVALID1');
+    require(false, 'I1');
     return address(0);
   }
 
