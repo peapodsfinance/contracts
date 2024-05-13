@@ -11,8 +11,6 @@ import './DecentralizedIndex.sol';
 contract WeightedIndex is DecentralizedIndex {
   using SafeERC20 for IERC20;
 
-  IUniswapV2Factory immutable V2_FACTORY;
-
   uint256 _totalWeights;
 
   constructor(
@@ -24,7 +22,7 @@ contract WeightedIndex is DecentralizedIndex {
     uint256[] memory _weights,
     address _pairedLpToken,
     address _lpRewardsToken,
-    address _v2Router,
+    address _dexHandler,
     bool _stakeRestriction
   )
     DecentralizedIndex(
@@ -35,11 +33,10 @@ contract WeightedIndex is DecentralizedIndex {
       _fees,
       _pairedLpToken,
       _lpRewardsToken,
-      _v2Router,
+      _dexHandler,
       _stakeRestriction
     )
   {
-    V2_FACTORY = IUniswapV2Factory(IUniswapV2Router02(_v2Router).factory());
     require(_tokens.length == _weights.length, 'V');
     uint256 _tl = _tokens.length;
     for (uint8 _i; _i < _tl; _i++) {
@@ -59,9 +56,10 @@ contract WeightedIndex is DecentralizedIndex {
       _isTokenInIndex[_tokens[_i]] = true;
 
       if (_config.blacklistTKNpTKNPoolV2 && _tokens[_i] != _pairedLpToken) {
-        address _blkPool = IUniswapV2Factory(
-          IUniswapV2Router02(_v2Router).factory()
-        ).createPair(address(this), _tokens[_i]);
+        address _blkPool = IDexAdapter(_dexHandler).createV2Pool(
+          address(this),
+          _tokens[_i]
+        );
         _blacklist[_blkPool] = true;
       }
     }
@@ -77,7 +75,7 @@ contract WeightedIndex is DecentralizedIndex {
 
   function _getNativePriceUSDX96() internal view returns (uint256) {
     IUniswapV2Pair _nativeStablePool = IUniswapV2Pair(
-      V2_FACTORY.getPair(DAI, WETH)
+      DEX_HANDLER.getV2Pool(DAI, WETH)
     );
     address _token0 = _nativeStablePool.token0();
     (uint8 _decimals0, uint8 _decimals1) = (
@@ -101,7 +99,7 @@ contract WeightedIndex is DecentralizedIndex {
     if (_token == WETH) {
       return _getNativePriceUSDX96();
     }
-    IUniswapV2Pair _pool = IUniswapV2Pair(V2_FACTORY.getPair(_token, WETH));
+    IUniswapV2Pair _pool = IUniswapV2Pair(DEX_HANDLER.getV2Pool(_token, WETH));
     address _token0 = _pool.token0();
     uint8 _decimals0 = IERC20Metadata(_token0).decimals();
     uint8 _decimals1 = IERC20Metadata(_pool.token1()).decimals();

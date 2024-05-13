@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import './interfaces/IDexAdapter.sol';
 import './interfaces/IRewardsWhitelister.sol';
 import './interfaces/IProtocolFeeRouter.sol';
 import './interfaces/IStakingPoolToken.sol';
@@ -18,7 +19,7 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
   address public override stakingToken;
 
   modifier onlyRestricted() {
-    require(_msgSender() == stakeUserRestriction, 'RESUSERAUTH');
+    require(_msgSender() == stakeUserRestriction, 'R');
     _;
   }
 
@@ -28,9 +29,9 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
     address _pairedLpToken,
     address _rewardsToken,
     address _stakeUserRestriction,
-    address _v3Router,
     IProtocolFeeRouter _feeRouter,
     IRewardsWhitelister _rewardsWhitelist,
+    IDexAdapter _dexHandler,
     IV3TwapUtilities _v3TwapUtilities
   ) ERC20(_name, _symbol) {
     indexFund = _msgSender();
@@ -39,8 +40,8 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
       new TokenRewards(
         _feeRouter,
         _rewardsWhitelist,
+        _dexHandler,
         _v3TwapUtilities,
-        _v3Router,
         indexFund,
         _pairedLpToken,
         address(this),
@@ -50,9 +51,9 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
   }
 
   function stake(address _user, uint256 _amount) external override {
-    require(stakingToken != address(0), 'INIT');
+    require(stakingToken != address(0), 'I');
     if (stakeUserRestriction != address(0)) {
-      require(_user == stakeUserRestriction, 'RESTRICT');
+      require(_user == stakeUserRestriction, 'U');
     }
     _mint(_user, _amount);
     IERC20(stakingToken).safeTransferFrom(_msgSender(), address(this), _amount);
@@ -66,7 +67,7 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
   }
 
   function setStakingToken(address _stakingToken) external onlyOwner {
-    require(stakingToken == address(0), 'SET');
+    require(stakingToken == address(0), 'S');
     stakingToken = _stakingToken;
   }
 

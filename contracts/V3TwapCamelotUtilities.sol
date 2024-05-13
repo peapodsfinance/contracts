@@ -35,9 +35,19 @@ contract V3TwapCamelotUtilities is IV3TwapUtilities, Ownable {
     address,
     address,
     address,
+    int24
+  ) external pure override returns (address) {
+    require(false, 'INVALID0');
+    return address(0);
+  }
+
+  function getV3Pool(
+    address,
+    address,
+    address,
     uint24
   ) external pure override returns (address) {
-    require(false, 'INVALID: NOFEE');
+    require(false, 'INVALID1');
     return address(0);
   }
 

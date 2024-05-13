@@ -15,6 +15,13 @@ interface IV3TwapUtilities {
     uint24 poolFee
   ) external view returns (address);
 
+  function getV3Pool(
+    address v3Factory,
+    address token0,
+    address token1,
+    int24 tickSpacing
+  ) external view returns (address);
+
   function getPoolPriceUSDX96(
     address pricePool,
     address nativeStablePool,

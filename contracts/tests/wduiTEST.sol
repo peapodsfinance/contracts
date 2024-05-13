@@ -8,7 +8,7 @@ contract wduiTEST is WeightedIndex {
     address[] memory _tokens,
     uint256[] memory _weights,
     address _rewardsToken,
-    address _v2Router,
+    address _dexHandler,
     Config memory _config,
     Fees memory _fees
   )
@@ -21,7 +21,7 @@ contract wduiTEST is WeightedIndex {
       _weights,
       address(0),
       _rewardsToken,
-      _v2Router,
+      _dexHandler,
       false
     )
   {}
