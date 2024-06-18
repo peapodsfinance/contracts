@@ -229,7 +229,7 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
     uint256 _minLPTokens,
     uint256 _minPairedLpToken,
     uint256 _deadline
-  ) external {
+  ) external override {
     address _stakingPool = _indexFund.lpStakingPool();
     address _pairedLpToken = _indexFund.PAIRED_LP_TOKEN();
     uint256 _stakingBalBefore = IERC20(_stakingPool).balanceOf(address(this));

@@ -13,4 +13,12 @@ interface IIndexUtils {
     uint256 slippage,
     uint256 deadline
   ) external payable returns (uint256 amountOut);
+
+  function unstakeAndRemoveLP(
+    IDecentralizedIndex indexFund,
+    uint256 amountStakedTokens,
+    uint256 minLPTokens,
+    uint256 minPairedLpToken,
+    uint256 deadline
+  ) external;
 }

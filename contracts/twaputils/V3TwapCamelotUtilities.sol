@@ -3,15 +3,15 @@ pragma solidity ^0.8.19;
 
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
-import './interfaces/IERC20Metadata.sol';
-import './interfaces/IAlgebraFactory.sol';
-import './interfaces/IAlgebraKimV3Pool.sol';
-import './interfaces/IV3TwapUtilities.sol';
-import './libraries/FullMath.sol';
-import './libraries/PoolAddressKimMode.sol';
-import './libraries/TickMath.sol';
+import '../interfaces/IERC20Metadata.sol';
+import '../interfaces/IAlgebraFactory.sol';
+import '../interfaces/IAlgebraV3Pool.sol';
+import '../interfaces/IV3TwapUtilities.sol';
+import '../libraries/FullMath.sol';
+import '../libraries/PoolAddressAlgebra.sol';
+import '../libraries/TickMath.sol';
 
-contract V3TwapKimUtilities is IV3TwapUtilities, Ownable {
+contract V3TwapCamelotUtilities is IV3TwapUtilities, Ownable {
   uint32 constant INTERVAL = 10 minutes;
 
   function getV3Pool(
@@ -20,12 +20,12 @@ contract V3TwapKimUtilities is IV3TwapUtilities, Ownable {
     address _t1
   ) external view override returns (address) {
     (address _token0, address _token1) = _t0 < _t1 ? (_t0, _t1) : (_t1, _t0);
-    PoolAddressKimMode.PoolKey memory _key = PoolAddressKimMode.PoolKey({
+    PoolAddressAlgebra.PoolKey memory _key = PoolAddressAlgebra.PoolKey({
       token0: _token0,
       token1: _token1
     });
     return
-      PoolAddressKimMode.computeAddress(
+      PoolAddressAlgebra.computeAddress(
         IAlgebraFactory(_v3Factory).poolDeployer(),
         _key
       );
@@ -56,18 +56,16 @@ contract V3TwapKimUtilities is IV3TwapUtilities, Ownable {
     address _nativeStablePool,
     address _WETH9
   ) public view override returns (uint256) {
-    address _token0 = IAlgebraKimV3Pool(_nativeStablePool).token0();
+    address _token0 = IAlgebraV3Pool(_nativeStablePool).token0();
     uint256 _priceStableWETH9X96 = _adjustedPriceX96(
-      IAlgebraKimV3Pool(_nativeStablePool),
-      _token0 == _WETH9
-        ? IAlgebraKimV3Pool(_nativeStablePool).token1()
-        : _token0
+      IAlgebraV3Pool(_nativeStablePool),
+      _token0 == _WETH9 ? IAlgebraV3Pool(_nativeStablePool).token1() : _token0
     );
     if (_pricePool == _nativeStablePool) {
       return _priceStableWETH9X96;
     }
     uint256 _priceMainX96 = _adjustedPriceX96(
-      IAlgebraKimV3Pool(_pricePool),
+      IAlgebraV3Pool(_pricePool),
       _WETH9
     );
     return (_priceStableWETH9X96 * _priceMainX96) / FixedPoint96.Q96;
@@ -76,9 +74,18 @@ contract V3TwapKimUtilities is IV3TwapUtilities, Ownable {
   function sqrtPriceX96FromPoolAndInterval(
     address _poolAddress
   ) public view override returns (uint160 sqrtPriceX96) {
-    IAlgebraKimV3Pool _pool = IAlgebraKimV3Pool(_poolAddress);
-    // TODO: find and use tickCumulative method
-    (sqrtPriceX96, , , , , ) = _pool.globalState();
+    IAlgebraV3Pool _pool = IAlgebraV3Pool(_poolAddress);
+    if (INTERVAL == 0) {
+      (sqrtPriceX96, , , , , , , ) = _pool.globalState();
+    } else {
+      uint32[] memory secondsAgo = new uint32[](2);
+      secondsAgo[0] = INTERVAL;
+      secondsAgo[1] = 0;
+      (int56[] memory tickCumulatives, , , ) = _pool.getTimepoints(secondsAgo);
+      sqrtPriceX96 = TickMath.getSqrtRatioAtTick(
+        int24((tickCumulatives[1] - tickCumulatives[0]) / int32(INTERVAL))
+      );
+    }
   }
 
   function priceX96FromSqrtPriceX96(
@@ -88,7 +95,7 @@ contract V3TwapKimUtilities is IV3TwapUtilities, Ownable {
   }
 
   function _adjustedPriceX96(
-    IAlgebraKimV3Pool _pool,
+    IAlgebraV3Pool _pool,
     address _numeratorToken
   ) internal view returns (uint256) {
     address _token1 = _pool.token1();

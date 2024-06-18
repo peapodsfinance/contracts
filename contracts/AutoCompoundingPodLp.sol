@@ -12,12 +12,12 @@ import './interfaces/IRewardsWhitelister.sol';
 import './interfaces/IV3TwapUtilities.sol';
 import './Zapper.sol';
 
-contract AutoCompoundedPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
+contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
   using SafeERC20 for IERC20;
 
   uint256 constant FACTOR = 10 ** 18;
   uint24 constant REWARDS_POOL_FEE = 10000;
-  uint256 constant DEFAULT_SLIPPAGE = 50;
+  uint256 constant DEFAULT_SLIPPAGE = 100;
 
   IDecentralizedIndex immutable POD;
   IIndexUtils immutable INDEX_UTILS;

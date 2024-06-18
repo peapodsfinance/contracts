@@ -40,6 +40,14 @@ interface IDexAdapter {
     address _recipient
   ) external returns (uint256 _amountOut);
 
+  function swapV2SingleExactOut(
+    address _tokenIn,
+    address _tokenOut,
+    uint256 _amountInMax,
+    uint256 _amountOut,
+    address _recipient
+  ) external returns (uint256 _amountInUsed);
+
   function swapV3Single(
     address _tokenIn,
     address _tokenOut,
