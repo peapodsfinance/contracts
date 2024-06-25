@@ -19,4 +19,8 @@ contract LeveragePositions is Context, ERC721A {
     _tokenId = _nextTokenId();
     _mint(_receiver, 1);
   }
+
+  function _startTokenId() internal pure override returns (uint256) {
+    return 1;
+  }
 }

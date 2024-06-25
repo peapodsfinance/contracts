@@ -9,45 +9,28 @@ contract LeverageManagerAccessControl is Ownable {
   // pod => pair
   mapping(address => address) public lendingPairs;
   // pod => auto compounding LP token
-  mapping(address => address) public lpCompounder;
+  mapping(address => address) public aspTkn;
   // pod => flash source
   mapping(address => address) public flashSource;
 
-  function addPair(address _pod, address _pair) external onlyOwner {
-    require(lendingPairs[_pod] == address(0), 'A');
-    require(IFraxlendPair(_pair).collateralContract() != address(0), 'AV');
+  function setPair(address _pod, address _pair) external onlyOwner {
+    if (_pair != address(0)) {
+      require(IFraxlendPair(_pair).collateralContract() != address(0), 'AV');
+    }
     lendingPairs[_pod] = _pair;
   }
 
-  function removePair(address _pod) external onlyOwner {
-    require(lendingPairs[_pod] != address(0), 'R');
-    delete lendingPairs[_pod];
+  function setAspTkn(address _pod, address _lpCompToken) external onlyOwner {
+    aspTkn[_pod] = _lpCompToken;
   }
 
-  function addLpCompound(
-    address _pod,
-    address _lpCompToken
-  ) external onlyOwner {
-    require(lpCompounder[_pod] == address(0), 'A');
-    lpCompounder[_pod] = _lpCompToken;
-  }
-
-  function removeLpCompound(address _pod) external onlyOwner {
-    require(lpCompounder[_pod] != address(0), 'R');
-    delete lpCompounder[_pod];
-  }
-
-  function addFlashSource(
+  function setFlashSource(
     address _pod,
     address _flashSource
   ) external onlyOwner {
-    require(flashSource[_pod] == address(0), 'A');
-    require(IFlashLoanSource(_flashSource).source() != address(0), 'AFS');
+    if (_flashSource != address(0)) {
+      require(IFlashLoanSource(_flashSource).source() != address(0), 'AFS');
+    }
     flashSource[_pod] = _flashSource;
-  }
-
-  function removeFlashSource(address _pod) external onlyOwner {
-    require(flashSource[_pod] != address(0), 'R');
-    delete flashSource[_pod];
   }
 }

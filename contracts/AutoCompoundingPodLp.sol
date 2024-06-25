@@ -20,8 +20,10 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
   uint256 constant DEFAULT_SLIPPAGE = 100;
 
   IDecentralizedIndex immutable POD;
-  IIndexUtils immutable INDEX_UTILS;
-  IRewardsWhitelister immutable REWARDS_WHITELISTER;
+
+  IIndexUtils public indexUtils;
+  IRewardsWhitelister public rewardsWhitelister;
+  bool public yieldConvEnabled = true;
 
   error NotImplemented();
 
@@ -39,8 +41,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
     Zapper(_v3TwapUtilities, _dexAdapter)
   {
     POD = _pod;
-    INDEX_UTILS = _utils;
-    REWARDS_WHITELISTER = _whitelist;
+    indexUtils = _utils;
+    rewardsWhitelister = _whitelist;
   }
 
   function asset() external view override returns (address) {
@@ -88,7 +90,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
   ) internal returns (uint256 _shares) {
     _shares = convertToShares(_assets);
     IERC20(_asset()).safeTransferFrom(_msgSender(), address(this), _assets);
-    _processAllRewardsTokensToPodLp(block.timestamp);
+    // TODO: slippage/oracles for inputs
+    _processAllRewardsTokensToPodLp(0, 0, block.timestamp);
 
     _mint(_receiver, _shares);
     emit Deposit(_msgSender(), _receiver, _assets, _shares);
@@ -150,9 +153,16 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
   }
 
   function processAllRewardsTokensToPodLp(
+    uint256 _amountLpOutMin,
+    uint256 _slippageOverride,
     uint256 _deadline
   ) external onlyOwner returns (uint256) {
-    return _processAllRewardsTokensToPodLp(_deadline);
+    return
+      _processAllRewardsTokensToPodLp(
+        _amountLpOutMin,
+        _slippageOverride,
+        _deadline
+      );
   }
 
   function _withdraw(
@@ -161,7 +171,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
   ) internal returns (uint256 _assets) {
     // trigger any pending rewards distro
     IERC20(_asset()).transfer(address(this), 0);
-    _processAllRewardsTokensToPodLp(block.timestamp);
+    // TODO: slippage/oracles for inputs
+    _processAllRewardsTokensToPodLp(0, 0, block.timestamp);
 
     _assets = convertToAssets(_shares);
     _burn(_msgSender(), _shares);
@@ -185,9 +196,14 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
   }
 
   function _processAllRewardsTokensToPodLp(
+    uint256 _amountLpOutMin,
+    uint256 _slippageOverride,
     uint256 _deadline
   ) internal returns (uint256 _lpAmtOut) {
-    address[] memory _tokens = REWARDS_WHITELISTER.getFullWhitelist();
+    if (!yieldConvEnabled) {
+      return _lpAmtOut;
+    }
+    address[] memory _tokens = rewardsWhitelister.getFullWhitelist();
     uint256 _len = _tokens.length;
     for (uint256 _i; _i < _len; _i++) {
       address _token = _tokens[_i];
@@ -195,8 +211,13 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
       if (_bal == 0) {
         continue;
       }
-      // TODO: use oracles to calculate slippage
-      _lpAmtOut += _tokenToPodLp(_token, _bal, 0, 0, _deadline);
+      _lpAmtOut += _tokenToPodLp(
+        _token,
+        _bal,
+        _amountLpOutMin,
+        _slippageOverride,
+        _deadline
+      );
     }
   }
 
@@ -213,7 +234,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
       0,
       _slippageOverride
     );
-    return _pairedLpTokenToPodLp(_pairedOut, _amountLpOutMin, _deadline);
+    _lpAmtOut = _pairedLpTokenToPodLp(_pairedOut, _amountLpOutMin, _deadline);
   }
 
   function _tokenToPairedLpToken(
@@ -276,7 +297,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
       address(this)
     );
     return
-      INDEX_UTILS.addLPAndStake(
+      indexUtils.addLPAndStake(
         POD,
         POD.balanceOf(address(this)),
         _pairedLpToken,
@@ -285,5 +306,18 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
         DEFAULT_SLIPPAGE,
         _deadline
       );
+  }
+
+  function setIndexUtils(IIndexUtils _utils) external onlyOwner {
+    indexUtils = _utils;
+  }
+
+  function setRewardsWhitelister(IRewardsWhitelister _wl) external onlyOwner {
+    rewardsWhitelister = _wl;
+  }
+
+  function setYieldConvEnabled(bool _enabled) external onlyOwner {
+    require(yieldConvEnabled != _enabled, 'T');
+    yieldConvEnabled = _enabled;
   }
 }

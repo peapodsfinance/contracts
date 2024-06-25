@@ -10,6 +10,23 @@ import '../interfaces/IFraxlendPair.sol';
 contract LeveragePositionCustodian is Context, Ownable {
   using SafeERC20 for IERC20;
 
+  function borrowAsset(
+    address _pair,
+    uint256 _borrowAmount,
+    uint256 _collateralAmount,
+    address _receiver
+  ) external onlyOwner {
+    IERC20(IFraxlendPair(_pair).collateralContract()).safeIncreaseAllowance(
+      _pair,
+      _collateralAmount
+    );
+    IFraxlendPair(_pair).borrowAsset(
+      _borrowAmount,
+      _collateralAmount,
+      _receiver
+    );
+  }
+
   function removeCollateral(
     address _pair,
     uint256 _collateralAmount,

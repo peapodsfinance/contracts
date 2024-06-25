@@ -32,6 +32,7 @@ contract spTKNOracle is IMinimalOracle {
   function getPrices()
     external
     view
+    virtual
     override
     returns (bool _isBadData, uint256 _priceLow, uint256 _priceHigh)
   {
@@ -67,11 +68,11 @@ contract spTKNOracle is IMinimalOracle {
       IERC20(_lpTkn).totalSupply();
   }
 
-  function _getLpTkn() internal view returns (address) {
+  function _getLpTkn() private view returns (address) {
     return IStakingPoolToken(SPTKN).stakingToken();
   }
 
-  function _sqrt(uint256 x) internal pure returns (uint256 y) {
+  function _sqrt(uint256 x) private pure returns (uint256 y) {
     uint256 z = (x + 1) / 2;
     y = x;
     while (z < y) {

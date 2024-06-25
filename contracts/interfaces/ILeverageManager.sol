@@ -25,6 +25,8 @@ interface ILeverageManager {
     address custodian;
   }
 
+  function initializePosition(address _pod, address _recipient) external;
+
   function addLeverage(
     uint256 _tokenId,
     address _pod,
@@ -41,6 +43,7 @@ interface ILeverageManager {
     uint256 _collateralAssetAmtRemove,
     uint256 _podAmtMin,
     uint256 _pairedAssetAmtMin,
-    bool _userProvidesRepayDebt
+    address _dexAdapter,
+    uint256 _userProvidedDebtAmtMax
   ) external;
 }

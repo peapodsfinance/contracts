@@ -152,17 +152,14 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
     uint256 _slippage,
     uint256 _deadline
   ) external payable override returns (uint256 _amountOut) {
-    address _v2Pool = DEX_ADAPTER.getV2Pool(
-      address(_indexFund),
-      _indexFund.PAIRED_LP_TOKEN()
-    );
-    uint256 _idxTokensBefore = IERC20(address(_indexFund)).balanceOf(
+    address _indexFundAddy = address(_indexFund);
+    address _pairedLpToken = _indexFund.PAIRED_LP_TOKEN();
+    uint256 _idxTokensBefore = IERC20(_indexFundAddy).balanceOf(address(this));
+    uint256 _pairedLpTokenBefore = IERC20(_pairedLpToken).balanceOf(
       address(this)
     );
-    uint256 _pairedLpTokenBefore = IERC20(_indexFund.PAIRED_LP_TOKEN())
-      .balanceOf(address(this));
     uint256 _ethBefore = address(this).balance - msg.value;
-    IERC20(address(_indexFund)).safeTransferFrom(
+    IERC20(_indexFundAddy).safeTransferFrom(
       _msgSender(),
       address(this),
       _amountIdxTokens
@@ -177,32 +174,28 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
         _amtPairedLpTokenProvided
       );
     }
-    if (_pairedLpTokenProvided != _indexFund.PAIRED_LP_TOKEN()) {
+    if (_pairedLpTokenProvided != _pairedLpToken) {
       _zap(
         _pairedLpTokenProvided,
-        _indexFund.PAIRED_LP_TOKEN(),
+        _pairedLpToken,
         _amtPairedLpTokenProvided,
         _amountPairedLpTokenMin
       );
     }
 
-    IERC20(_indexFund.PAIRED_LP_TOKEN()).safeIncreaseAllowance(
-      address(_indexFund),
-      IERC20(_indexFund.PAIRED_LP_TOKEN()).balanceOf(address(this)) -
-        _pairedLpTokenBefore
+    IERC20(_pairedLpToken).safeIncreaseAllowance(
+      _indexFundAddy,
+      IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore
     );
     _amountOut = _indexFund.addLiquidityV2(
-      IERC20(address(_indexFund)).balanceOf(address(this)) - _idxTokensBefore,
-      IERC20(_indexFund.PAIRED_LP_TOKEN()).balanceOf(address(this)) -
-        _pairedLpTokenBefore,
+      IERC20(_indexFundAddy).balanceOf(address(this)) - _idxTokensBefore,
+      IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore,
       _slippage,
       _deadline
     );
 
-    IERC20(_v2Pool).safeIncreaseAllowance(
-      _indexFund.lpStakingPool(),
-      _amountOut
-    );
+    IERC20(DEX_ADAPTER.getV2Pool(_indexFundAddy, _pairedLpToken))
+      .safeIncreaseAllowance(_indexFund.lpStakingPool(), _amountOut);
     IStakingPoolToken(_indexFund.lpStakingPool()).stake(
       _msgSender(),
       _amountOut
@@ -215,12 +208,8 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
       }('');
       require(_s && address(this).balance >= _ethBefore, 'TOOMUCH');
     }
-    _checkAndRefundERC20(_msgSender(), address(_indexFund), _idxTokensBefore);
-    _checkAndRefundERC20(
-      _msgSender(),
-      _indexFund.PAIRED_LP_TOKEN(),
-      _pairedLpTokenBefore
-    );
+    _checkAndRefundERC20(_msgSender(), _indexFundAddy, _idxTokensBefore);
+    _checkAndRefundERC20(_msgSender(), _pairedLpToken, _pairedLpTokenBefore);
   }
 
   function unstakeAndRemoveLP(
