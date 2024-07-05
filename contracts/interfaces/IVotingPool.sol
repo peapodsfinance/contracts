@@ -13,6 +13,7 @@ interface IVotingPool {
     uint256 amtStaked;
     uint256 stakedToOutputFactor;
     uint256 stakedToOutputDenomenator;
+    uint256 lastStaked;
   }
 
   event AddStake(

@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import { VaultAccount } from '../libraries/VaultAccount.sol';
+
 interface IFraxlendPair {
+  function totalBorrow() external view returns (VaultAccount memory);
+
   function collateralContract() external view returns (address);
 
   function userCollateralBalance(address user) external view returns (uint256); // amount of collateral each user is backed

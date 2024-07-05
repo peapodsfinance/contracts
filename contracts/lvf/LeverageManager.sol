@@ -11,6 +11,7 @@ import '../interfaces/IFlashLoanRecipient.sol';
 // import '../interfaces/IIndexUtils.sol';
 import '../interfaces/IIndexUtils_LEGACY.sol';
 import '../interfaces/ILeverageManager.sol';
+import { VaultAccount, VaultAccountingLibrary } from '../libraries/VaultAccount.sol';
 import '../AutoCompoundingPodLp.sol';
 import './LeverageManagerAccessControl.sol';
 import './LeveragePositions.sol';
@@ -23,17 +24,18 @@ contract LeverageManager is
   LeverageManagerAccessControl
 {
   using SafeERC20 for IERC20;
+  using VaultAccountingLibrary for VaultAccount;
 
   IIndexUtils_LEGACY public indexUtils;
   LeveragePositions public positionNFT;
 
-  // tokenId => position props
+  // positionId => position props
   mapping(uint256 => LeveragePositionProps) public positionProps;
 
-  event AddLeverage(uint256 indexed tokenId, address indexed user);
+  event AddLeverage(uint256 indexed positionId, address indexed user);
 
-  modifier onlyPositionOwner(uint256 _tokenId) {
-    require(positionNFT.ownerOf(_tokenId) == _msgSender(), 'AUTH');
+  modifier onlyPositionOwner(uint256 _positionId) {
+    require(positionNFT.ownerOf(_positionId) == _msgSender(), 'AUTH');
     _;
   }
 
@@ -54,7 +56,7 @@ contract LeverageManager is
   }
 
   function addLeverage(
-    uint256 _tokenId,
+    uint256 _positionId,
     address _pod,
     uint256 _podAmount,
     uint256 _pairedLpDesired,
@@ -62,10 +64,10 @@ contract LeverageManager is
     uint256 _slippage,
     uint256 _deadline
   ) external override {
-    if (_tokenId == 0) {
-      _tokenId = _initializePosition(_pod, _msgSender());
+    if (_positionId == 0) {
+      _positionId = _initializePosition(_pod, _msgSender());
     } else {
-      _pod = positionProps[_tokenId].pod;
+      _pod = positionProps[_positionId].pod;
       require(_pod != address(0), 'PV');
     }
     require(flashSource[_pod] != address(0), 'FSV');
@@ -83,7 +85,7 @@ contract LeverageManager is
     bytes memory _leverageData = abi.encode(
       LeverageFlashProps({
         method: FlashCallbackMethod.ADD,
-        tokenId: _tokenId,
+        positionId: _positionId,
         user: _msgSender(),
         pod: _pod,
         podAmount: _podAmount,
@@ -103,15 +105,15 @@ contract LeverageManager is
   }
 
   function removeLeverage(
-    uint256 _tokenId,
+    uint256 _positionId,
     uint256 _borrowAssetAmt,
     uint256 _collateralAssetAmtRemove,
     uint256 _podAmtMin,
     uint256 _pairedAssetAmtMin,
     address _dexAdapter,
     uint256 _userProvidedDebtAmtMax
-  ) external override onlyPositionOwner(_tokenId) {
-    LeveragePositionProps memory _props = positionProps[_tokenId];
+  ) external override onlyPositionOwner(_positionId) {
+    LeveragePositionProps memory _props = positionProps[_positionId];
     IFlashLoanSource _flashLoanSource = IFlashLoanSource(
       flashSource[_props.pod]
     );
@@ -121,7 +123,7 @@ contract LeverageManager is
 
     LeverageFlashProps memory _position;
     _position.method = FlashCallbackMethod.REMOVE;
-    _position.tokenId = _tokenId;
+    _position.positionId = _positionId;
     _position.user = _msgSender();
     _position.pod = _props.pod;
     bytes memory _additionalInfo = abi.encode(
@@ -137,6 +139,19 @@ contract LeverageManager is
       _borrowAssetAmt,
       address(this),
       abi.encode(_position, _additionalInfo)
+    );
+  }
+
+  function withdrawAssets(
+    uint256 _positionId,
+    address _token,
+    address _recipient,
+    uint256 _amount
+  ) external onlyPositionOwner(_positionId) {
+    LeveragePositionCustodian(positionProps[_positionId].custodian).withdraw(
+      _token,
+      _recipient,
+      _amount
     );
   }
 
@@ -176,11 +191,11 @@ contract LeverageManager is
   function _initializePosition(
     address _pod,
     address _recipient
-  ) internal returns (uint256 _tokenId) {
+  ) internal returns (uint256 _positionId) {
     require(lendingPairs[_pod] != address(0), 'LVP');
-    _tokenId = positionNFT.mint(_recipient);
+    _positionId = positionNFT.mint(_recipient);
     LeveragePositionCustodian _custodian = new LeveragePositionCustodian();
-    positionProps[_tokenId] = LeveragePositionProps({
+    positionProps[_positionId] = LeveragePositionProps({
       pod: _pod,
       lendingPair: lendingPairs[_pod],
       custodian: address(_custodian)
@@ -228,10 +243,10 @@ contract LeverageManager is
     uint256 _borrowedAvailable = _d.amount - _borrowedUsed;
 
     IERC20(aspTkn[_props.pod]).safeTransfer(
-      positionProps[_props.tokenId].custodian,
+      positionProps[_props.positionId].custodian,
       _aspTknCollateralBal
     );
-    LeveragePositionCustodian(positionProps[_props.tokenId].custodian)
+    LeveragePositionCustodian(positionProps[_props.positionId].custodian)
       .borrowAsset(
         lendingPairs[_props.pod],
         _props.pairedLpDesired,
@@ -251,7 +266,7 @@ contract LeverageManager is
         _borrowedAvailable - _flashPaybackAmt
       );
     }
-    emit AddLeverage(_props.tokenId, _props.user);
+    emit AddLeverage(_props.positionId, _props.user);
   }
 
   function _removeLeverage(
@@ -278,11 +293,12 @@ contract LeverageManager is
       lendingPairs[_props.pod],
       _borrowAssetAmt
     );
-    IFraxlendPair(lendingPairs[_props.pod]).repayAsset(
-      _borrowAssetAmt,
-      positionProps[_props.tokenId].custodian
+    IFraxlendPair _fraxPair = IFraxlendPair(lendingPairs[_props.pod]);
+    _fraxPair.repayAsset(
+      _fraxPair.totalBorrow().toShares(_borrowAssetAmt, true),
+      positionProps[_props.positionId].custodian
     );
-    LeveragePositionCustodian(positionProps[_props.tokenId].custodian)
+    LeveragePositionCustodian(positionProps[_props.positionId].custodian)
       .removeCollateral(
         lendingPairs[_props.pod],
         _collateralAssetAmtRemove,
@@ -367,6 +383,10 @@ contract LeverageManager is
     uint256 _targetNeededAmt
   ) internal returns (uint256 _podRemainingAmt) {
     uint256 _balBefore = IERC20(_sourceToken).balanceOf(address(this));
+    IERC20(_sourceToken).safeIncreaseAllowance(
+      address(_dexAdapter),
+      _sourceAmt
+    );
     _dexAdapter.swapV2SingleExactOut(
       _sourceToken,
       _targetToken,

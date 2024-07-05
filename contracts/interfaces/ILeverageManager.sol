@@ -9,7 +9,7 @@ interface ILeverageManager {
 
   struct LeverageFlashProps {
     FlashCallbackMethod method;
-    uint256 tokenId;
+    uint256 positionId;
     address user;
     address pod;
     uint256 podAmount;
@@ -28,7 +28,7 @@ interface ILeverageManager {
   function initializePosition(address _pod, address _recipient) external;
 
   function addLeverage(
-    uint256 _tokenId,
+    uint256 _positionId,
     address _pod,
     uint256 _podAmount,
     uint256 _pairedLpDesired,
@@ -38,7 +38,7 @@ interface ILeverageManager {
   ) external;
 
   function removeLeverage(
-    uint256 _tokenId,
+    uint256 _positionId,
     uint256 _borrowAssetAmt,
     uint256 _collateralAssetAmtRemove,
     uint256 _podAmtMin,

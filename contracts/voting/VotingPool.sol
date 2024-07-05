@@ -59,6 +59,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     }
 
     Stake storage _stake = stakes[_msgSender()][_asset];
+    _stake.lastStaked = block.timestamp;
     uint256 _mintedAmtBefore = _stake.amtStaked == 0
       ? 0
       : (_stake.amtStaked * _stake.stakedToOutputFactor) /
@@ -78,6 +79,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
   function unstake(address _asset, uint256 _amount) external override {
     require(_amount > 0, 'R');
     Stake storage _stake = stakes[_msgSender()][_asset];
+    require(block.timestamp > _stake.lastStaked + lockupPeriod, 'LU');
     uint256 _amtToBurn = (_amount * _stake.stakedToOutputFactor) /
       _stake.stakedToOutputDenomenator;
     _stake.amtStaked -= _amount;

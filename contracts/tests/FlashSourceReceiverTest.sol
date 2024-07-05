@@ -9,7 +9,7 @@ import '../interfaces/IFlashLoanSource.sol';
 contract FlashSourceReceiverTest is IFlashLoanRecipient {
   using SafeERC20 for IERC20;
 
-  function testFlash(
+  function tryFlash(
     IFlashLoanSource _source,
     address _token,
     uint256 _amount

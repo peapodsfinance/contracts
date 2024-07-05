@@ -88,11 +88,11 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
     uint256 _assets,
     address _receiver
   ) internal returns (uint256 _shares) {
+    // TODO: slippage/oracles for inputs
+    _triggerAndProcessRewardsToLp(0, 0, block.timestamp);
+
     _shares = convertToShares(_assets);
     IERC20(_asset()).safeTransferFrom(_msgSender(), address(this), _assets);
-    // TODO: slippage/oracles for inputs
-    _processAllRewardsTokensToPodLp(0, 0, block.timestamp);
-
     _mint(_receiver, _shares);
     emit Deposit(_msgSender(), _receiver, _assets, _shares);
   }
@@ -155,24 +155,27 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
   function processAllRewardsTokensToPodLp(
     uint256 _amountLpOutMin,
     uint256 _slippageOverride,
-    uint256 _deadline
+    uint256 _deadline,
+    bool _triggerNew
   ) external onlyOwner returns (uint256) {
+    if (_triggerNew) {
+      return
+        _triggerAndProcessRewardsToLp(
+          _amountLpOutMin,
+          _slippageOverride,
+          _deadline
+        );
+    }
     return
-      _processAllRewardsTokensToPodLp(
-        _amountLpOutMin,
-        _slippageOverride,
-        _deadline
-      );
+      _processRewardsToPodLp(_amountLpOutMin, _slippageOverride, _deadline);
   }
 
   function _withdraw(
     uint256 _shares,
     address _receiver
   ) internal returns (uint256 _assets) {
-    // trigger any pending rewards distro
-    IERC20(_asset()).transfer(address(this), 0);
     // TODO: slippage/oracles for inputs
-    _processAllRewardsTokensToPodLp(0, 0, block.timestamp);
+    _triggerAndProcessRewardsToLp(0, 0, block.timestamp);
 
     _assets = convertToAssets(_shares);
     _burn(_msgSender(), _shares);
@@ -180,11 +183,20 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
     emit Withdraw(_msgSender(), _receiver, _receiver, _assets, _shares);
   }
 
-  function _cbr() internal view returns (uint256) {
+  function _triggerAndProcessRewardsToLp(
+    uint256 _amountLpOutMin,
+    uint256 _slippageOverride,
+    uint256 _deadline
+  ) internal returns (uint256) {
+    // trigger any pending rewards distro
+    IERC20(_asset()).transfer(address(this), 0);
     return
-      (FACTOR * totalAssets() * 10 ** decimals()) /
-      totalSupply() /
-      10 ** IERC20Metadata(_asset()).decimals();
+      _processRewardsToPodLp(_amountLpOutMin, _slippageOverride, _deadline);
+  }
+
+  // @notice: assumes underlying vault asset has decimals == 18
+  function _cbr() internal view returns (uint256) {
+    return (FACTOR * totalAssets()) / totalSupply();
   }
 
   function _asset() internal view returns (address) {
@@ -195,7 +207,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
     return IERC20Metadata(_asset()).decimals();
   }
 
-  function _processAllRewardsTokensToPodLp(
+  function _processRewardsToPodLp(
     uint256 _amountLpOutMin,
     uint256 _slippageOverride,
     uint256 _deadline
@@ -245,6 +257,9 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
   ) internal returns (uint256 _amountOut) {
     address _pairedLpToken = POD.PAIRED_LP_TOKEN();
     address _rewardsToken = POD.lpRewardsToken();
+    if (_token == _pairedLpToken) {
+      return _amountIn;
+    }
     if (_token != address(0) && _token != _rewardsToken) {
       return _zap(_token, _pairedLpToken, _amountIn, _amountOutMin);
     }
@@ -296,10 +311,13 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
       _amountOutMin,
       address(this)
     );
+    uint256 _podAmt = POD.balanceOf(address(this));
+    IERC20(POD).safeIncreaseAllowance(address(indexUtils), _podAmt);
+    IERC20(_pairedLpToken).safeIncreaseAllowance(address(indexUtils), _half);
     return
       indexUtils.addLPAndStake(
         POD,
-        POD.balanceOf(address(this)),
+        _podAmt,
         _pairedLpToken,
         _half,
         _half,
