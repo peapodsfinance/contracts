@@ -3,18 +3,21 @@ pragma solidity ^0.8.19;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '@openzeppelin/contracts/utils/Context.sol';
 import '../interfaces/IDecentralizedIndex.sol';
 import '../interfaces/IFlashLoanRecipient.sol';
-import '../interfaces/IFlashLoanSource.sol';
+import './FlashSourceBase.sol';
 
-contract PodFlashSource is IFlashLoanSource, IFlashLoanRecipient, Context {
+contract PodFlashSource is FlashSourceBase, IFlashLoanRecipient {
   using SafeERC20 for IERC20;
 
   address public override source;
   address public override paymentToken;
 
-  constructor(address _pod, address _flashPaymentToken) {
+  constructor(
+    address _pod,
+    address _flashPaymentToken,
+    address _lvfMan
+  ) FlashSourceBase(_lvfMan) {
     source = _pod;
     paymentToken = _flashPaymentToken;
   }
@@ -28,7 +31,7 @@ contract PodFlashSource is IFlashLoanSource, IFlashLoanRecipient, Context {
     uint256 _amount,
     address _recipient,
     bytes calldata _data
-  ) external override {
+  ) external override onlyLeverageManager {
     uint256 _paymentAmount = paymentAmount();
     IERC20(paymentToken).safeTransferFrom(
       _msgSender(),

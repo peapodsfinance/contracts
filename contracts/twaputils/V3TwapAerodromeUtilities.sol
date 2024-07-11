@@ -72,16 +72,30 @@ contract V3TwapAerodromeUtilities is IV3TwapUtilities, Ownable {
   function sqrtPriceX96FromPoolAndInterval(
     address _poolAddress
   ) public view override returns (uint160 sqrtPriceX96) {
+    sqrtPriceX96 = _sqrtPriceX96FromPoolAndInterval(_poolAddress, INTERVAL);
+  }
+
+  function sqrtPriceX96FromPoolAndPassedInterval(
+    address _poolAddress,
+    uint32 _interval
+  ) external view override returns (uint160 sqrtPriceX96) {
+    sqrtPriceX96 = _sqrtPriceX96FromPoolAndInterval(_poolAddress, _interval);
+  }
+
+  function _sqrtPriceX96FromPoolAndInterval(
+    address _poolAddress,
+    uint32 _interval
+  ) internal view returns (uint160 sqrtPriceX96) {
     ICLPool _pool = ICLPool(_poolAddress);
-    if (INTERVAL == 0) {
+    if (_interval == 0) {
       (sqrtPriceX96, , , , , ) = _pool.slot0();
     } else {
       uint32[] memory secondsAgo = new uint32[](2);
-      secondsAgo[0] = INTERVAL;
+      secondsAgo[0] = _interval;
       secondsAgo[1] = 0;
       (int56[] memory tickCumulatives, ) = _pool.observe(secondsAgo);
       sqrtPriceX96 = TickMath.getSqrtRatioAtTick(
-        int24((tickCumulatives[1] - tickCumulatives[0]) / int32(INTERVAL))
+        int24((tickCumulatives[1] - tickCumulatives[0]) / int32(_interval))
       );
     }
   }

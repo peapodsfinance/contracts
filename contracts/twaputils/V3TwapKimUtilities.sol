@@ -76,6 +76,19 @@ contract V3TwapKimUtilities is IV3TwapUtilities, Ownable {
   function sqrtPriceX96FromPoolAndInterval(
     address _poolAddress
   ) public view override returns (uint160 sqrtPriceX96) {
+    sqrtPriceX96 = _sqrtPriceX96FromPoolAndInterval(_poolAddress);
+  }
+
+  function sqrtPriceX96FromPoolAndPassedInterval(
+    address _poolAddress,
+    uint32
+  ) external view override returns (uint160 sqrtPriceX96) {
+    sqrtPriceX96 = _sqrtPriceX96FromPoolAndInterval(_poolAddress);
+  }
+
+  function _sqrtPriceX96FromPoolAndInterval(
+    address _poolAddress
+  ) internal view returns (uint160 sqrtPriceX96) {
     IAlgebraKimV3Pool _pool = IAlgebraKimV3Pool(_poolAddress);
     // TODO: find and use tickCumulative method
     (sqrtPriceX96, , , , , ) = _pool.globalState();

@@ -1,27 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import '@openzeppelin/contracts/utils/Context.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3FlashCallback.sol';
 import '../interfaces/IFlashLoanRecipient.sol';
-import '../interfaces/IFlashLoanSource.sol';
+import './FlashSourceBase.sol';
 
 // https://solidity-by-example.org/defi/uniswap-v3-flash/
-contract UniswapV3FlashSource is
-  IFlashLoanSource,
-  IUniswapV3FlashCallback,
-  Context
-{
+contract UniswapV3FlashSource is FlashSourceBase, IUniswapV3FlashCallback {
   using SafeERC20 for IERC20;
 
   address public override source;
   address public override paymentToken;
   uint256 public override paymentAmount;
 
-  constructor(address _pool) {
+  constructor(address _pool, address _lvfMan) FlashSourceBase(_lvfMan) {
     source = _pool;
   }
 
@@ -30,7 +25,7 @@ contract UniswapV3FlashSource is
     uint256 _amount,
     address _recipient,
     bytes calldata _data
-  ) external override {
+  ) external override onlyLeverageManager {
     FlashData memory _fData = FlashData(_recipient, _token, _amount, _data, 0);
     (uint256 _borrowAmount0, uint256 _borrowAmount1) = _token ==
       IUniswapV3Pool(source).token0()

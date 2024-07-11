@@ -361,17 +361,13 @@ contract LeverageManager is
     }
     if (_borrowAmtNeededToSwap > 0) {
       // sell pod token into LP for enough borrow token to get enough to repay
-      uint256 _podAmtBefore = IERC20(_pod).balanceOf(address(this));
-      _swapPodForBorrowToken(
+      _podAmtRemaining = _swapPodForBorrowToken(
         IDexAdapter(_dexAdapter),
         _pod,
         _borrowToken,
         _podAmtReceived,
         _borrowAmtNeededToSwap
       );
-      _podAmtRemaining =
-        _podAmtReceived -
-        (_podAmtBefore - IERC20(_pod).balanceOf(address(this)));
     }
   }
 
@@ -410,9 +406,6 @@ contract LeverageManager is
     uint256 _podBalBefore = IERC20(_props.pod).balanceOf(address(this));
     uint256 _pairedLpBalBefore = IERC20(_d.token).balanceOf(address(this));
     uint256 _stakeBalBefore = IERC20(_spTKN).balanceOf(address(this));
-    uint256 _aspTknBalBefore = IERC20(aspTkn[_props.pod]).balanceOf(
-      address(this)
-    );
     IERC20(_props.pod).safeIncreaseAllowance(
       address(indexUtils),
       _props.podAmount
@@ -430,17 +423,17 @@ contract LeverageManager is
     uint256 _newStakes = IERC20(_spTKN).balanceOf(address(this)) -
       _stakeBalBefore;
     IERC20(_spTKN).safeIncreaseAllowance(aspTkn[_props.pod], _newStakes);
-    IERC4626(aspTkn[_props.pod]).deposit(_newStakes, address(this));
 
+    _newAspTkns = IERC4626(aspTkn[_props.pod]).deposit(
+      _newStakes,
+      address(this)
+    );
     _podAmountUsed =
       _podBalBefore -
       IERC20(_props.pod).balanceOf(address(this));
     _pairedLpUsed =
       _pairedLpBalBefore -
       IERC20(_d.token).balanceOf(address(this));
-    _newAspTkns =
-      IERC20(aspTkn[_props.pod]).balanceOf(address(this)) -
-      _aspTknBalBefore;
   }
 
   function _unstakeAndRemoveLP(
@@ -484,14 +477,13 @@ contract LeverageManager is
   }
 
   function rescueETH() external onlyOwner {
-    uint256 _bal = address(this).balance;
-    require(_bal > 0, 'B');
-    (bool _s, ) = payable(_msgSender()).call{ value: _bal }('');
+    (bool _s, ) = payable(_msgSender()).call{ value: address(this).balance }(
+      ''
+    );
     require(_s, 'S');
   }
 
   function rescueTokens(IERC20 _token) external onlyOwner {
-    require(_token.balanceOf(address(this)) > 0);
     _token.safeTransfer(_msgSender(), _token.balanceOf(address(this)));
   }
 

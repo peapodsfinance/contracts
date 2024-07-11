@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
 import '../interfaces/IDecentralizedIndex.sol';
@@ -11,11 +12,13 @@ import '../interfaces/ICamelotPair.sol';
 import '../interfaces/IMinimalOracle.sol';
 import '../interfaces/IV3TwapUtilities.sol';
 
-contract spTKNOracle is IMinimalOracle {
+contract spTKNOracle is IMinimalOracle, Ownable {
   address public immutable BASE_TOKEN;
   address public immutable SPTKN; // QUOTE_TOKEN
   address public immutable CL_POOL;
   IV3TwapUtilities public immutable TWAP_UTILS;
+
+  uint32 twapInterval = 10 minutes;
 
   constructor(
     address _baseToken,
@@ -45,16 +48,18 @@ contract spTKNOracle is IMinimalOracle {
 
   function _basePerSpTKNX96() internal view returns (uint256) {
     address _lpTkn = _getLpTkn();
-    uint160 _sqrtPriceX96 = TWAP_UTILS.sqrtPriceX96FromPoolAndInterval(CL_POOL);
+    uint160 _sqrtPriceX96 = _getSqrtPriceX96();
     uint256 _priceX96 = TWAP_UTILS.priceX96FromSqrtPriceX96(_sqrtPriceX96);
     address _clToken0 = IUniswapV3Pool(CL_POOL).token0();
     address _clToken1 = IUniswapV3Pool(CL_POOL).token1();
     uint256 _priceAssetX96 = _clToken1 == BASE_TOKEN
       ? _priceX96
       : FixedPoint96.Q96 ** 2 / _priceX96;
-    _priceAssetX96 =
-      (10 ** IERC20Metadata(_clToken0).decimals() * _priceAssetX96) /
-      10 ** IERC20Metadata(_clToken1).decimals();
+    _priceAssetX96 = _clToken1 == BASE_TOKEN
+      ? (10 ** IERC20Metadata(_clToken0).decimals() * _priceAssetX96) /
+        10 ** IERC20Metadata(_clToken1).decimals()
+      : (10 ** IERC20Metadata(_clToken1).decimals() * _priceAssetX96) /
+        10 ** IERC20Metadata(_clToken0).decimals();
     (uint112 _reserve0, uint112 _reserve1, , ) = ICamelotPair(_lpTkn)
       .getReserves();
     uint256 _k = uint256(_reserve0) * _reserve1;
@@ -64,8 +69,13 @@ contract spTKNOracle is IMinimalOracle {
     uint256 _avgBaseAssetInLpX96 = _sqrt((_priceAssetX96 * _k) / _kDec) *
       2 ** (96 / 2);
     return
-      (_avgBaseAssetInLpX96 * 10 ** IERC20Metadata(_lpTkn).decimals()) /
+      (2 * _avgBaseAssetInLpX96 * 10 ** IERC20Metadata(_lpTkn).decimals()) /
       IERC20(_lpTkn).totalSupply();
+  }
+
+  function _getSqrtPriceX96() internal view returns (uint160) {
+    return
+      TWAP_UTILS.sqrtPriceX96FromPoolAndPassedInterval(CL_POOL, twapInterval);
   }
 
   function _getLpTkn() private view returns (address) {
@@ -79,5 +89,9 @@ contract spTKNOracle is IMinimalOracle {
       y = z;
       z = (x / z + z) / 2;
     }
+  }
+
+  function setTwapInterval(uint32 _interval) external onlyOwner {
+    twapInterval = _interval;
   }
 }

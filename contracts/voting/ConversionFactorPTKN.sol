@@ -8,7 +8,13 @@ import '../interfaces/IStakingConversionFactor.sol';
 contract ConversionFactorPTKN is IStakingConversionFactor {
   function getConversionFactor(
     address _pod
-  ) external view override returns (uint256 _factor, uint256 _denomenator) {
+  )
+    external
+    view
+    virtual
+    override
+    returns (uint256 _factor, uint256 _denomenator)
+  {
     (_factor, _denomenator) = _calculateCbrWithDen(_pod);
   }
 

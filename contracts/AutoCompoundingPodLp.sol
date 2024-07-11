@@ -1,29 +1,42 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import '@openzeppelin/contracts/access/Ownable.sol';
+import '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
 import './interfaces/IDecentralizedIndex.sol';
 import './interfaces/IDexAdapter.sol';
 import './interfaces/IIndexUtils.sol';
 import './interfaces/IRewardsWhitelister.sol';
 import './interfaces/IV3TwapUtilities.sol';
-import './Zapper.sol';
 
-contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
+contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
   using SafeERC20 for IERC20;
+
+  struct Pools {
+    address pool1;
+    address pool2;
+  }
 
   uint256 constant FACTOR = 10 ** 18;
   uint24 constant REWARDS_POOL_FEE = 10000;
   uint256 constant DEFAULT_SLIPPAGE = 100;
 
   IDecentralizedIndex immutable POD;
+  IDexAdapter immutable DEX_ADAPTER;
+  IV3TwapUtilities immutable V3_TWAP_UTILS;
 
   IIndexUtils public indexUtils;
   IRewardsWhitelister public rewardsWhitelister;
   bool public yieldConvEnabled = true;
+  // token in => token out => swap pool(s)
+  mapping(address => mapping(address => Pools)) public swapMaps;
+
+  uint256 _totalAssets;
 
   error NotImplemented();
 
@@ -35,12 +48,10 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
     IIndexUtils _utils,
     IRewardsWhitelister _whitelist,
     IV3TwapUtilities _v3TwapUtilities
-  )
-    ERC20(_name, _symbol)
-    ERC20Permit(_name)
-    Zapper(_v3TwapUtilities, _dexAdapter)
-  {
+  ) ERC20(_name, _symbol) ERC20Permit(_name) {
     POD = _pod;
+    DEX_ADAPTER = _dexAdapter;
+    V3_TWAP_UTILS = _v3TwapUtilities;
     indexUtils = _utils;
     rewardsWhitelister = _whitelist;
   }
@@ -50,7 +61,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
   }
 
   function totalAssets() public view override returns (uint256) {
-    return IERC20(_asset()).balanceOf(address(this));
+    return _totalAssets;
   }
 
   function convertToShares(
@@ -92,6 +103,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
     _triggerAndProcessRewardsToLp(0, 0, block.timestamp);
 
     _shares = convertToShares(_assets);
+    _totalAssets += _assets;
     IERC20(_asset()).safeTransferFrom(_msgSender(), address(this), _assets);
     _mint(_receiver, _shares);
     emit Deposit(_msgSender(), _receiver, _assets, _shares);
@@ -134,8 +146,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
   function maxRedeem(
     address _owner
   ) external view override returns (uint256 _maxShares) {
-    uint256 _assets = IERC20(_asset()).balanceOf(_owner);
-    return convertToShares(_assets);
+    return balanceOf(_owner);
   }
 
   function previewRedeem(
@@ -180,6 +191,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
     _assets = convertToAssets(_shares);
     _burn(_msgSender(), _shares);
     IERC20(_asset()).safeTransfer(_receiver, _assets);
+    _totalAssets -= _assets;
     emit Withdraw(_msgSender(), _receiver, _receiver, _assets, _shares);
   }
 
@@ -196,7 +208,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
 
   // @notice: assumes underlying vault asset has decimals == 18
   function _cbr() internal view returns (uint256) {
-    return (FACTOR * totalAssets()) / totalSupply();
+    uint256 _supply = totalSupply();
+    return _supply == 0 ? FACTOR : (FACTOR * totalAssets()) / _supply;
   }
 
   function _asset() internal view returns (address) {
@@ -261,7 +274,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
       return _amountIn;
     }
     if (_token != address(0) && _token != _rewardsToken) {
-      return _zap(_token, _pairedLpToken, _amountIn, _amountOutMin);
+      return _swap(_token, _pairedLpToken, _amountIn, _amountOutMin);
     }
     (address _token0, address _token1) = _pairedLpToken < _rewardsToken
       ? (_pairedLpToken, _rewardsToken)
@@ -324,6 +337,60 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Zapper {
         DEFAULT_SLIPPAGE,
         _deadline
       );
+  }
+
+  function _swap(
+    address _in,
+    address _out,
+    uint256 _amountIn,
+    uint256 _amountOutMin
+  ) internal returns (uint256 _amountOut) {
+    Pools memory _swapMap = swapMaps[_in][_out];
+    if (_swapMap.pool1 == address(0)) {
+      address[] memory _path = new address[](2);
+      _path[0] = _in;
+      _path[1] = _out;
+      return _swapV2(_path, _amountIn, _amountOutMin);
+    }
+    bool _twoHops = _swapMap.pool2 != address(0);
+    address _token0 = IUniswapV2Pair(_swapMap.pool1).token0();
+    address[] memory _path = new address[](_twoHops ? 3 : 2);
+    _path[0] = _in;
+    _path[1] = !_twoHops
+      ? _out
+      : _token0 == _in
+        ? IUniswapV2Pair(_swapMap.pool1).token1()
+        : _token0;
+    if (_twoHops) {
+      _path[2] = _out;
+    }
+    _amountOut = _swapV2(_path, _amountIn, _amountOutMin);
+  }
+
+  function _swapV2(
+    address[] memory _path,
+    uint256 _amountIn,
+    uint256 _amountOutMin
+  ) internal returns (uint256) {
+    address _out = _path.length == 3 ? _path[2] : _path[1];
+    uint256 _outBefore = IERC20(_out).balanceOf(address(this));
+    IERC20(_path[0]).safeIncreaseAllowance(address(DEX_ADAPTER), _amountIn);
+    DEX_ADAPTER.swapV2Single(
+      _path[0],
+      _path[1],
+      _amountIn,
+      _amountOutMin,
+      address(this)
+    );
+    return IERC20(_out).balanceOf(address(this)) - _outBefore;
+  }
+
+  function setZapMap(
+    address _in,
+    address _out,
+    Pools memory _pools
+  ) external onlyOwner {
+    swapMaps[_in][_out] = _pools;
   }
 
   function setIndexUtils(IIndexUtils _utils) external onlyOwner {
