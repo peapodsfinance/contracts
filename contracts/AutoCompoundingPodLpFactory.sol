@@ -32,14 +32,15 @@ contract AutoCompoundingPodLpFactory is Ownable {
       _v3TwapUtilities
     );
     if (minimumDepositAtCreation > 0) {
+      address _lpToken = _pod.lpStakingPool();
       uint256 _depositWithDecimals = minimumDepositAtCreation *
-        10 ** IERC20Metadata(address(_pod)).decimals();
-      IERC20(_pod).safeTransferFrom(
+        10 ** IERC20Metadata(_lpToken).decimals();
+      IERC20(_lpToken).safeTransferFrom(
         _msgSender(),
         address(this),
         _depositWithDecimals
       );
-      IERC20(_pod).safeApprove(address(_asp), _depositWithDecimals);
+      IERC20(_lpToken).safeApprove(address(_asp), _depositWithDecimals);
       _asp.deposit(_depositWithDecimals, _msgSender());
     }
     emit Create(address(_asp));

@@ -236,13 +236,15 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
       if (_bal == 0) {
         continue;
       }
-      _lpAmtOut += _tokenToPodLp(
+      uint256 _newLp = _tokenToPodLp(
         _token,
         _bal,
         _amountLpOutMin,
         _slippageOverride,
         _deadline
       );
+      _lpAmtOut += _newLp;
+      _totalAssets += _newLp;
     }
   }
 
@@ -347,10 +349,10 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
   ) internal returns (uint256 _amountOut) {
     Pools memory _swapMap = swapMaps[_in][_out];
     if (_swapMap.pool1 == address(0)) {
-      address[] memory _path = new address[](2);
-      _path[0] = _in;
-      _path[1] = _out;
-      return _swapV2(_path, _amountIn, _amountOutMin);
+      address[] memory _path1 = new address[](2);
+      _path1[0] = _in;
+      _path1[1] = _out;
+      return _swapV2(_path1, _amountIn, _amountOutMin);
     }
     bool _twoHops = _swapMap.pool2 != address(0);
     address _token0 = IUniswapV2Pair(_swapMap.pool1).token0();

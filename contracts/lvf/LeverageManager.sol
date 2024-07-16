@@ -67,6 +67,16 @@ contract LeverageManager is
     if (_positionId == 0) {
       _positionId = _initializePosition(_pod, _msgSender());
     } else {
+      address _msgSender = msg.sender;
+      address _owner = positionNFT.ownerOf(_positionId);
+      address _approvedAddress = positionNFT.getApproved(_positionId);
+      bool _isApprovedAll = positionNFT.isApprovedForAll(_owner, _msgSender);
+      require(
+        _owner == _msgSender ||
+          _approvedAddress == _msgSender ||
+          _isApprovedAll,
+        'AUTH'
+      );
       _pod = positionProps[_positionId].pod;
       require(_pod != address(0), 'PV');
     }
@@ -121,13 +131,17 @@ contract LeverageManager is
     // if additional fees required for flash source, handle that here
     _processExtraFlashLoanPayment(_props.pod, _msgSender());
 
+    uint256 _borrowSharesToRepay = IFraxlendPair(lendingPairs[_props.pod])
+      .totalBorrow()
+      .toShares(_borrowAssetAmt, true);
+
     LeverageFlashProps memory _position;
     _position.method = FlashCallbackMethod.REMOVE;
     _position.positionId = _positionId;
     _position.user = _msgSender();
     _position.pod = _props.pod;
     bytes memory _additionalInfo = abi.encode(
-      _borrowAssetAmt,
+      _borrowSharesToRepay,
       _collateralAssetAmtRemove,
       _podAmtMin,
       _pairedAssetAmtMin,
@@ -279,7 +293,7 @@ contract LeverageManager is
     (LeverageFlashProps memory _props, bytes memory _additionalInfo) = abi
       .decode(_d.data, (LeverageFlashProps, bytes));
     (
-      uint256 _borrowAssetAmt,
+      uint256 _borrowSharesToRepay,
       uint256 _collateralAssetAmtRemove,
       uint256 _podAmtMin,
       uint256 _pairedAssetAmtMin,
@@ -291,11 +305,11 @@ contract LeverageManager is
       );
     IERC20(_d.token).safeIncreaseAllowance(
       lendingPairs[_props.pod],
-      _borrowAssetAmt
+      _borrowSharesToRepay
     );
     IFraxlendPair _fraxPair = IFraxlendPair(lendingPairs[_props.pod]);
     _fraxPair.repayAsset(
-      _fraxPair.totalBorrow().toShares(_borrowAssetAmt, true),
+      _borrowSharesToRepay,
       positionProps[_props.positionId].custodian
     );
     LeveragePositionCustodian(positionProps[_props.positionId].custodian)
