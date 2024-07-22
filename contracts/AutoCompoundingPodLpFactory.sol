@@ -9,7 +9,7 @@ import './AutoCompoundingPodLp.sol';
 contract AutoCompoundingPodLpFactory is Ownable {
   using SafeERC20 for IERC20;
 
-  uint256 minimumDepositAtCreation = 1;
+  uint256 minimumDepositAtCreation = 10 ** 9;
 
   event Create(address newAspTkn);
 
@@ -33,15 +33,13 @@ contract AutoCompoundingPodLpFactory is Ownable {
     );
     if (minimumDepositAtCreation > 0) {
       address _lpToken = _pod.lpStakingPool();
-      uint256 _depositWithDecimals = minimumDepositAtCreation *
-        10 ** IERC20Metadata(_lpToken).decimals();
       IERC20(_lpToken).safeTransferFrom(
         _msgSender(),
         address(this),
-        _depositWithDecimals
+        minimumDepositAtCreation
       );
-      IERC20(_lpToken).safeApprove(address(_asp), _depositWithDecimals);
-      _asp.deposit(_depositWithDecimals, _msgSender());
+      IERC20(_lpToken).safeApprove(address(_asp), minimumDepositAtCreation);
+      _asp.deposit(minimumDepositAtCreation, _msgSender());
     }
     emit Create(address(_asp));
   }

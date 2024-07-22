@@ -244,17 +244,12 @@ contract LeverageManager is
       _d.data,
       (LeverageFlashProps, bytes)
     );
-    (
-      uint256 _aspTknCollateralBal,
-      uint256 _podAmountUsed,
-      uint256 _borrowedUsed
-    ) = _lpAndStakeInPod(
-        IDecentralizedIndex(_props.pod).lpStakingPool(),
-        _d,
-        _props
-      );
+    (uint256 _aspTknCollateralBal, uint256 _podAmountUsed, ) = _lpAndStakeInPod(
+      IDecentralizedIndex(_props.pod).lpStakingPool(),
+      _d,
+      _props
+    );
     _refundAmt = _props.podAmount - _podAmountUsed;
-    uint256 _borrowedAvailable = _d.amount - _borrowedUsed;
 
     IERC20(aspTkn[_props.pod]).safeTransfer(
       positionProps[_props.positionId].custodian,
@@ -274,11 +269,9 @@ contract LeverageManager is
       IFlashLoanSource(flashSource[_props.pod]).source(),
       _flashPaybackAmt
     );
-    if (_borrowedAvailable > _flashPaybackAmt) {
-      IERC20(_d.token).safeTransfer(
-        _props.user,
-        _borrowedAvailable - _flashPaybackAmt
-      );
+    uint256 _remaining = IERC20(_d.token).balanceOf(address(this));
+    if (_remaining != 0) {
+      IERC20(_d.token).safeTransfer(_props.user, _remaining);
     }
     emit AddLeverage(_props.positionId, _props.user);
   }
