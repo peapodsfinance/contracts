@@ -29,6 +29,9 @@ contract LeverageManager is
   IIndexUtils_LEGACY public indexUtils;
   LeveragePositions public positionNFT;
 
+  uint16 public openFeePerc; // 1000 precision
+  uint16 public closeFeePerc; // 1000 precision
+
   // positionId => position props
   mapping(uint256 => LeveragePositionProps) public positionProps;
 
@@ -141,6 +144,7 @@ contract LeverageManager is
     _position.user = _msgSender();
     _position.pod = _props.pod;
     bytes memory _additionalInfo = abi.encode(
+      _borrowAssetAmt,
       _borrowSharesToRepay,
       _collateralAssetAmtRemove,
       _podAmtMin,
@@ -191,6 +195,12 @@ contract LeverageManager is
         _userData
       );
       if (_podAmtToUser > 0) {
+        // if there's a close fee send returned pod tokens for fee to protocol
+        if (closeFeePerc > 0) {
+          uint256 _closeFeeAmt = (_podAmtToUser * closeFeePerc) / 1000;
+          IERC20(_posProps.pod).safeTransfer(owner(), _closeFeeAmt);
+          _podAmtToUser -= _closeFeeAmt;
+        }
         IERC20(_posProps.pod).safeTransfer(_posProps.user, _podAmtToUser);
       }
       if (_pairedLpToUser > 0) {
@@ -251,6 +261,13 @@ contract LeverageManager is
     );
     _refundAmt = _props.podAmount - _podAmountUsed;
 
+    // if there's an open fee send aspTKN generated to protocol
+    if (openFeePerc > 0) {
+      uint256 _openFeeAmt = (_aspTknCollateralBal * openFeePerc) / 1000;
+      IERC20(aspTkn[_props.pod]).safeTransfer(owner(), _openFeeAmt);
+      _aspTknCollateralBal -= _openFeeAmt;
+    }
+
     IERC20(aspTkn[_props.pod]).safeTransfer(
       positionProps[_props.positionId].custodian,
       _aspTknCollateralBal
@@ -286,6 +303,7 @@ contract LeverageManager is
     (LeverageFlashProps memory _props, bytes memory _additionalInfo) = abi
       .decode(_d.data, (LeverageFlashProps, bytes));
     (
+      uint256 _borrowAssetAmt,
       uint256 _borrowSharesToRepay,
       uint256 _collateralAssetAmtRemove,
       uint256 _podAmtMin,
@@ -294,14 +312,13 @@ contract LeverageManager is
       uint256 _userProvidedDebtAmtMax
     ) = abi.decode(
         _additionalInfo,
-        (uint256, uint256, uint256, uint256, address, uint256)
+        (uint256, uint256, uint256, uint256, uint256, address, uint256)
       );
     IERC20(_d.token).safeIncreaseAllowance(
       lendingPairs[_props.pod],
-      _borrowSharesToRepay
+      _borrowAssetAmt
     );
-    IFraxlendPair _fraxPair = IFraxlendPair(lendingPairs[_props.pod]);
-    _fraxPair.repayAsset(
+    IFraxlendPair(lendingPairs[_props.pod]).repayAsset(
       _borrowSharesToRepay,
       positionProps[_props.positionId].custodian
     );
@@ -481,6 +498,16 @@ contract LeverageManager is
 
   function setIndexUtils(IIndexUtils_LEGACY _utils) external onlyOwner {
     indexUtils = _utils;
+  }
+
+  function setOpenFeePerc(uint16 _newFee) external onlyOwner {
+    require(_newFee <= 250, 'MAX');
+    openFeePerc = _newFee;
+  }
+
+  function setCloseFeePerc(uint16 _newFee) external onlyOwner {
+    require(_newFee <= 250, 'MAX');
+    closeFeePerc = _newFee;
   }
 
   function rescueETH() external onlyOwner {

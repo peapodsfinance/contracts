@@ -50,16 +50,16 @@ contract spTKNOracle is IMinimalOracle, Ownable {
     address _lpTkn = _getLpTkn();
     uint160 _sqrtPriceX96 = _getSqrtPriceX96();
     uint256 _priceX96 = TWAP_UTILS.priceX96FromSqrtPriceX96(_sqrtPriceX96);
-    address _clToken0 = IUniswapV3Pool(CL_POOL).token0();
-    address _clToken1 = IUniswapV3Pool(CL_POOL).token1();
-    uint256 _priceAssetX96 = _clToken1 == BASE_TOKEN
+    address _clT0 = IUniswapV3Pool(CL_POOL).token0();
+    uint8 _clT0Decimals = IERC20Metadata(_clT0).decimals();
+    address _clT1 = IUniswapV3Pool(CL_POOL).token1();
+    uint8 _clT1Decimals = IERC20Metadata(_clT1).decimals();
+    uint256 _priceAssetX96 = _clT1 == BASE_TOKEN
       ? _priceX96
       : FixedPoint96.Q96 ** 2 / _priceX96;
-    _priceAssetX96 = _clToken1 == BASE_TOKEN
-      ? (10 ** IERC20Metadata(_clToken0).decimals() * _priceAssetX96) /
-        10 ** IERC20Metadata(_clToken1).decimals()
-      : (10 ** IERC20Metadata(_clToken1).decimals() * _priceAssetX96) /
-        10 ** IERC20Metadata(_clToken0).decimals();
+    _priceAssetX96 = _clT1 == BASE_TOKEN
+      ? (10 ** _clT0Decimals * _priceAssetX96) / 10 ** _clT1Decimals
+      : (10 ** _clT1Decimals * _priceAssetX96) / 10 ** _clT0Decimals;
     (uint112 _reserve0, uint112 _reserve1, , ) = ICamelotPair(_lpTkn)
       .getReserves();
     uint256 _k = uint256(_reserve0) * _reserve1;
@@ -68,9 +68,14 @@ contract spTKNOracle is IMinimalOracle, Ownable {
       10 ** IERC20Metadata(ICamelotPair(_lpTkn).token1()).decimals();
     uint256 _avgBaseAssetInLpX96 = _sqrt((_priceAssetX96 * _k) / _kDec) *
       2 ** (96 / 2);
-    return
-      (2 * _avgBaseAssetInLpX96 * 10 ** IERC20Metadata(_lpTkn).decimals()) /
+    uint256 _lpPriceX96 = ((2 *
+      _avgBaseAssetInLpX96 *
+      10 ** (_clT0Decimals + _clT1Decimals)) / 2) /
       IERC20(_lpTkn).totalSupply();
+    uint256 _baseTDecimals = _clT1 == BASE_TOKEN
+      ? _clT1Decimals
+      : _clT0Decimals;
+    return (_lpPriceX96 * 10 ** _baseTDecimals) / FixedPoint96.Q96;
   }
 
   function _getSqrtPriceX96() internal view returns (uint160) {

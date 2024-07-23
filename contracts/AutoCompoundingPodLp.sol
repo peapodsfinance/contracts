@@ -33,6 +33,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
   IIndexUtils public indexUtils;
   IRewardsWhitelister public rewardsWhitelister;
   bool public yieldConvEnabled = true;
+  uint16 public feePerc = 50; // 1000 precision
   // token in => token out => swap pool(s)
   mapping(address => mapping(address => Pools)) public swapMaps;
 
@@ -261,6 +262,11 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
       0,
       _slippageOverride
     );
+    if (feePerc > 0) {
+      uint256 _pairedFee = (_pairedOut * feePerc) / 1000;
+      IERC20(POD.PAIRED_LP_TOKEN()).safeTransfer(owner(), _pairedFee);
+      _pairedOut -= _pairedFee;
+    }
     _lpAmtOut = _pairedLpTokenToPodLp(_pairedOut, _amountLpOutMin, _deadline);
   }
 
@@ -406,5 +412,10 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
   function setYieldConvEnabled(bool _enabled) external onlyOwner {
     require(yieldConvEnabled != _enabled, 'T');
     yieldConvEnabled = _enabled;
+  }
+
+  function setFeePerc(uint16 _newFee) external onlyOwner {
+    require(_newFee <= 1000, 'MAX');
+    feePerc = _newFee;
   }
 }
