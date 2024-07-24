@@ -39,11 +39,12 @@ contract spTKNOracle is IMinimalOracle, Ownable {
     override
     returns (bool _isBadData, uint256 _priceLow, uint256 _priceHigh)
   {
-    uint256 _priceBaseSpTKNX96 = _basePerSpTKNX96();
+    uint256 _priceBaseSpTKN = _basePerSpTKNX96();
     _isBadData = false;
-    uint256 _priceMid = (_priceBaseSpTKNX96 * 10 ** 18) / FixedPoint96.Q96;
-    _priceLow = (_priceMid * 99) / 100;
-    _priceHigh = (_priceMid * 101) / 100;
+    uint256 _priceMid18 = _priceBaseSpTKN *
+      10 ** (18 - IERC20Metadata(BASE_TOKEN).decimals());
+    _priceLow = (_priceMid18 * 99) / 100;
+    _priceHigh = (_priceMid18 * 101) / 100;
   }
 
   function _basePerSpTKNX96() internal view returns (uint256) {
@@ -68,10 +69,9 @@ contract spTKNOracle is IMinimalOracle, Ownable {
       10 ** IERC20Metadata(ICamelotPair(_lpTkn).token1()).decimals();
     uint256 _avgBaseAssetInLpX96 = _sqrt((_priceAssetX96 * _k) / _kDec) *
       2 ** (96 / 2);
-    uint256 _lpPriceX96 = ((2 *
-      _avgBaseAssetInLpX96 *
-      10 ** (_clT0Decimals + _clT1Decimals)) / 2) /
-      IERC20(_lpTkn).totalSupply();
+    uint256 _lpPriceX96 = (
+      ((2 * _avgBaseAssetInLpX96 * 10 ** ((_clT0Decimals + _clT1Decimals))) / 2)
+    ) / IERC20(_lpTkn).totalSupply();
     uint256 _baseTDecimals = _clT1 == BASE_TOKEN
       ? _clT1Decimals
       : _clT0Decimals;
