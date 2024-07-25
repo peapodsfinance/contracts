@@ -49,31 +49,9 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     require(assets[_asset].enabled, 'E');
 
     IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _amount);
-
-    uint256 _convFctr = 1;
-    uint256 _convDenom = 1;
-    if (address(assets[_asset].convFactor) != address(0)) {
-      (_convFctr, _convDenom) = assets[_asset].convFactor.getConversionFactor(
-        _asset
-      );
-    }
-
-    Stake storage _stake = stakes[_msgSender()][_asset];
-    _stake.lastStaked = block.timestamp;
-    uint256 _mintedAmtBefore = _stake.amtStaked == 0
-      ? 0
-      : (_stake.amtStaked * _stake.stakedToOutputFactor) /
-        _stake.stakedToOutputDenomenator;
-    _stake.amtStaked += _amount;
-    _stake.stakedToOutputFactor = _convFctr;
-    _stake.stakedToOutputDenomenator = _convDenom;
-    uint256 _finalNewMintAmt = (_stake.amtStaked * _convFctr) / _convDenom;
-    if (_finalNewMintAmt > _mintedAmtBefore) {
-      _mint(_msgSender(), _finalNewMintAmt - _mintedAmtBefore);
-    } else if (_mintedAmtBefore > _finalNewMintAmt) {
-      _burn(_msgSender(), _mintedAmtBefore - _finalNewMintAmt);
-    }
-    emit AddStake(_msgSender(), _asset, _amount, _convFctr, _convDenom);
+    stakes[_msgSender()][_asset].lastStaked = block.timestamp;
+    _update(_msgSender(), _asset, _amount);
+    emit AddStake(_msgSender(), _asset, _amount);
   }
 
   function unstake(address _asset, uint256 _amount) external override {
@@ -86,6 +64,40 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     _burn(_msgSender(), _amtToBurn);
     IERC20(_asset).safeTransfer(_msgSender(), _amount);
     emit Unstake(_msgSender(), _asset, _amount);
+  }
+
+  function update(
+    address _user,
+    address _asset
+  ) external returns (uint256 _convFctr, uint256 _convDenom) {
+    return _update(_user, _asset, 0);
+  }
+
+  function _update(
+    address _user,
+    address _asset,
+    uint256 _addAmt
+  ) internal returns (uint256 _convFctr, uint256 _convDenom) {
+    (_convFctr, _convDenom) = _getConversionFactorAndDenom(_asset);
+    Stake storage _stake = stakes[_user][_asset];
+    uint256 _mintedAmtBefore = _stake.amtStaked == 0
+      ? 0
+      : (_stake.amtStaked * _stake.stakedToOutputFactor) /
+        _stake.stakedToOutputDenomenator;
+    _stake.amtStaked += _addAmt;
+    _stake.stakedToOutputFactor = _convFctr;
+    _stake.stakedToOutputDenomenator = _convDenom;
+    uint256 _finalNewMintAmt = (_stake.amtStaked * _convFctr) / _convDenom;
+    if (_finalNewMintAmt > _mintedAmtBefore) {
+      _mint(_user, _finalNewMintAmt - _mintedAmtBefore);
+    } else if (_mintedAmtBefore > _finalNewMintAmt) {
+      if (_mintedAmtBefore - _finalNewMintAmt > balanceOf(_user)) {
+        _burn(_user, balanceOf(_user));
+      } else {
+        _burn(_user, _mintedAmtBefore - _finalNewMintAmt);
+      }
+    }
+    emit Update(_user, _asset, _convFctr, _convDenom);
   }
 
   function addOrUpdateAsset(
@@ -109,6 +121,16 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
   function setLockupPeriod(uint256 _newLockup) external onlyOwner {
     require(_newLockup <= 112 days, 'M'); // 16 weeks
     lockupPeriod = _newLockup;
+  }
+
+  function _getConversionFactorAndDenom(
+    address _asset
+  ) internal view returns (uint256 _factor, uint256 _denom) {
+    _factor = 1;
+    _denom = 1;
+    if (address(assets[_asset].convFactor) != address(0)) {
+      (_factor, _denom) = assets[_asset].convFactor.getConversionFactor(_asset);
+    }
   }
 
   function _afterTokenTransfer(

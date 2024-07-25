@@ -16,10 +16,11 @@ interface IVotingPool {
     uint256 lastStaked;
   }
 
-  event AddStake(
+  event AddStake(address indexed user, address asset, uint256 amount);
+
+  event Update(
     address indexed user,
     address asset,
-    uint256 amount,
     uint256 conversionFactor,
     uint256 conversionDenomenator
   );
