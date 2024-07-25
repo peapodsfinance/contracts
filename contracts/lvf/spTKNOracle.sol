@@ -4,7 +4,6 @@ pragma solidity ^0.8.19;
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
-import '../interfaces/IDecentralizedIndex.sol';
 import '../interfaces/IStakingConversionFactor.sol';
 import '../interfaces/IStakingPoolToken.sol';
 import '../interfaces/IUniswapV3Pool.sol';
@@ -56,8 +55,8 @@ contract spTKNOracle is IMinimalOracle, Ownable {
     address _clT1 = IUniswapV3Pool(CL_POOL).token1();
     uint8 _clT1Decimals = IERC20Metadata(_clT1).decimals();
     uint256 _priceAssetX96 = _clT1 == BASE_TOKEN
-      ? _priceX96
-      : FixedPoint96.Q96 ** 2 / _priceX96;
+      ? _accountForCBR(_priceX96)
+      : FixedPoint96.Q96 ** 2 / _accountForCBR(_priceX96);
     _priceAssetX96 = _clT1 == BASE_TOKEN
       ? (10 ** _clT0Decimals * _priceAssetX96) / 10 ** _clT1Decimals
       : (10 ** _clT1Decimals * _priceAssetX96) / 10 ** _clT0Decimals;
@@ -69,9 +68,10 @@ contract spTKNOracle is IMinimalOracle, Ownable {
       10 ** IERC20Metadata(ICamelotPair(_lpTkn).token1()).decimals();
     uint256 _avgBaseAssetInLpX96 = _sqrt((_priceAssetX96 * _k) / _kDec) *
       2 ** (96 / 2);
-    uint256 _lpPriceX96 = (
-      ((2 * _avgBaseAssetInLpX96 * 10 ** ((_clT0Decimals + _clT1Decimals))) / 2)
-    ) / IERC20(_lpTkn).totalSupply();
+    uint256 _lpPriceX96 = (2 *
+      _avgBaseAssetInLpX96 *
+      10 ** ((_clT0Decimals + _clT1Decimals) / 2)) /
+      IERC20(_lpTkn).totalSupply();
     uint256 _baseTDecimals = _clT1 == BASE_TOKEN
       ? _clT1Decimals
       : _clT0Decimals;
@@ -85,6 +85,16 @@ contract spTKNOracle is IMinimalOracle, Ownable {
 
   function _getLpTkn() private view returns (address) {
     return IStakingPoolToken(SPTKN).stakingToken();
+  }
+
+  function _accountForCBR(uint256 _underlying) internal view returns (uint256) {
+    address _pod = IStakingPoolToken(SPTKN).INDEX_FUND();
+    return
+      (_underlying *
+        IERC20(BASE_TOKEN).balanceOf(_pod) *
+        10 ** IERC20Metadata(_pod).decimals()) /
+      IERC20(_pod).totalSupply() /
+      10 ** IERC20Metadata(BASE_TOKEN).decimals();
   }
 
   function _sqrt(uint256 x) private pure returns (uint256 y) {
