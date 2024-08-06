@@ -17,15 +17,21 @@ interface ILeverageManager {
     uint256 pairedLpAmtMin;
     uint256 slippage;
     uint256 deadline;
+    address selfLendingPairPod;
   }
 
   struct LeveragePositionProps {
     address pod;
     address lendingPair;
     address custodian;
+    address selfLendingPod;
   }
 
-  function initializePosition(address _pod, address _recipient) external;
+  function initializePosition(
+    address _pod,
+    address _recipient,
+    address _selfLendingPairPod
+  ) external;
 
   function addLeverage(
     uint256 _positionId,
@@ -34,7 +40,8 @@ interface ILeverageManager {
     uint256 _pairedLpDesired,
     uint256 _pairedLpAmtMin,
     uint256 _slippage,
-    uint256 _deadline
+    uint256 _deadline,
+    address _selfLendingPairPod
   ) external;
 
   function removeLeverage(

@@ -46,8 +46,6 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
 
   function stake(address _asset, uint256 _amount) external override {
     require(_amount > 0, 'A');
-    require(assets[_asset].enabled, 'E');
-
     IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _amount);
     stakes[_msgSender()][_asset].lastStaked = block.timestamp;
     _update(_msgSender(), _asset, _amount);
@@ -58,12 +56,12 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     require(_amount > 0, 'R');
     Stake storage _stake = stakes[_msgSender()][_asset];
     require(block.timestamp > _stake.lastStaked + lockupPeriod, 'LU');
-    uint256 _amtToBurn = (_amount * _stake.stakedToOutputFactor) /
-      _stake.stakedToOutputDenomenator;
-    _stake.amtStaked -= _amount;
-    _burn(_msgSender(), _amtToBurn);
-    IERC20(_asset).safeTransfer(_msgSender(), _amount);
-    emit Unstake(_msgSender(), _asset, _amount);
+    uint256 _amtStakeToRemove = (_amount * _stake.stakedToOutputDenomenator) /
+      _stake.stakedToOutputFactor;
+    _stake.amtStaked -= _amtStakeToRemove;
+    _burn(_msgSender(), _amount);
+    IERC20(_asset).safeTransfer(_msgSender(), _amtStakeToRemove);
+    emit Unstake(_msgSender(), _asset, _amount, _amtStakeToRemove);
   }
 
   function update(
@@ -78,6 +76,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     address _asset,
     uint256 _addAmt
   ) internal returns (uint256 _convFctr, uint256 _convDenom) {
+    require(assets[_asset].enabled, 'E');
     (_convFctr, _convDenom) = _getConversionFactorAndDenom(_asset);
     Stake storage _stake = stakes[_user][_asset];
     uint256 _mintedAmtBefore = _stake.amtStaked == 0

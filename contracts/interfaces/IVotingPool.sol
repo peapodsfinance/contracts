@@ -25,7 +25,12 @@ interface IVotingPool {
     uint256 conversionDenomenator
   );
 
-  event Unstake(address indexed user, address asset, uint256 amount);
+  event Unstake(
+    address indexed user,
+    address asset,
+    uint256 amountBurned,
+    uint256 amountAsset
+  );
 
   function REWARDS() external view returns (address);
 
