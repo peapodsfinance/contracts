@@ -12,8 +12,21 @@ contract aspTKNOracle is spTKNOracle {
     address _baseToken,
     address _spTKN,
     address _pTKNBasePool,
-    IV3TwapUtilities _utils
-  ) spTKNOracle(_baseToken, _spTKN, _pTKNBasePool, _utils) {
+    IV3TwapUtilities _utils,
+    address _clMultAddress,
+    address _clDivAddress,
+    bool _allowOnlyUniOracle
+  )
+    spTKNOracle(
+      _baseToken,
+      _spTKN,
+      _pTKNBasePool,
+      _utils,
+      _clMultAddress,
+      _clDivAddress,
+      _allowOnlyUniOracle
+    )
+  {
     ASPTKN = _aspTKN;
   }
 
@@ -26,12 +39,21 @@ contract aspTKNOracle is spTKNOracle {
   {
     uint256 _assetFactor = 10 ** 18;
     uint256 _aspTknPerSpTkn = IERC4626(ASPTKN).convertToShares(_assetFactor);
-    uint256 _priceBaseAspTKNX96 = (_basePerSpTKNX96() * _assetFactor) /
+    uint256 _priceBaseAspTKNX96 = (_v3BasePerSpTKNX96() * _assetFactor) /
       _aspTknPerSpTkn;
 
-    _isBadData = false;
-    uint256 _priceMid = (_priceBaseAspTKNX96 * 10 ** 18) / FixedPoint96.Q96;
-    _priceLow = (_priceMid * 99) / 100;
-    _priceHigh = (_priceMid * 101) / 100;
+    uint256 _priceMid18 = (_priceBaseAspTKNX96 * 10 ** 18) / FixedPoint96.Q96;
+    uint256 _priceCl18;
+    (_isBadData, _priceCl18) = _getChainlinkPrice();
+    if (_isBadData) {
+      if (allowOnlyUniOracle) {
+        _isBadData = false;
+        _priceLow = (_priceMid18 * 995) / 1000;
+        _priceHigh = (_priceMid18 * 1005) / 1000;
+      }
+    } else {
+      _priceLow = _priceMid18 > _priceCl18 ? _priceCl18 : _priceMid18;
+      _priceHigh = _priceMid18 > _priceCl18 ? _priceMid18 : _priceCl18;
+    }
   }
 }

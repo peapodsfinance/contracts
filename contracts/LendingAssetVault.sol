@@ -23,6 +23,7 @@ contract LendingAssetVault is
   uint256 _totalAssets;
   uint256 _totalUsed;
 
+  uint256 public lastAssetChange;
   mapping(address => bool) public useWhitelist;
 
   constructor(
@@ -84,6 +85,7 @@ contract LendingAssetVault is
     uint256 _assets,
     address _receiver
   ) internal returns (uint256 _shares) {
+    lastAssetChange = block.timestamp;
     _shares = convertToShares(_assets);
     _totalAssets += _assets;
     _mint(_receiver, _shares);
@@ -163,6 +165,7 @@ contract LendingAssetVault is
     uint256 _shares,
     address _receiver
   ) internal returns (uint256 _assets) {
+    lastAssetChange = block.timestamp;
     _assets = convertToAssets(_shares);
     _burn(_msgSender(), _shares);
     IERC20(_asset).safeTransfer(_receiver, _assets);
