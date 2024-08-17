@@ -21,10 +21,18 @@ contract LendingAssetVault is
 
   address _asset;
   uint256 _totalAssets;
-  uint256 _totalUsed;
+  uint256 _totalAssetsUtilized;
 
   uint256 public lastAssetChange;
-  mapping(address => bool) public useWhitelist;
+  mapping(address => bool) public vaultWhitelist;
+  mapping(address => uint256) public vaultUtilization;
+  mapping(address => uint256) _vaultMaxPerc;
+  mapping(address => uint256) _vaultWhitelistCbr;
+
+  modifier onlyWhitelist() {
+    require(vaultWhitelist[_msgSender()], 'WL');
+    _;
+  }
 
   constructor(
     string memory _name,
@@ -42,12 +50,8 @@ contract LendingAssetVault is
     return _totalAssets;
   }
 
-  function totalUsed() external view override returns (uint256) {
-    return _totalUsed;
-  }
-
   function totalAvailableAssets() public view override returns (uint256) {
-    return _totalAssets - _totalUsed;
+    return _totalAssets - _totalAssetsUtilized;
   }
 
   function convertToShares(
@@ -152,13 +156,51 @@ contract LendingAssetVault is
     _assets = _withdraw(_shares, _receiver);
   }
 
-  /// @notice The ```whitelistWithdraw``` is called by any whitelisted account to withdraw assets.
-  /// @param _amount the amount of underlying assets to withdraw
-  function whitelistWithdraw(uint256 _amount) external {
-    require(useWhitelist[_msgSender()], 'A');
-    _totalUsed += _amount;
-    IERC20(_asset).safeTransfer(_msgSender(), _amount);
-    emit UseAssets(_msgSender(), _amount);
+  /// @notice The ```whitelistWithdraw``` is called by any whitelisted vault to withdraw assets.
+  /// @param _assetAmt the amount of underlying assets to withdraw
+  function whitelistWithdraw(
+    uint256 _assetAmt
+  ) external override onlyWhitelist {
+    address _vault = _msgSender();
+    uint256 _newAssetUtil = vaultUtilization[_vault] + _assetAmt;
+    require(
+      (PRECISION * _newAssetUtil) / _totalAssets <= _vaultMaxPerc[_vault],
+      'MAX'
+    );
+    vaultUtilization[_vault] = _newAssetUtil;
+    _totalAssetsUtilized += _assetAmt;
+    IERC20(_asset).safeTransfer(_vault, _assetAmt);
+    emit WhitelistWithdraw(_vault, _assetAmt);
+  }
+
+  /// @notice The ```whitelistDeposit``` is called by any whitelisted target vault to deposit assets back into this vault.
+  /// @notice need this instead of direct depositing in order to handle accounting for used assets and validation
+  /// @param _assetAmt the amount of underlying assets to deposit
+  function whitelistDeposit(uint256 _assetAmt) external override onlyWhitelist {
+    address _vault = _msgSender();
+    uint256 _prevRatio = _vaultWhitelistCbr[_vault];
+    _vaultWhitelistCbr[_vault] = IERC4626(_vault).convertToAssets(PRECISION);
+
+    // calculate the current ratio of assets in the target vault to previously recorded ratio
+    // to correctly calculate the change in total assets here based on how the vault share
+    // has changed over time
+    uint256 _vaultAssetRatio = _prevRatio == 0
+      ? 0
+      : _prevRatio > _vaultWhitelistCbr[_vault]
+        ? ((PRECISION * _prevRatio) / _vaultWhitelistCbr[_vault]) -
+          _vaultWhitelistCbr[_vault]
+        : ((PRECISION * _vaultWhitelistCbr[_vault]) / _prevRatio) - _prevRatio;
+    _totalAssets = _vaultWhitelistCbr[_vault] > _prevRatio
+      ? _totalAssets + ((_assetAmt * _vaultAssetRatio) / PRECISION)
+      : _totalAssets - ((_assetAmt * _vaultAssetRatio) / PRECISION);
+    _totalAssetsUtilized -= _assetAmt > _totalAssetsUtilized
+      ? _totalAssetsUtilized
+      : _assetAmt;
+    vaultUtilization[_vault] -= _assetAmt > vaultUtilization[_vault]
+      ? vaultUtilization[_vault]
+      : _assetAmt;
+    IERC20(_asset).safeTransferFrom(_vault, address(this), _assetAmt);
+    emit WhitelistDeposit(_vault, _assetAmt);
   }
 
   function _withdraw(
@@ -173,18 +215,31 @@ contract LendingAssetVault is
     emit Withdraw(_msgSender(), _receiver, _receiver, _assets, _shares);
   }
 
-  // @notice: assumes underlying vault asset has decimals == 18
+  /// @notice Assumes underlying vault asset has decimals == 18
   function _cbr() internal view returns (uint256) {
     uint256 _supply = totalSupply();
-    return _supply == 0 ? PRECISION : (PRECISION * totalAssets()) / _supply;
+    return _supply == 0 ? PRECISION : (PRECISION * _totalAssets) / _supply;
   }
 
   function _assetDecimals() internal view returns (uint8) {
     return IERC20Metadata(_asset).decimals();
   }
 
-  function setWhitelist(address _wallet, bool _isAllowed) external onlyOwner {
-    require(useWhitelist[_wallet] != _isAllowed, 'T');
-    useWhitelist[_wallet] = _isAllowed;
+  function setVaultWhitelist(address _vault, bool _allowed) external onlyOwner {
+    require(vaultWhitelist[_vault] != _allowed, 'T');
+    vaultWhitelist[_vault] = _allowed;
+    emit SetVaultWhitelist(_vault, _allowed);
+  }
+
+  /// @notice The ```setVaultMaxPerc``` sets the maximum amount of vault assets allowed to be allocated to a whitelisted vault
+  /// @param _vault the vault we're allocating to
+  /// @param _percentage the percentage, up to PRECISION (100%), of assets we can allocate to this vault
+  function setVaultMaxPerc(
+    address _vault,
+    uint256 _percentage
+  ) external onlyOwner {
+    require(_percentage <= PRECISION, 'MAX');
+    _vaultMaxPerc[_vault] = _percentage;
+    emit SetVaultMaxAlloPercentage(_vault, _percentage);
   }
 }

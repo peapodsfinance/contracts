@@ -4,11 +4,17 @@ pragma solidity ^0.8.19;
 interface ILendingAssetVault {
   event PayBackUsedAssets(address indexed user, uint256 amount);
 
-  event UseAssets(address indexed user, uint256 amount);
+  event SetVaultWhitelist(address indexed vault, bool isWhitelisted);
+
+  event SetVaultMaxAlloPercentage(address indexed vault, uint256 percentage);
+
+  event WhitelistDeposit(address indexed user, uint256 amount);
+
+  event WhitelistWithdraw(address indexed user, uint256 amount);
 
   function totalAvailableAssets() external view returns (uint256);
 
-  function totalUsed() external view returns (uint256);
+  function whitelistDeposit(uint256 amount) external;
 
   function whitelistWithdraw(uint256 amount) external;
 }

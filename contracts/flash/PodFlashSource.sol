@@ -31,7 +31,7 @@ contract PodFlashSource is FlashSourceBase, IFlashLoanRecipient {
     uint256 _amount,
     address _recipient,
     bytes calldata _data
-  ) external override onlyLeverageManager {
+  ) external override workflow(true) onlyLeverageManager {
     uint256 _paymentAmount = paymentAmount();
     IERC20(paymentToken).safeTransferFrom(
       _msgSender(),
@@ -48,7 +48,7 @@ contract PodFlashSource is FlashSourceBase, IFlashLoanRecipient {
     );
   }
 
-  function callback(bytes calldata _data) external override {
+  function callback(bytes calldata _data) external override workflow(false) {
     require(_msgSender() == source, 'CBV');
     FlashData memory _fData = abi.decode(_data, (FlashData));
     IERC20(_fData.token).safeTransfer(_fData.recipient, _fData.amount);

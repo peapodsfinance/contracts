@@ -25,7 +25,7 @@ contract UniswapV3FlashSource is FlashSourceBase, IUniswapV3FlashCallback {
     uint256 _amount,
     address _recipient,
     bytes calldata _data
-  ) external override onlyLeverageManager {
+  ) external override workflow(true) onlyLeverageManager {
     FlashData memory _fData = FlashData(_recipient, _token, _amount, _data, 0);
     (uint256 _borrowAmount0, uint256 _borrowAmount1) = _token ==
       IUniswapV3Pool(source).token0()
@@ -43,7 +43,7 @@ contract UniswapV3FlashSource is FlashSourceBase, IUniswapV3FlashCallback {
     uint256 _fee0,
     uint256 _fee1,
     bytes calldata _data
-  ) external override {
+  ) external override workflow(false) {
     require(_msgSender() == source, 'CBV');
     FlashData memory _fData = abi.decode(_data, (FlashData));
     _fData.fee = _fData.token == IUniswapV3Pool(source).token0()

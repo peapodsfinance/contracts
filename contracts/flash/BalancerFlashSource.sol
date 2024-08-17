@@ -39,7 +39,7 @@ contract BalancerFlashSource is FlashSourceBase, IBalancerFlashRecipient {
     uint256 _amount,
     address _recipient,
     bytes calldata _data
-  ) external override onlyLeverageManager {
+  ) external override workflow(true) onlyLeverageManager {
     IERC20[] memory _tokens = new IERC20[](1);
     uint256[] memory _amounts = new uint256[](1);
     _tokens[0] = IERC20(_token);
@@ -58,7 +58,7 @@ contract BalancerFlashSource is FlashSourceBase, IBalancerFlashRecipient {
     uint256[] memory,
     uint256[] memory _feeAmounts,
     bytes memory _userData
-  ) external override {
+  ) external override workflow(false) {
     require(_msgSender() == source, 'CBV');
     FlashData memory _fData = abi.decode(_userData, (FlashData));
     _fData.fee = _feeAmounts[0];
