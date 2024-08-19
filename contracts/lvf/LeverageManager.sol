@@ -42,6 +42,18 @@ contract LeverageManager is
     _;
   }
 
+  bool _initialised;
+  modifier workflow(bool _starting) {
+    if (_starting) {
+      require(!_initialised, 'W0');
+      _initialised = true;
+    } else {
+      require(_initialised, 'W1');
+      _initialised = false;
+    }
+    _;
+  }
+
   constructor(
     string memory _positionName,
     string memory _positionSymbol,
@@ -68,7 +80,7 @@ contract LeverageManager is
     uint256 _slippage,
     uint256 _deadline,
     address _selfLendingPairPod
-  ) external override {
+  ) external override workflow(true) {
     if (_positionId == 0) {
       _positionId = _initializePosition(
         _pod,
@@ -91,8 +103,8 @@ contract LeverageManager is
     }
     require(flashSource[_pod] != address(0), 'FSV');
     require(lendingPairs[_pod] != address(0), 'LVP');
+    require(aspTkn[_pod] != address(0), 'ASP');
 
-    IFlashLoanSource _flashLoanSource = IFlashLoanSource(flashSource[_pod]);
     IERC20(_pod).safeTransferFrom(_msgSender(), address(this), _podAmount);
 
     // if additional fees required for flash source, handle that here
@@ -114,7 +126,7 @@ contract LeverageManager is
       }),
       _noop
     );
-    _flashLoanSource.flash(
+    IFlashLoanSource(flashSource[_pod]).flash(
       _getBorrowTknForPod(_pod),
       _pairedLpDesired,
       address(this),
@@ -130,11 +142,8 @@ contract LeverageManager is
     uint256 _pairedAssetAmtMin,
     address _dexAdapter,
     uint256 _userProvidedDebtAmtMax
-  ) external override onlyPositionOwner(_positionId) {
+  ) external override onlyPositionOwner(_positionId) workflow(true) {
     LeveragePositionProps memory _props = positionProps[_positionId];
-    IFlashLoanSource _flashLoanSource = IFlashLoanSource(
-      flashSource[_props.pod]
-    );
 
     // if additional fees required for flash source, handle that here
     _processExtraFlashLoanPayment(_props.pod, _msgSender());
@@ -164,7 +173,7 @@ contract LeverageManager is
       _dexAdapter,
       _userProvidedDebtAmtMax
     );
-    _flashLoanSource.flash(
+    IFlashLoanSource(flashSource[_props.pod]).flash(
       _borrowTkn,
       _borrowAssetAmt,
       address(this),
@@ -185,7 +194,7 @@ contract LeverageManager is
     );
   }
 
-  function callback(bytes memory _userData) external override {
+  function callback(bytes memory _userData) external override workflow(false) {
     IFlashLoanSource.FlashData memory _d = abi.decode(
       _userData,
       (IFlashLoanSource.FlashData)

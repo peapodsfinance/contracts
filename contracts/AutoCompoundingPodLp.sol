@@ -205,8 +205,6 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     uint256 _slippageOverride,
     uint256 _deadline
   ) internal returns (uint256) {
-    // trigger any pending rewards distro
-    IERC20(_asset()).transfer(address(this), 0);
     return
       _processRewardsToPodLp(_amountLpOutMin, _slippageOverride, _deadline);
   }

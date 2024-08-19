@@ -17,6 +17,7 @@ contract LendingAssetVault is
 {
   using SafeERC20 for IERC20;
 
+  uint16 constant PERCENTAGE_PRECISION = 10000;
   uint256 constant PRECISION = 10 ** 18;
 
   address _asset;
@@ -164,7 +165,8 @@ contract LendingAssetVault is
     address _vault = _msgSender();
     uint256 _newAssetUtil = vaultUtilization[_vault] + _assetAmt;
     require(
-      (PRECISION * _newAssetUtil) / _totalAssets <= _vaultMaxPerc[_vault],
+      (PERCENTAGE_PRECISION * _newAssetUtil) / _totalAssets <=
+        _vaultMaxPerc[_vault],
       'MAX'
     );
     vaultUtilization[_vault] = _newAssetUtil;
@@ -187,9 +189,8 @@ contract LendingAssetVault is
     uint256 _vaultAssetRatio = _prevRatio == 0
       ? 0
       : _prevRatio > _vaultWhitelistCbr[_vault]
-        ? ((PRECISION * _prevRatio) / _vaultWhitelistCbr[_vault]) -
-          _vaultWhitelistCbr[_vault]
-        : ((PRECISION * _vaultWhitelistCbr[_vault]) / _prevRatio) - _prevRatio;
+        ? ((PRECISION * _prevRatio) / _vaultWhitelistCbr[_vault]) - PRECISION
+        : ((PRECISION * _vaultWhitelistCbr[_vault]) / _prevRatio) - PRECISION;
     _totalAssets = _vaultWhitelistCbr[_vault] > _prevRatio
       ? _totalAssets + ((_assetAmt * _vaultAssetRatio) / PRECISION)
       : _totalAssets - ((_assetAmt * _vaultAssetRatio) / PRECISION);
@@ -233,12 +234,12 @@ contract LendingAssetVault is
 
   /// @notice The ```setVaultMaxPerc``` sets the maximum amount of vault assets allowed to be allocated to a whitelisted vault
   /// @param _vault the vault we're allocating to
-  /// @param _percentage the percentage, up to PRECISION (100%), of assets we can allocate to this vault
+  /// @param _percentage the percentage, up to PERCENTAGE_PRECISION (100%), of assets we can allocate to this vault
   function setVaultMaxPerc(
     address _vault,
     uint256 _percentage
   ) external onlyOwner {
-    require(_percentage <= PRECISION, 'MAX');
+    require(_percentage <= PERCENTAGE_PRECISION, 'MAX');
     _vaultMaxPerc[_vault] = _percentage;
     emit SetVaultMaxAlloPercentage(_vault, _percentage);
   }
