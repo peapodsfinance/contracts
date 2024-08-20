@@ -99,6 +99,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     uint256 _assets,
     address _receiver
   ) internal returns (uint256 _shares) {
+    require(_assets != 0, 'M');
+
     // TODO: slippage/oracles for inputs
     _triggerAndProcessRewardsToLp(0, 0, block.timestamp);
 
@@ -190,6 +192,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     uint256 _shares,
     address _receiver
   ) internal returns (uint256 _assets) {
+    require(_shares != 0, 'B');
+
     // TODO: slippage/oracles for inputs
     _triggerAndProcessRewardsToLp(0, 0, block.timestamp);
 

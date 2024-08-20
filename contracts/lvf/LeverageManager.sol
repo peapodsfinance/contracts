@@ -346,7 +346,7 @@ contract LeverageManager is
     );
     LeveragePositionCustodian(positionProps[_props.positionId].custodian)
       .removeCollateral(_lendingPair, _collateralAssetRemoveAmt, address(this));
-    (uint256 _podAmtReceived, uint256 _borrowAmtReceived) = _unstakeAndRemoveLP(
+    (uint256 _podAmtReceived, uint256 _pairedAmtReceived) = _unstakeAndRemoveLP(
       _props.pod,
       _collateralAssetRemoveAmt,
       _podAmtMin,
@@ -358,34 +358,31 @@ contract LeverageManager is
     if (_isSelfLendingAndOrPodded(_props.pod)) {
       // unwrap from self lending pod for lending pair asset
       if (positionProps[_props.positionId].selfLendingPod != address(0)) {
-        _borrowAmtReceived = _debondFromSelfLendingPod(
+        _pairedAmtReceived = _debondFromSelfLendingPod(
           positionProps[_props.positionId].selfLendingPod,
-          _borrowAmtReceived
+          _pairedAmtReceived
         );
       }
 
       IFraxlendPair(_lendingPair).redeem(
-        IFraxlendPair(_lendingPair).totalBorrow().toShares(
-          _borrowAmtReceived,
-          true
-        ),
+        _pairedAmtReceived,
         address(this),
         address(this)
       );
-      _borrowAmtReceived = IERC20(IFraxlendPair(_lendingPair).asset())
+      _pairedAmtReceived = IERC20(IFraxlendPair(_lendingPair).asset())
         .balanceOf(address(this));
     }
 
     // pay back flash loan and send remaining to borrower
     uint256 _repayAmount = _d.amount + _d.fee;
-    if (_borrowAmtReceived < _repayAmount) {
+    if (_pairedAmtReceived < _repayAmount) {
       _podAmtRemaining = _acquireBorrowTokenForRepayment(
         _props.pod,
         _props.user,
         _d.token,
         _dexAdapter,
         _repayAmount,
-        _borrowAmtReceived,
+        _pairedAmtReceived,
         _podAmtReceived,
         _userProvidedDebtAmtMax
       );
@@ -394,8 +391,8 @@ contract LeverageManager is
       IFlashLoanSource(flashSource[_props.pod]).source(),
       _repayAmount
     );
-    _borrowAmtRemaining = _borrowAmtReceived > _repayAmount
-      ? _borrowAmtReceived - _repayAmount
+    _borrowAmtRemaining = _pairedAmtReceived > _repayAmount
+      ? _pairedAmtReceived - _repayAmount
       : 0;
   }
 
@@ -419,12 +416,12 @@ contract LeverageManager is
     address _borrowToken,
     address _dexAdapter,
     uint256 _repayAmount,
-    uint256 _borrowAmtReceived,
+    uint256 _pairedAmtReceived,
     uint256 _podAmtReceived,
     uint256 _userProvidedDebtAmtMax
   ) internal returns (uint256 _podAmtRemaining) {
     _podAmtRemaining = _podAmtReceived;
-    uint256 _borrowNeeded = _repayAmount - _borrowAmtReceived;
+    uint256 _borrowNeeded = _repayAmount - _pairedAmtReceived;
     uint256 _borrowAmtNeededToSwap = _borrowNeeded;
     if (_userProvidedDebtAmtMax > 0) {
       uint256 _borrowAmtFromUser = _userProvidedDebtAmtMax >= _borrowNeeded
@@ -521,6 +518,16 @@ contract LeverageManager is
     _pairedLpUsed =
       _pairedLpBalBefore -
       IERC20(_pairedLpForPod).balanceOf(address(this));
+
+    // for self lending pods redeem any extra paired LP asset back into main asset
+    uint256 _pairedLeftover = _pairedLpBalBefore - _pairedLpUsed;
+    if (_isSelfLendingAndOrPodded(_props.pod) && _pairedLeftover > 0) {
+      IFraxlendPair(lendingPairs[_props.pod]).redeem(
+        _pairedLeftover,
+        address(this),
+        address(this)
+      );
+    }
   }
 
   function _getPairedTknAndAmt(
@@ -533,13 +540,10 @@ contract LeverageManager is
     _finalPairedAmt = _mainAmt;
     if (_isSelfLendingAndOrPodded(_pod)) {
       _finalPairedTkn = lendingPairs[_pod];
-      uint256 _fTknBalBefore = IERC20(lendingPairs[_pod]).balanceOf(
+      _finalPairedAmt = IFraxlendPair(lendingPairs[_pod]).deposit(
+        _finalPairedAmt,
         address(this)
       );
-      IFraxlendPair(lendingPairs[_pod]).deposit(_finalPairedAmt, address(this));
-      _finalPairedAmt =
-        IERC20(lendingPairs[_pod]).balanceOf(address(this)) -
-        _fTknBalBefore;
 
       // self lending+podded
       if (_selfLendingPairPod != address(0)) {
@@ -563,7 +567,7 @@ contract LeverageManager is
     uint256 _collateralAssetRemoveAmt,
     uint256 _podAmtMin,
     uint256 _pairedAssetAmtMin
-  ) internal returns (uint256 _podAmtReceived, uint256 _borrowAmtReceived) {
+  ) internal returns (uint256 _podAmtReceived, uint256 _pairedAmtReceived) {
     address _spTKN = IDecentralizedIndex(_pod).lpStakingPool();
     address _pairedLpToken = IDecentralizedIndex(_pod).PAIRED_LP_TOKEN();
 
@@ -589,7 +593,7 @@ contract LeverageManager is
       block.timestamp
     );
     _podAmtReceived = IERC20(_pod).balanceOf(address(this)) - _podAmtBefore;
-    _borrowAmtReceived =
+    _pairedAmtReceived =
       IERC20(_pairedLpToken).balanceOf(address(this)) -
       _pairedTokenAmtBefore;
   }

@@ -13,8 +13,10 @@ contract aspTKNOracle is spTKNOracle {
     address _spTKN,
     address _pTKNBasePool,
     IV3TwapUtilities _utils,
-    address _clMultAddress,
-    address _clDivAddress,
+    address _clBaseMultAddress,
+    address _clBaseDivAddress,
+    address _clQuoteMultAddress,
+    address _clQuoteDivAddress,
     bool _allowOnlyUniOracle
   )
     spTKNOracle(
@@ -22,8 +24,10 @@ contract aspTKNOracle is spTKNOracle {
       _spTKN,
       _pTKNBasePool,
       _utils,
-      _clMultAddress,
-      _clDivAddress,
+      _clBaseMultAddress,
+      _clBaseDivAddress,
+      _clQuoteMultAddress,
+      _clQuoteDivAddress,
       _allowOnlyUniOracle
     )
   {
@@ -31,7 +35,7 @@ contract aspTKNOracle is spTKNOracle {
   }
 
   function getPrices()
-    external
+    public
     view
     virtual
     override
@@ -39,21 +43,8 @@ contract aspTKNOracle is spTKNOracle {
   {
     uint256 _assetFactor = 10 ** 18;
     uint256 _aspTknPerSpTkn = IERC4626(ASPTKN).convertToShares(_assetFactor);
-    uint256 _priceBaseAspTKNX96 = (_v3BasePerSpTKNX96() * _assetFactor) /
-      _aspTknPerSpTkn;
-
-    uint256 _priceMid18 = (_priceBaseAspTKNX96 * 10 ** 18) / FixedPoint96.Q96;
-    uint256 _priceCl18;
-    (_isBadData, _priceCl18) = _getChainlinkPrice();
-    if (_isBadData) {
-      if (allowOnlyUniOracle) {
-        _isBadData = false;
-        _priceLow = (_priceMid18 * 995) / 1000;
-        _priceHigh = (_priceMid18 * 1005) / 1000;
-      }
-    } else {
-      _priceLow = _priceMid18 > _priceCl18 ? _priceCl18 : _priceMid18;
-      _priceHigh = _priceMid18 > _priceCl18 ? _priceMid18 : _priceCl18;
-    }
+    (_isBadData, _priceLow, _priceHigh) = super.getPrices();
+    _priceLow = (_priceLow * _assetFactor) / _aspTknPerSpTkn;
+    _priceHigh = (_priceHigh * _assetFactor) / _aspTknPerSpTkn;
   }
 }
