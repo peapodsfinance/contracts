@@ -63,6 +63,10 @@ contract LeverageManager is
     positionNFT = new LeveragePositions(_positionName, _positionSymbol);
   }
 
+  /// @notice The ```initializePosition``` function initializes a new position and mints a new position NFT
+  /// @param _pod The pod to leverage against for the new position
+  /// @param _recipient User to receive the position NFT
+  /// @param _selfLendingPod Optional self lending pod, use address(0) if not applicable
   function initializePosition(
     address _pod,
     address _recipient,
@@ -71,6 +75,15 @@ contract LeverageManager is
     _initializePosition(_pod, _recipient, _selfLendingPod);
   }
 
+  /// @notice The ```addLeverage``` function adds leverage to a position (or creates a new one and adds leverage)
+  /// @param _positionId The NFT ID of an existing position to add leverage to, or 0 if a new position should be created
+  /// @param _pod The pod to leverage against for the position
+  /// @param _podAmount Amount of pTKN to use to leverage against
+  /// @param _pairedLpDesired Number of pairedLpTkn for the pod to use to add LP for the new position
+  /// @param _pairedLpAmtMin Minimum number of pairedLpTkn for LP, slippage
+  /// @param _slippage Slippage for the LP execution with 1000 precision (1000 == 100%)
+  /// @param _deadline LP deadline for the UniswapV2 implementation
+  /// @param _selfLendingPairPod Advanced implementation parameter that is a pod to wrap pairedLpTkn into before adding leverage, or address(0) if not applicable
   function addLeverage(
     uint256 _positionId,
     address _pod,
@@ -103,7 +116,6 @@ contract LeverageManager is
     }
     require(flashSource[_pod] != address(0), 'FSV');
     require(lendingPairs[_pod] != address(0), 'LVP');
-    require(aspTkn[_pod] != address(0), 'ASP');
 
     IERC20(_pod).safeTransferFrom(_msgSender(), address(this), _podAmount);
 
@@ -134,6 +146,14 @@ contract LeverageManager is
     );
   }
 
+  /// @notice The ```removeLeverage``` function removes leverage from a position
+  /// @param _positionId The NFT ID for the position
+  /// @param _borrowAssetAmt Amount of borrowed assets to flash loan and use pay back and remove leverage
+  /// @param _collateralAssetRemoveAmt Amount of collateral asset to remvoe from the position
+  /// @param _podAmtMin Minimum amount of pTKN to receive on remove LP transaction (slippage)
+  /// @param _pairedAssetAmtMin Minimum amount of pairedLpTkn to receive on remove LP transaction (slippage)
+  /// @param _dexAdapter Adapter to use to optionally swap pod token into borrow token if not received enough to pay back flash loan
+  /// @param _userProvidedDebtAmtMax Amt of borrow token a user will allow to transfer from their wallet to pay back flash loan
   function removeLeverage(
     uint256 _positionId,
     uint256 _borrowAssetAmt,
@@ -181,6 +201,11 @@ contract LeverageManager is
     );
   }
 
+  /// @notice The ```withdrawAssets``` function allows a position owner to withdraw any assets in the position custodian
+  /// @param _positionId The NFT ID for the position
+  /// @param _token The token to withdraw assets from
+  /// @param _recipient Where the received assets should go
+  /// @param _amount How much to withdraw
   function withdrawAssets(
     uint256 _positionId,
     address _token,
@@ -194,6 +219,9 @@ contract LeverageManager is
     );
   }
 
+  /// @notice The ```callback``` function can only be called within the addLeverage or removeLeverage workflow,
+  /// @notice and is called by the flash source implementation used to borrow assets to initiate adding or removing lev
+  /// @param _userData Config/info to unpack and extract individual pieces when adding/removing leverage, see addLeverage and removeLeverage
   function callback(bytes memory _userData) external override workflow(false) {
     IFlashLoanSource.FlashData memory _d = abi.decode(
       _userData,
@@ -285,13 +313,14 @@ contract LeverageManager is
     _refundAmt = _props.podAmount - _podAmountUsed;
 
     // if there's an open fee send aspTKN generated to protocol
+    address _aspTkn = _getAspTkn(_props.pod);
     if (openFeePerc > 0) {
       uint256 _openFeeAmt = (_aspTknCollateralBal * openFeePerc) / 1000;
-      IERC20(aspTkn[_props.pod]).safeTransfer(owner(), _openFeeAmt);
+      IERC20(_aspTkn).safeTransfer(owner(), _openFeeAmt);
       _aspTknCollateralBal -= _openFeeAmt;
     }
 
-    IERC20(aspTkn[_props.pod]).safeTransfer(
+    IERC20(_aspTkn).safeTransfer(
       positionProps[_props.positionId].custodian,
       _aspTknCollateralBal
     );
@@ -369,8 +398,7 @@ contract LeverageManager is
         address(this),
         address(this)
       );
-      _pairedAmtReceived = IERC20(IFraxlendPair(_lendingPair).asset())
-        .balanceOf(address(this));
+      _pairedAmtReceived = IERC20(_d.token).balanceOf(address(this));
     }
 
     // pay back flash loan and send remaining to borrower
@@ -506,12 +534,10 @@ contract LeverageManager is
       _props.deadline
     );
 
+    address _aspTkn = _getAspTkn(_props.pod);
     uint256 _stakingBal = IERC20(_spTKN).balanceOf(address(this));
-    IERC20(_spTKN).safeIncreaseAllowance(aspTkn[_props.pod], _stakingBal);
-    _newAspTkns = IERC4626(aspTkn[_props.pod]).deposit(
-      _stakingBal,
-      address(this)
-    );
+    IERC20(_spTKN).safeIncreaseAllowance(_aspTkn, _stakingBal);
+    _newAspTkns = IERC4626(_aspTkn).deposit(_stakingBal, address(this));
     _podAmountUsed =
       _podBalBefore -
       IERC20(_props.pod).balanceOf(address(this));
@@ -522,6 +548,18 @@ contract LeverageManager is
     // for self lending pods redeem any extra paired LP asset back into main asset
     uint256 _pairedLeftover = _pairedLpBalBefore - _pairedLpUsed;
     if (_isSelfLendingAndOrPodded(_props.pod) && _pairedLeftover > 0) {
+      if (_props.selfLendingPairPod != address(0)) {
+        address[] memory _noop1 = new address[](0);
+        uint8[] memory _noop2 = new uint8[](0);
+        IDecentralizedIndex(_props.selfLendingPairPod).debond(
+          _pairedLeftover,
+          _noop1,
+          _noop2
+        );
+        _pairedLeftover = IERC20(lendingPairs[_props.pod]).balanceOf(
+          address(this)
+        );
+      }
       IFraxlendPair(lendingPairs[_props.pod]).redeem(
         _pairedLeftover,
         address(this),
@@ -532,14 +570,18 @@ contract LeverageManager is
 
   function _getPairedTknAndAmt(
     address _pod,
-    address _mainPairedTkn,
-    uint256 _mainAmt,
+    address _borrowedTkn,
+    uint256 _borrowedAmt,
     address _selfLendingPairPod
   ) internal returns (address _finalPairedTkn, uint256 _finalPairedAmt) {
-    _finalPairedTkn = _mainPairedTkn;
-    _finalPairedAmt = _mainAmt;
+    _finalPairedTkn = _borrowedTkn;
+    _finalPairedAmt = _borrowedAmt;
     if (_isSelfLendingAndOrPodded(_pod)) {
       _finalPairedTkn = lendingPairs[_pod];
+      IERC20(_borrowedTkn).safeIncreaseAllowance(
+        lendingPairs[_pod],
+        _finalPairedAmt
+      );
       _finalPairedAmt = IFraxlendPair(lendingPairs[_pod]).deposit(
         _finalPairedAmt,
         address(this)
@@ -576,7 +618,7 @@ contract LeverageManager is
       address(this)
     );
 
-    uint256 _spTKNAmtReceived = IERC4626(aspTkn[_pod]).redeem(
+    uint256 _spTKNAmtReceived = IERC4626(_getAspTkn(_pod)).redeem(
       _collateralAssetRemoveAmt,
       address(this),
       address(this)
@@ -611,6 +653,10 @@ contract LeverageManager is
       _isSelfLendingAndOrPodded(_pod)
         ? IFraxlendPair(lendingPairs[_pod]).asset()
         : IDecentralizedIndex(_pod).PAIRED_LP_TOKEN();
+  }
+
+  function _getAspTkn(address _pod) internal view returns (address) {
+    return IFraxlendPair(lendingPairs[_pod]).collateralContract();
   }
 
   function setIndexUtils(IIndexUtils_LEGACY _utils) external onlyOwner {

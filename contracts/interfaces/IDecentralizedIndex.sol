@@ -33,22 +33,51 @@ interface IDecentralizedIndex is IERC20 {
     uint256 q1; // arbitrary quantity/number field we can use for an index
   }
 
+  /// @notice The ```Create``` event fires when a new decentralized index has been created
+  /// @param newIdx The CA of the new index contract
+  /// @param wallet The creator of the new index
   event Create(address indexed newIdx, address indexed wallet);
+
+  /// @notice The ```Initialize``` event fires when the new pod has been initialized,
+  /// @notice which is at creation on some and in another txn for others (gas limits)
+  /// @param wallet The wallet that initialized
+  /// @param v2Pool The new UniV2 derivative pool that was created at initialization
   event Initialize(address indexed wallet, address v2Pool);
+
+  /// @notice The ```Bond``` event fires when someone wraps into the pod which mints new pod tokens
+  /// @param wallet The wallet that wrapped
+  /// @param token The token that was used as a ref to wrap into, representing an underlying tkn
+  /// @param amountTokensBonded Amount of underlying tkns used to wrap/bond
+  /// @param amountTokensMinted Amount of new pod tokens (pTKN) minted
   event Bond(
     address indexed wallet,
     address indexed token,
     uint256 amountTokensBonded,
     uint256 amountTokensMinted
   );
+
+  /// @notice The ```Debond``` event fires when someone unwraps from a pod and redeems underlying tkn(s)
+  /// @param wallet The wallet that unwrapped/debond
+  /// @param amountDebonded Amount of pTKNs burned/unwrapped
   event Debond(address indexed wallet, uint256 amountDebonded);
+
+  /// @notice The ```AddLiquidity``` event fires when new liquidity (LP) for a pod is added
+  /// @param wallet The wallet that added LP
+  /// @param amountTokens Amount of pTKNs used for LP
+  /// @param amountDAI Amount of pairedLpAsset used for LP
   event AddLiquidity(
     address indexed wallet,
     uint256 amountTokens,
     uint256 amountDAI
   );
+
+  /// @notice The ```RemoveLiquidity``` event fires when LP is removed for a pod
+  /// @param wallet The wallet that removed LP
+  /// @param amountLiquidity Amount of liquidity removed
   event RemoveLiquidity(address indexed wallet, uint256 amountLiquidity);
+
   event SetPartner(address indexed wallet, address newPartner);
+
   event SetPartnerFee(address indexed wallet, uint16 newFee);
 
   function BOND_FEE() external view returns (uint16);
