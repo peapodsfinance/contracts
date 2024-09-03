@@ -253,7 +253,7 @@ abstract contract DecentralizedIndex is
         );
       }
     } else if (IERC20(PAIRED_LP_TOKEN).balanceOf(_rewards) > 0) {
-      ITokenRewards(_rewards).depositFromPairedLpToken(0, 0);
+      ITokenRewards(_rewards).depositFromPairedLpToken(0);
     }
   }
 

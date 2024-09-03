@@ -20,6 +20,8 @@ interface ITokenRewards {
     uint256 amount
   );
 
+  event RewardSwapError(uint256 amountIn);
+
   function totalShares() external view returns (uint256);
 
   function totalStakers() external view returns (uint256);
@@ -28,10 +30,7 @@ interface ITokenRewards {
 
   function trackingToken() external view returns (address);
 
-  function depositFromPairedLpToken(
-    uint256 amount,
-    uint256 slippageOverride
-  ) external;
+  function depositFromPairedLpToken(uint256 amount) external;
 
   function depositRewards(address token, uint256 amount) external;
 

@@ -22,9 +22,16 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     address pool2;
   }
 
+  event TokenToPairedLpSwapError(
+    address rewardsToken,
+    address pairedLpToken,
+    uint256 amountIn
+  );
+
   uint256 constant FACTOR = 10 ** 18;
   uint24 constant REWARDS_POOL_FEE = 10000;
-  uint256 constant DEFAULT_SLIPPAGE = 100;
+  uint256 constant LP_SLIPPAGE = 80; // 8%
+  uint256 constant REWARDS_SWAP_SLIPPAGE = 20; // 2%
 
   IDexAdapter immutable DEX_ADAPTER;
   IV3TwapUtilities immutable V3_TWAP_UTILS;
@@ -33,10 +40,14 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
   IIndexUtils public indexUtils;
   IRewardsWhitelister public rewardsWhitelister;
   bool public yieldConvEnabled = true;
-  uint16 public feePerc = 50; // 1000 precision
+  uint16 public protocolFee = 50; // 1000 precision
   // token in => token out => swap pool(s)
   mapping(address => mapping(address => Pools)) public swapMaps;
 
+  // inputTkn => outputTkn => amountInOverride
+  mapping(address => mapping(address => uint256)) _tokenToPairedSwapAmountInOverride;
+
+  // internal tracking
   uint256 _totalAssets;
 
   /// @notice can pass _pod as null address and set later if need be
@@ -101,8 +112,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
   ) internal returns (uint256 _shares) {
     require(_assets != 0, 'M');
 
-    // TODO: slippage/oracles for inputs
-    _triggerAndProcessRewardsToLp(0, 0, block.timestamp);
+    _processRewardsToPodLp(0, block.timestamp);
 
     _shares = convertToShares(_assets);
     _totalAssets += _assets;
@@ -172,20 +182,9 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
 
   function processAllRewardsTokensToPodLp(
     uint256 _amountLpOutMin,
-    uint256 _slippageOverride,
-    uint256 _deadline,
-    bool _triggerNew
+    uint256 _deadline
   ) external onlyOwner returns (uint256) {
-    if (_triggerNew) {
-      return
-        _triggerAndProcessRewardsToLp(
-          _amountLpOutMin,
-          _slippageOverride,
-          _deadline
-        );
-    }
-    return
-      _processRewardsToPodLp(_amountLpOutMin, _slippageOverride, _deadline);
+    return _processRewardsToPodLp(_amountLpOutMin, _deadline);
   }
 
   function _withdraw(
@@ -194,23 +193,13 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
   ) internal returns (uint256 _assets) {
     require(_shares != 0, 'B');
 
-    // TODO: slippage/oracles for inputs
-    _triggerAndProcessRewardsToLp(0, 0, block.timestamp);
+    _processRewardsToPodLp(0, block.timestamp);
 
     _assets = convertToAssets(_shares);
     _burn(_msgSender(), _shares);
     IERC20(_asset()).safeTransfer(_receiver, _assets);
     _totalAssets -= _assets;
     emit Withdraw(_msgSender(), _receiver, _receiver, _assets, _shares);
-  }
-
-  function _triggerAndProcessRewardsToLp(
-    uint256 _amountLpOutMin,
-    uint256 _slippageOverride,
-    uint256 _deadline
-  ) internal returns (uint256) {
-    return
-      _processRewardsToPodLp(_amountLpOutMin, _slippageOverride, _deadline);
   }
 
   // @notice: assumes underlying vault asset has decimals == 18
@@ -229,7 +218,6 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
 
   function _processRewardsToPodLp(
     uint256 _amountLpOutMin,
-    uint256 _slippageOverride,
     uint256 _deadline
   ) internal returns (uint256 _lpAmtOut) {
     if (!yieldConvEnabled) {
@@ -243,13 +231,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
       if (_bal == 0) {
         continue;
       }
-      uint256 _newLp = _tokenToPodLp(
-        _token,
-        _bal,
-        _amountLpOutMin,
-        _slippageOverride,
-        _deadline
-      );
+      uint256 _newLp = _tokenToPodLp(_token, _bal, _amountLpOutMin, _deadline);
       _lpAmtOut += _newLp;
       _totalAssets += _newLp;
     }
@@ -259,17 +241,11 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     address _token,
     uint256 _amountIn,
     uint256 _amountLpOutMin,
-    uint256 _slippageOverride,
     uint256 _deadline
   ) internal returns (uint256 _lpAmtOut) {
-    uint256 _pairedOut = _tokenToPairedLpToken(
-      _token,
-      _amountIn,
-      0,
-      _slippageOverride
-    );
-    if (feePerc > 0) {
-      uint256 _pairedFee = (_pairedOut * feePerc) / 1000;
+    uint256 _pairedOut = _tokenToPairedLpToken(_token, _amountIn, 0);
+    if (protocolFee > 0) {
+      uint256 _pairedFee = (_pairedOut * protocolFee) / 1000;
       IERC20(pod.PAIRED_LP_TOKEN()).safeTransfer(owner(), _pairedFee);
       _pairedOut -= _pairedFee;
     }
@@ -279,17 +255,21 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
   function _tokenToPairedLpToken(
     address _token,
     uint256 _amountIn,
-    uint256 _amountOutMin,
-    uint256 _slippageOverride
+    uint256 _amountOutMin
   ) internal returns (uint256 _amountOut) {
     address _pairedLpToken = pod.PAIRED_LP_TOKEN();
-    address _rewardsToken = pod.lpRewardsToken();
     if (_token == _pairedLpToken) {
       return _amountIn;
     }
+
+    address _rewardsToken = pod.lpRewardsToken();
     if (_token != address(0) && _token != _rewardsToken) {
       return _swap(_token, _pairedLpToken, _amountIn, _amountOutMin);
     }
+    uint256 _amountInOverride = _tokenToPairedSwapAmountInOverride[
+      _rewardsToken
+    ][_pairedLpToken];
+    _amountIn = _amountInOverride > 0 ? _amountInOverride : _amountIn;
     (address _token0, address _token1) = _pairedLpToken < _rewardsToken
       ? (_pairedLpToken, _rewardsToken)
       : (_rewardsToken, _pairedLpToken);
@@ -303,16 +283,15 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
       uint256 _amountOutNoSlip = _token0 == _rewardsToken
         ? (_rewardsPriceX96 * _amountIn) / FixedPoint96.Q96
         : (_amountIn * FixedPoint96.Q96) / _rewardsPriceX96;
-      uint256 _slippage = _slippageOverride > 0
-        ? _slippageOverride
-        : DEFAULT_SLIPPAGE;
-      _amountOutMin = (_amountOutNoSlip * (1000 - _slippage)) / 1000;
+      _amountOutMin =
+        (_amountOutNoSlip * (1000 - REWARDS_SWAP_SLIPPAGE)) /
+        1000;
     }
     IERC20(_rewardsToken).safeIncreaseAllowance(
       address(DEX_ADAPTER),
       _amountIn
     );
-    return
+    try
       DEX_ADAPTER.swapV3Single(
         _rewardsToken,
         _pairedLpToken,
@@ -320,7 +299,20 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         _amountIn,
         _amountOutMin,
         address(this)
+      )
+    returns (uint256 __amountOut) {
+      _tokenToPairedSwapAmountInOverride[_rewardsToken][_pairedLpToken] = 0;
+      _amountOut = __amountOut;
+    } catch {
+      _tokenToPairedSwapAmountInOverride[_rewardsToken][_pairedLpToken] =
+        _amountIn /
+        2;
+      IERC20(_rewardsToken).safeDecreaseAllowance(
+        address(DEX_ADAPTER),
+        _amountIn
       );
+      emit TokenToPairedLpSwapError(_rewardsToken, _pairedLpToken, _amountIn);
+    }
   }
 
   function _pairedLpTokenToPodLp(
@@ -348,7 +340,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         _pairedLpToken,
         _half,
         _half,
-        DEFAULT_SLIPPAGE,
+        LP_SLIPPAGE,
         _deadline
       );
   }
@@ -425,8 +417,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     yieldConvEnabled = _enabled;
   }
 
-  function setFeePerc(uint16 _newFee) external onlyOwner {
+  function setProtocolFee(uint16 _newFee) external onlyOwner {
     require(_newFee <= 1000, 'MAX');
-    feePerc = _newFee;
+    protocolFee = _newFee;
   }
 }

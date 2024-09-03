@@ -8,6 +8,10 @@ import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './interfaces/ILendingAssetVault.sol';
 
+interface IVaultInterestUpdate {
+  function externalAddInterest() external;
+}
+
 contract LendingAssetVault is
   IERC4626,
   ILendingAssetVault,
@@ -17,6 +21,7 @@ contract LendingAssetVault is
 {
   using SafeERC20 for IERC20;
 
+  uint8 constant MAX_VAULTS = 12;
   uint16 constant PERCENTAGE_PRECISION = 10000;
   uint256 constant PRECISION = 10 ** 18;
 
@@ -29,6 +34,10 @@ contract LendingAssetVault is
   mapping(address => uint256) public vaultUtilization;
   mapping(address => uint256) _vaultMaxPerc;
   mapping(address => uint256) _vaultWhitelistCbr;
+
+  address[] _vaultWhitelistAry;
+  // vault address => idx in _vaultWhitelistAry
+  mapping(address => uint256) _vaultWhitelistAryIdx;
 
   modifier onlyWhitelist() {
     require(vaultWhitelist[_msgSender()], 'WL');
@@ -95,6 +104,7 @@ contract LendingAssetVault is
     _totalAssets += _assets;
     _mint(_receiver, _shares);
     IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _assets);
+    _updateInterestInAllVaults();
     emit Deposit(_msgSender(), _receiver, _assets, _shares);
   }
 
@@ -163,6 +173,12 @@ contract LendingAssetVault is
     uint256 _assetAmt
   ) external override onlyWhitelist {
     address _vault = _msgSender();
+    _updateTotalAssetsFromVaultChanges(_vault);
+
+    // validate that our new vault utilization does not exceed our max. Since we
+    // call this after updating _totalAssets above it reflects the latest total,
+    // but this is okay since we should validate total utilization after we account
+    // for changes from this vault anyways
     uint256 _newAssetUtil = vaultUtilization[_vault] + _assetAmt;
     require(
       (PERCENTAGE_PRECISION * _newAssetUtil) / _totalAssets <=
@@ -180,20 +196,7 @@ contract LendingAssetVault is
   /// @param _assetAmt the amount of underlying assets to deposit
   function whitelistDeposit(uint256 _assetAmt) external override onlyWhitelist {
     address _vault = _msgSender();
-    uint256 _prevRatio = _vaultWhitelistCbr[_vault];
-    _vaultWhitelistCbr[_vault] = IERC4626(_vault).convertToAssets(PRECISION);
-
-    // calculate the current ratio of assets in the target vault to previously recorded ratio
-    // to correctly calculate the change in total assets here based on how the vault share
-    // has changed over time
-    uint256 _vaultAssetRatio = _prevRatio == 0
-      ? 0
-      : _prevRatio > _vaultWhitelistCbr[_vault]
-        ? ((PRECISION * _prevRatio) / _vaultWhitelistCbr[_vault]) - PRECISION
-        : ((PRECISION * _vaultWhitelistCbr[_vault]) / _prevRatio) - PRECISION;
-    _totalAssets = _vaultWhitelistCbr[_vault] > _prevRatio
-      ? _totalAssets + ((_assetAmt * _vaultAssetRatio) / PRECISION)
-      : _totalAssets - ((_assetAmt * _vaultAssetRatio) / PRECISION);
+    _updateTotalAssetsFromVaultChanges(_vault);
     _totalAssetsUtilized -= _assetAmt > _totalAssetsUtilized
       ? _totalAssetsUtilized
       : _assetAmt;
@@ -202,6 +205,27 @@ contract LendingAssetVault is
       : _assetAmt;
     IERC20(_asset).safeTransferFrom(_vault, address(this), _assetAmt);
     emit WhitelistDeposit(_vault, _assetAmt);
+  }
+
+  /// @notice The ```_updateTotalAssetsFromVaultChanges``` updates _totalAssets based on  the current ratio
+  /// @notice of assets in the target vault to previously recorded ratio
+  /// @notice to correctly calculate the change in total assets here based on how the vault share
+  /// @notice has changed over time
+  /// @param _vault the vault we're adjusting _totalAssets from based on it's CBR updates from last check
+  function _updateTotalAssetsFromVaultChanges(address _vault) internal {
+    uint256 _prevVaultCbr = _vaultWhitelistCbr[_vault];
+    _vaultWhitelistCbr[_vault] = IERC4626(_vault).convertToAssets(PRECISION);
+    if (_prevVaultCbr == 0) {
+      return;
+    }
+    uint256 _currentAssetsUtilized = vaultUtilization[_vault];
+    uint256 _vaultAssetRatio = _prevVaultCbr > _vaultWhitelistCbr[_vault]
+      ? ((PRECISION * _prevVaultCbr) / _vaultWhitelistCbr[_vault]) - PRECISION
+      : ((PRECISION * _vaultWhitelistCbr[_vault]) / _prevVaultCbr) - PRECISION;
+    // note that if _prevVaultCbr == _vaultWhitelistCbr[_vault] then _totalAssets is not changed
+    _totalAssets = _prevVaultCbr > _vaultWhitelistCbr[_vault]
+      ? _totalAssets - (_currentAssetsUtilized * _vaultAssetRatio) / PRECISION
+      : _totalAssets + (_currentAssetsUtilized * _vaultAssetRatio) / PRECISION;
   }
 
   function _withdraw(
@@ -213,6 +237,7 @@ contract LendingAssetVault is
     _burn(_msgSender(), _shares);
     IERC20(_asset).safeTransfer(_receiver, _assets);
     _totalAssets -= _assets;
+    _updateInterestInAllVaults();
     emit Withdraw(_msgSender(), _receiver, _receiver, _assets, _shares);
   }
 
@@ -226,9 +251,26 @@ contract LendingAssetVault is
     return IERC20Metadata(_asset).decimals();
   }
 
+  function _updateInterestInAllVaults() internal {
+    for (uint256 _i; _i < _vaultWhitelistAry.length; _i++) {
+      IVaultInterestUpdate(_vaultWhitelistAry[_i]).externalAddInterest();
+    }
+  }
+
   function setVaultWhitelist(address _vault, bool _allowed) external onlyOwner {
     require(vaultWhitelist[_vault] != _allowed, 'T');
     vaultWhitelist[_vault] = _allowed;
+    if (_allowed) {
+      require(_vaultWhitelistAry.length <= MAX_VAULTS, 'M');
+      _vaultWhitelistAryIdx[_vault] = _vaultWhitelistAry.length;
+      _vaultWhitelistAry.push(_vault);
+    } else {
+      uint256 _idx = _vaultWhitelistAryIdx[_vault];
+      address _movingVault = _vaultWhitelistAry[_vaultWhitelistAry.length - 1];
+      _vaultWhitelistAry[_idx] = _movingVault;
+      _vaultWhitelistAryIdx[_movingVault] = _idx;
+      _vaultWhitelistAry.pop();
+    }
     emit SetVaultWhitelist(_vault, _allowed);
   }
 

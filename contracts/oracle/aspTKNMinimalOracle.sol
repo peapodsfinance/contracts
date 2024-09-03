@@ -10,6 +10,7 @@ contract aspTKNMinimalOracle is spTKNMinimalOracle {
   constructor(
     address _aspTKN,
     address _baseToken,
+    bool _baseIsPod,
     address _spTKN,
     address _underlyingClPool,
     address _baseConversionChainlinkFeed,
@@ -17,10 +18,12 @@ contract aspTKNMinimalOracle is spTKNMinimalOracle {
     address _clBaseFeed,
     address _clQuoteFeed,
     address _clSinglePriceOracle,
-    address _uniswapSinglePriceOracle
+    address _uniswapSinglePriceOracle,
+    address _v2Reserves
   )
     spTKNMinimalOracle(
       _baseToken,
+      _baseIsPod,
       _spTKN,
       _underlyingClPool,
       _baseConversionChainlinkFeed,
@@ -28,7 +31,8 @@ contract aspTKNMinimalOracle is spTKNMinimalOracle {
       _clBaseFeed,
       _clQuoteFeed,
       _clSinglePriceOracle,
-      _uniswapSinglePriceOracle
+      _uniswapSinglePriceOracle,
+      _v2Reserves
     )
   {
     ASP_TKN = _aspTKN;

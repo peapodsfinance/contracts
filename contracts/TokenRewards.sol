@@ -19,6 +19,7 @@ contract TokenRewards is ITokenRewards, Context {
   using SafeERC20 for IERC20;
 
   uint256 constant PRECISION = 10 ** 36;
+  uint256 constant REWARDS_SWAP_SLIPPAGE = 20; // 2%
   uint24 constant REWARDS_POOL_FEE = 10000; // 1%
   int24 constant REWARDS_TICK_SPACING = 200;
   address immutable INDEX_FUND;
@@ -41,7 +42,7 @@ contract TokenRewards is ITokenRewards, Context {
   // reward token => user => Reward
   mapping(address => mapping(address => Reward)) public rewards;
 
-  uint256 _rewardsSwapSlippage = 20; // 2%
+  uint256 _rewardsSwapAmountInOverride;
   // reward token => amount
   mapping(address => uint256) _rewardsPerShare;
   // reward token => amount
@@ -125,11 +126,9 @@ contract TokenRewards is ITokenRewards, Context {
   }
 
   function depositFromPairedLpToken(
-    uint256 _amountTknDepositing,
-    uint256 _slippageOverride
+    uint256 _amountTknDepositing
   ) public override {
     require(PAIRED_LP_TOKEN != rewardsToken, 'R');
-    require(_slippageOverride <= 200, 'MS'); // 20%
     if (_amountTknDepositing > 0) {
       IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
         _msgSender(),
@@ -160,17 +159,7 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 _amountOut = _token0 == PAIRED_LP_TOKEN
       ? (_rewardsPriceX96 * _amountTkn) / FixedPoint96.Q96
       : (_amountTkn * FixedPoint96.Q96) / _rewardsPriceX96;
-
-    uint256 _slippage = _slippageOverride > 0
-      ? _slippageOverride
-      : _rewardsSwapSlippage;
-    _swapForRewards(
-      _amountTkn,
-      _amountOut,
-      _slippage,
-      _slippageOverride > 0,
-      _adminAmt
-    );
+    _swapForRewards(_amountTkn, _amountOut, _adminAmt);
   }
 
   function depositRewards(address _token, uint256 _amount) external override {
@@ -307,10 +296,11 @@ contract TokenRewards is ITokenRewards, Context {
   function _swapForRewards(
     uint256 _amountIn,
     uint256 _amountOut,
-    uint256 _slippage,
-    bool _isSlipOverride,
     uint256 _adminAmt
   ) internal {
+    _amountIn = _rewardsSwapAmountInOverride > 0
+      ? _rewardsSwapAmountInOverride
+      : _amountIn;
     uint256 _balBefore = IERC20(rewardsToken).balanceOf(address(this));
     IERC20(PAIRED_LP_TOKEN).safeIncreaseAllowance(
       address(DEX_ADAPTER),
@@ -322,29 +312,28 @@ contract TokenRewards is ITokenRewards, Context {
         rewardsToken,
         REWARDS_POOL_FEE,
         _amountIn,
-        (_amountOut * (1000 - _slippage)) / 1000,
+        (_amountOut * (1000 - REWARDS_SWAP_SLIPPAGE)) / 1000,
         address(this)
       )
     {
+      _rewardsSwapAmountInOverride = 0;
       if (_adminAmt > 0) {
         IERC20(PAIRED_LP_TOKEN).safeTransfer(
           Ownable(address(V3_TWAP_UTILS)).owner(),
           _adminAmt
         );
       }
-      _rewardsSwapSlippage = 20;
       _depositRewards(
         rewardsToken,
         IERC20(rewardsToken).balanceOf(address(this)) - _balBefore
       );
     } catch {
-      if (!_isSlipOverride && _rewardsSwapSlippage < 200) {
-        _rewardsSwapSlippage += 10;
-      }
+      _rewardsSwapAmountInOverride = _amountIn / 2;
       IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(
         address(DEX_ADAPTER),
         _amountIn
       );
+      emit RewardSwapError(_amountIn);
     }
   }
 

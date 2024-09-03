@@ -81,6 +81,7 @@ contract LeverageManager is
   /// @param _podAmount Amount of pTKN to use to leverage against
   /// @param _pairedLpDesired Number of pairedLpTkn for the pod to use to add LP for the new position
   /// @param _pairedLpAmtMin Minimum number of pairedLpTkn for LP, slippage
+  /// @param _overrideBorrowAmt Override amount to borrow from the lending pair, only matters if max LTV is >50% on the lending pair
   /// @param _slippage Slippage for the LP execution with 1000 precision (1000 == 100%)
   /// @param _deadline LP deadline for the UniswapV2 implementation
   /// @param _selfLendingPairPod Advanced implementation parameter that is a pod to wrap pairedLpTkn into before adding leverage, or address(0) if not applicable
@@ -90,25 +91,20 @@ contract LeverageManager is
     uint256 _podAmount,
     uint256 _pairedLpDesired,
     uint256 _pairedLpAmtMin,
+    uint256 _overrideBorrowAmt,
     uint256 _slippage,
     uint256 _deadline,
     address _selfLendingPairPod
   ) external override workflow(true) {
+    address _sender = _msgSender();
     if (_positionId == 0) {
-      _positionId = _initializePosition(
-        _pod,
-        _msgSender(),
-        _selfLendingPairPod
-      );
+      _positionId = _initializePosition(_pod, _sender, _selfLendingPairPod);
     } else {
-      address _msgSender = msg.sender;
       address _owner = positionNFT.ownerOf(_positionId);
       address _approvedAddress = positionNFT.getApproved(_positionId);
-      bool _isApprovedAll = positionNFT.isApprovedForAll(_owner, _msgSender);
+      bool _isApprovedAll = positionNFT.isApprovedForAll(_owner, _sender);
       require(
-        _owner == _msgSender ||
-          _approvedAddress == _msgSender ||
-          _isApprovedAll,
+        _owner == _sender || _approvedAddress == _sender || _isApprovedAll,
         'AUTH'
       );
       _pod = positionProps[_positionId].pod;
@@ -117,21 +113,22 @@ contract LeverageManager is
     require(flashSource[_pod] != address(0), 'FSV');
     require(lendingPairs[_pod] != address(0), 'LVP');
 
-    IERC20(_pod).safeTransferFrom(_msgSender(), address(this), _podAmount);
+    IERC20(_pod).safeTransferFrom(_sender, address(this), _podAmount);
 
     // if additional fees required for flash source, handle that here
-    _processExtraFlashLoanPayment(_pod, _msgSender());
+    _processExtraFlashLoanPayment(_pod, _sender);
 
     bytes memory _noop;
     bytes memory _leverageData = abi.encode(
       LeverageFlashProps({
         method: FlashCallbackMethod.ADD,
         positionId: _positionId,
-        user: _msgSender(),
+        user: _sender,
         pod: _pod,
         podAmount: _podAmount,
         pairedLpDesired: _pairedLpDesired,
         pairedLpAmtMin: _pairedLpAmtMin,
+        overrideBorrowAmt: _overrideBorrowAmt,
         slippage: _slippage,
         deadline: _deadline,
         selfLendingPairPod: _selfLendingPairPod
@@ -327,7 +324,9 @@ contract LeverageManager is
     LeveragePositionCustodian(positionProps[_props.positionId].custodian)
       .borrowAsset(
         lendingPairs[_props.pod],
-        _props.pairedLpDesired,
+        _props.overrideBorrowAmt > _props.pairedLpDesired
+          ? _props.overrideBorrowAmt
+          : _props.pairedLpDesired,
         _aspTknCollateralBal,
         address(this)
       );

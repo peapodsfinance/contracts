@@ -15,6 +15,7 @@ interface ILeverageManager {
     uint256 podAmount;
     uint256 pairedLpDesired;
     uint256 pairedLpAmtMin;
+    uint256 overrideBorrowAmt;
     uint256 slippage;
     uint256 deadline;
     address selfLendingPairPod;
@@ -39,6 +40,7 @@ interface ILeverageManager {
     uint256 _podAmount,
     uint256 _pairedLpDesired,
     uint256 _pairedLpAmtMin,
+    uint256 _overrideBorrowAmt,
     uint256 _slippage,
     uint256 _deadline,
     address _selfLendingPairPod
