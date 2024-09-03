@@ -23,7 +23,7 @@ contract LendingAssetVault is
 
   uint8 constant MAX_VAULTS = 12;
   uint16 constant PERCENTAGE_PRECISION = 10000;
-  uint256 constant PRECISION = 10 ** 18;
+  uint256 constant PRECISION = 10 ** 27;
 
   address _asset;
   uint256 _totalAssets;
@@ -167,25 +167,31 @@ contract LendingAssetVault is
     _assets = _withdraw(_shares, _receiver);
   }
 
+  function donate(uint256 _assetAmt) external {
+    _totalAssets += _assetAmt;
+    IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _assetAmt);
+    emit DonateAssets(_msgSender(), _assetAmt);
+  }
+
   /// @notice The ```whitelistWithdraw``` is called by any whitelisted vault to withdraw assets.
   /// @param _assetAmt the amount of underlying assets to withdraw
   function whitelistWithdraw(
     uint256 _assetAmt
   ) external override onlyWhitelist {
     address _vault = _msgSender();
-    _updateTotalAssetsFromVaultChanges(_vault);
+    _updateAssetMetadataFromVault(_vault);
 
     // validate that our new vault utilization does not exceed our max. Since we
     // call this after updating _totalAssets above it reflects the latest total,
     // but this is okay since we should validate total utilization after we account
     // for changes from this vault anyways
-    uint256 _newAssetUtil = vaultUtilization[_vault] + _assetAmt;
     require(
-      (PERCENTAGE_PRECISION * _newAssetUtil) / _totalAssets <=
+      (PERCENTAGE_PRECISION * (vaultUtilization[_vault] + _assetAmt)) /
+        _totalAssets <=
         _vaultMaxPerc[_vault],
       'MAX'
     );
-    vaultUtilization[_vault] = _newAssetUtil;
+    vaultUtilization[_vault] += _assetAmt;
     _totalAssetsUtilized += _assetAmt;
     IERC20(_asset).safeTransfer(_vault, _assetAmt);
     emit WhitelistWithdraw(_vault, _assetAmt);
@@ -196,36 +202,44 @@ contract LendingAssetVault is
   /// @param _assetAmt the amount of underlying assets to deposit
   function whitelistDeposit(uint256 _assetAmt) external override onlyWhitelist {
     address _vault = _msgSender();
-    _updateTotalAssetsFromVaultChanges(_vault);
-    _totalAssetsUtilized -= _assetAmt > _totalAssetsUtilized
-      ? _totalAssetsUtilized
-      : _assetAmt;
-    vaultUtilization[_vault] -= _assetAmt > vaultUtilization[_vault]
-      ? vaultUtilization[_vault]
-      : _assetAmt;
+    _updateAssetMetadataFromVault(_vault);
+    vaultUtilization[_vault] -= _assetAmt;
+    _totalAssetsUtilized -= _assetAmt;
     IERC20(_asset).safeTransferFrom(_vault, address(this), _assetAmt);
     emit WhitelistDeposit(_vault, _assetAmt);
   }
 
-  /// @notice The ```_updateTotalAssetsFromVaultChanges``` updates _totalAssets based on  the current ratio
+  /// @notice The ```_updateAssetMetadataFromVault``` updates _totalAssets based on  the current ratio
   /// @notice of assets in the target vault to previously recorded ratio
   /// @notice to correctly calculate the change in total assets here based on how the vault share
   /// @notice has changed over time
   /// @param _vault the vault we're adjusting _totalAssets from based on it's CBR updates from last check
-  function _updateTotalAssetsFromVaultChanges(address _vault) internal {
+  function _updateAssetMetadataFromVault(address _vault) internal {
     uint256 _prevVaultCbr = _vaultWhitelistCbr[_vault];
     _vaultWhitelistCbr[_vault] = IERC4626(_vault).convertToAssets(PRECISION);
     if (_prevVaultCbr == 0) {
       return;
     }
-    uint256 _currentAssetsUtilized = vaultUtilization[_vault];
-    uint256 _vaultAssetRatio = _prevVaultCbr > _vaultWhitelistCbr[_vault]
+    uint256 _vaultAssetRatioChange = _prevVaultCbr > _vaultWhitelistCbr[_vault]
       ? ((PRECISION * _prevVaultCbr) / _vaultWhitelistCbr[_vault]) - PRECISION
       : ((PRECISION * _vaultWhitelistCbr[_vault]) / _prevVaultCbr) - PRECISION;
-    // note that if _prevVaultCbr == _vaultWhitelistCbr[_vault] then _totalAssets is not changed
-    _totalAssets = _prevVaultCbr > _vaultWhitelistCbr[_vault]
-      ? _totalAssets - (_currentAssetsUtilized * _vaultAssetRatio) / PRECISION
-      : _totalAssets + (_currentAssetsUtilized * _vaultAssetRatio) / PRECISION;
+
+    uint256 _currentAssetsUtilized = vaultUtilization[_vault];
+    vaultUtilization[_vault] = _prevVaultCbr > _vaultWhitelistCbr[_vault]
+      ? _currentAssetsUtilized -
+        (_currentAssetsUtilized * _vaultAssetRatioChange) /
+        PRECISION
+      : _currentAssetsUtilized +
+        (_currentAssetsUtilized * _vaultAssetRatioChange) /
+        PRECISION;
+    _totalAssetsUtilized =
+      _totalAssetsUtilized -
+      _currentAssetsUtilized +
+      vaultUtilization[_vault];
+    _totalAssets =
+      _totalAssets -
+      _currentAssetsUtilized +
+      vaultUtilization[_vault];
   }
 
   function _withdraw(

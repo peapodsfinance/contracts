@@ -9,7 +9,6 @@ import '../interfaces/IUniswapV2Pair.sol';
 import '../interfaces/IMinimalOracle.sol';
 import '../interfaces/IMinimalSinglePriceOracle.sol';
 import '../interfaces/IV2Reserves.sol';
-import 'forge-std/console.sol';
 
 contract spTKNMinimalOracle is IMinimalOracle, Ownable {
   /// @dev The base token we will price against in the oracle. Will be either pairedLpAsset
