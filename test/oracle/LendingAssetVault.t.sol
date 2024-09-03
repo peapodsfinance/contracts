@@ -136,35 +136,14 @@ contract LendingAssetVaultTest is Test {
     _lendingAssetVault.deposit(_lavDepAmt, address(this));
     assertEq(_lendingAssetVault.totalSupply(), _lavDepAmt);
 
-    console.log(
-      '1 util: %s -- asset bal: %s',
-      _lendingAssetVault.vaultUtilization(address(_testVault)),
-      _asset.balanceOf(address(_testVault))
-    );
-
     _testVault.depositFromLendingAssetVault(
       address(_lendingAssetVault),
       _extDepAmt
     );
-    console.log(
-      '2 util: %s -- asset bal: %s',
-      _lendingAssetVault.vaultUtilization(address(_testVault)),
-      _asset.balanceOf(address(_testVault))
-    );
     _asset.transfer(address(_testVault), _extDepAmt);
-    console.log(
-      '2.5 util: %s -- asset bal: %s',
-      _lendingAssetVault.vaultUtilization(address(_testVault)),
-      _asset.balanceOf(address(_testVault))
-    );
     _testVault.withdrawToLendingAssetVault(
       address(_lendingAssetVault),
       _extDepAmt
-    );
-    console.log(
-      '3 util: %s -- asset bal: %s',
-      _lendingAssetVault.vaultUtilization(address(_testVault)),
-      _asset.balanceOf(address(_testVault))
     );
 
     _lendingAssetVault.withdraw(_lavDepAmt / 2, address(this), address(0));
@@ -177,11 +156,6 @@ contract LendingAssetVaultTest is Test {
     );
     assertApproxEqAbs(_asset.balanceOf(address(this)), _optimalBal, 1e18);
 
-    console.log(
-      '4 util: %s -- asset bal: %s',
-      _lendingAssetVault.vaultUtilization(address(_testVault)),
-      _asset.balanceOf(address(_testVault))
-    );
     _testVault.withdrawToLendingAssetVault(
       address(_lendingAssetVault),
       _lendingAssetVault.vaultUtilization(address(_testVault))

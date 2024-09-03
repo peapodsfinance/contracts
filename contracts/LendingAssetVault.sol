@@ -168,8 +168,8 @@ contract LendingAssetVault is
   }
 
   function donate(uint256 _assetAmt) external {
-    _totalAssets += _assetAmt;
-    IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _assetAmt);
+    _deposit(_assetAmt, address(this));
+    _burn(address(this), convertToShares(_assetAmt));
     emit DonateAssets(_msgSender(), _assetAmt);
   }
 
