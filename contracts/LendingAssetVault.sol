@@ -21,14 +21,15 @@ contract LendingAssetVault is
 {
   using SafeERC20 for IERC20;
 
-  uint8 constant MAX_VAULTS = 12;
   uint16 constant PERCENTAGE_PRECISION = 10000;
   uint256 constant PRECISION = 10 ** 27;
 
   address _asset;
   uint256 _totalAssets;
   uint256 _totalAssetsUtilized;
+  bool _updateInterestOnVaults = true;
 
+  uint8 public maxVaults = 12;
   uint256 public lastAssetChange;
   mapping(address => bool) public vaultWhitelist;
   mapping(address => uint256) public vaultUtilization;
@@ -266,16 +267,29 @@ contract LendingAssetVault is
   }
 
   function _updateInterestInAllVaults() internal {
+    if (!_updateInterestOnVaults) {
+      return;
+    }
     for (uint256 _i; _i < _vaultWhitelistAry.length; _i++) {
       IVaultInterestUpdate(_vaultWhitelistAry[_i]).externalAddInterest();
     }
+  }
+
+  function setMaxVaults(uint8 _newMax) external onlyOwner {
+    require(_newMax <= 20, 'M');
+    maxVaults = _newMax;
+  }
+
+  function setUpdateInterestOnVaults(bool _exec) external onlyOwner {
+    require(_updateInterestOnVaults != _exec, 'T');
+    _updateInterestOnVaults = _exec;
   }
 
   function setVaultWhitelist(address _vault, bool _allowed) external onlyOwner {
     require(vaultWhitelist[_vault] != _allowed, 'T');
     vaultWhitelist[_vault] = _allowed;
     if (_allowed) {
-      require(_vaultWhitelistAry.length <= MAX_VAULTS, 'M');
+      require(_vaultWhitelistAry.length <= maxVaults, 'M');
       _vaultWhitelistAryIdx[_vault] = _vaultWhitelistAry.length;
       _vaultWhitelistAry.push(_vault);
     } else {

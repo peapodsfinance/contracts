@@ -246,6 +246,7 @@ contract spTKNMinimalOracle is IMinimalOracle, Ownable {
     address _underlying,
     uint256 _amtUnderlying
   ) internal view returns (uint256) {
+    require(IDecentralizedIndex(_pod).unlocked() == 1, 'OU');
     if (_underlying == address(0)) {
       IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(
         _pod

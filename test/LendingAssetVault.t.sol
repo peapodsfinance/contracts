@@ -2,9 +2,9 @@
 pragma solidity ^0.8.19;
 
 import { Test } from 'forge-std/Test.sol';
-import '../..//contracts/test/TestERC20.sol';
-import '../../contracts/test/TestERC4626Vault.sol';
-import '../../contracts/LendingAssetVault.sol';
+import '../contracts/test/TestERC20.sol';
+import '../contracts/test/TestERC4626Vault.sol';
+import '../contracts/LendingAssetVault.sol';
 import 'forge-std/console.sol';
 
 contract LendingAssetVaultTest is Test {

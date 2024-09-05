@@ -42,6 +42,7 @@ abstract contract DecentralizedIndex is
   uint256 public immutable override created;
   address public immutable override lpRewardsToken;
   address public override lpStakingPool;
+  uint8 public override unlocked = 1;
 
   Config public config;
   Fees public fees;
@@ -55,7 +56,6 @@ abstract contract DecentralizedIndex is
   uint64 _lastSwap;
   uint8 _swapping;
   uint8 _swapAndFeeOn = 1;
-  uint8 _unlocked = 1;
   bool _initialized;
 
   event FlashLoan(
@@ -66,10 +66,10 @@ abstract contract DecentralizedIndex is
   );
 
   modifier lock() {
-    require(_unlocked == 1, 'L');
-    _unlocked = 0;
+    require(unlocked == 1, 'L');
+    unlocked = 0;
     _;
-    _unlocked = 1;
+    unlocked = 1;
   }
 
   modifier onlyPartner() {
