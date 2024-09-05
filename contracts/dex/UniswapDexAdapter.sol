@@ -31,6 +31,19 @@ contract UniswapDexAdapter is IDexAdapter, Context {
     ASYNC_INITIALIZE = _asyncInit;
   }
 
+  function WETH() external view virtual override returns (address) {
+    return IUniswapV2Router02(V2_ROUTER).WETH();
+  }
+
+  function getV3Pool(
+    address,
+    address,
+    int24
+  ) external view virtual override returns (address _p) {
+    _p;
+    require(false, 'I0');
+  }
+
   function getV3Pool(
     address _token0,
     address _token1,
@@ -93,6 +106,42 @@ contract UniswapDexAdapter is IDexAdapter, Context {
         block.timestamp
       );
     return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
+  }
+
+  function swapV2SingleExactOut(
+    address _tokenIn,
+    address _tokenOut,
+    uint256 _amountInMax,
+    uint256 _amountOut,
+    address _recipient
+  ) external virtual override returns (uint256 _amountInUsed) {
+    uint256 _inBefore = IERC20(_tokenIn).balanceOf(address(this));
+    if (_amountInMax == 0) {
+      _amountInMax = IERC20(_tokenIn).balanceOf(address(this));
+    } else {
+      IERC20(_tokenIn).safeTransferFrom(
+        _msgSender(),
+        address(this),
+        _amountInMax
+      );
+    }
+    address[] memory _path = new address[](2);
+    _path[0] = _tokenIn;
+    _path[1] = _tokenOut;
+    IERC20(_tokenIn).safeIncreaseAllowance(V2_ROUTER, _amountInMax);
+    IUniswapV2Router02(V2_ROUTER).swapTokensForExactTokens(
+      _amountOut,
+      _amountInMax,
+      _path,
+      _recipient,
+      block.timestamp
+    );
+    uint256 _inRemaining = IERC20(_tokenIn).balanceOf(address(this)) -
+      _inBefore;
+    if (_inRemaining > 0) {
+      IERC20(_tokenIn).safeTransfer(_msgSender(), _inRemaining);
+    }
+    _amountInUsed = _amountInMax - _inRemaining;
   }
 
   function swapV3Single(
@@ -201,5 +250,18 @@ contract UniswapDexAdapter is IDexAdapter, Context {
         IERC20(_pool).balanceOf(address(this)) - _lpBefore
       );
     }
+  }
+
+  function extraRewardsHook(
+    address,
+    address
+  )
+    external
+    virtual
+    override
+    returns (address[] memory _t, uint256[] memory _a)
+  {
+    _t;
+    _a;
   }
 }

@@ -12,6 +12,7 @@ If your contract requires extra constructor arguments, you'll have to specify th
 
 ```sh
 $ CONTRACT_NAME=V3TwapUtilities npx hardhat run --network goerli scripts/deploy.js
+$ CONTRACT_NAME=UniswapDexAdapter npx hardhat run --network goerli scripts/deploy.js
 $ CONTRACT_NAME=ProtocolFees npx hardhat run --network goerli scripts/deploy.js
 $ CONTRACT_NAME=ProtocolFeeRouter npx hardhat run --network goerli scripts/deploy.js
 $ CONTRACT_NAME=PEAS npx hardhat run --network goerli scripts/deploy.js
@@ -30,6 +31,21 @@ $ # or
 $ npx hardhat verify --constructor-args arguments.js CONTRACT_ADDRESS
 ```
 
+## Test
+
+We are building foundry/forge tests across the code base slowly, and as of now will leverage existing pods/contracts on mainnet so use --fork-url to a mainnet RPC when running tests.
+
+See https://book.getfoundry.sh/reference/forge/forge-test for more info
+
+```sh
+$ # without verbosity of any kind
+$ forge test --fork-url https://eth.llamarpc.com
+$ # show logs in tests
+$ forge test -vv --fork-url https://eth.llamarpc.com
+$ # full trace of all calls
+$ forge test -vvvv --fork-url https://eth.llamarpc.com
+```
+
 ## Flatten
 
 You generally should not need to do this simply to verify in today's compiler version (0.8.x), but should you ever want to:
@@ -37,3 +53,22 @@ You generally should not need to do this simply to verify in today's compiler ve
 ```sh
 $ npx hardhat flatten {contract file location} > output.sol
 ```
+
+## Boosted Volatility Farming
+
+### LendingAssetVault Setup & Testing
+
+1. Deploy LendingAssetVault
+2. Execute setVaultMaxPerc for lending pair(s) we want to support
+3. In lending pair(s), execute setExternalAssetVault for vault from #1
+4. Deposit assets to lending asset vault in #1, and optionally into lending pair(s)
+
+### Self-lending Setup & Testing
+
+1. Deploy AutoCompoundingPodLpFactory
+2. Get new AutoCompoundingPodLp CA via getNewCaFromParams in factory, pod == address(0)
+3. Deploy Fraxlend LendingPair with CA from #2 as collateral token and underlying as borrow token
+4. Deploy new pod with LendingPair CA from #3 as paired asset
+5. Deposit a bit into new LendingPair from #3, wrap into pod from #4 and LP, then approve new spTKN of pod for factory in #1 to deposit minimum at aspTKN creation (#6)
+6. Deploy AutoCompoundingPodLp (aspTKN) from factory in #1 with pod == address(0), then setPod in aspTKN to new pod from #5
+7. In LeverageManager execute setLendingPair, and setFlashSource

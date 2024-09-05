@@ -8,6 +8,14 @@ interface IDexAdapter {
 
   function V3_ROUTER() external view returns (address);
 
+  function WETH() external view returns (address);
+
+  function getV3Pool(
+    address _token0,
+    address _token1,
+    int24 _tickSpacing
+  ) external view returns (address _pool);
+
   function getV3Pool(
     address _token0,
     address _token1,
@@ -31,6 +39,14 @@ interface IDexAdapter {
     uint256 _amountOutMin,
     address _recipient
   ) external returns (uint256 _amountOut);
+
+  function swapV2SingleExactOut(
+    address _tokenIn,
+    address _tokenOut,
+    uint256 _amountInMax,
+    uint256 _amountOut,
+    address _recipient
+  ) external returns (uint256 _amountInUsed);
 
   function swapV3Single(
     address _tokenIn,
@@ -61,4 +77,9 @@ interface IDexAdapter {
     address to,
     uint256 deadline
   ) external;
+
+  function extraRewardsHook(
+    address _token0,
+    address _token1
+  ) external returns (address[] memory tokens, uint256[] memory amounts);
 }

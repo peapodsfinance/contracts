@@ -17,14 +17,11 @@ contract BulkPodYieldProcess is Context {
     }
   }
 
-  function bulkProcessPendingYield(
-    IDecentralizedIndex[] memory _idx,
-    uint256 _slippage
-  ) external {
+  function bulkProcessPendingYield(IDecentralizedIndex[] memory _idx) external {
     for (uint256 _i; _i < _idx.length; _i++) {
       address _stakingPool = _idx[_i].lpStakingPool();
-      address _rewards = IStakingPoolToken(_stakingPool).poolRewards();
-      ITokenRewards(_rewards).depositFromPairedLpToken(0, _slippage);
+      address _rewards = IStakingPoolToken(_stakingPool).POOL_REWARDS();
+      ITokenRewards(_rewards).depositFromPairedLpToken(0);
     }
   }
 }

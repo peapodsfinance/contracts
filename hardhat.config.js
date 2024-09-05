@@ -1,3 +1,5 @@
+require('@nomicfoundation/hardhat-foundry')
+
 // import "@nomiclabs/hardhat-etherscan";
 require('@nomiclabs/hardhat-etherscan')
 // import "@nomiclabs/hardhat-waffle";
@@ -23,6 +25,8 @@ dotenvConfig({ path: resolve(__dirname, './.env') })
 const chainIds = {
   arbitrum: 42161,
   arbgoerli: 421613,
+  arbsep: 421614,
+  base: 8453,
   bsc: 56,
   kcc: 321,
   polygon: 137,
@@ -30,7 +34,9 @@ const chainIds = {
   goerli: 5,
   hardhat: 31337,
   mainnet: 1,
+  mode: 34443,
   sepolia: 11155111,
+  opsep: 11155420,
 }
 
 // Ensure that we have all the environment variables we need.
@@ -43,13 +49,13 @@ if (!privateKey) {
 //   throw new Error("Please set your MNEMONIC in a .env file");
 // }
 
-const infuraApiKey = process.env.INFURA_API_KEY
-if (!infuraApiKey) {
-  throw new Error('Please set your INFURA_API_KEY in a .env file')
-}
+// const infuraApiKey = process.env.INFURA_API_KEY
+// if (!infuraApiKey) {
+//   throw new Error('Please set your INFURA_API_KEY in a .env file')
+// }
 
 function createConfig(network, rpcUrl = null) {
-  const url = rpcUrl || `https://${network}.infura.io/v3/${infuraApiKey}`
+  const url = rpcUrl || 'https://ethereum.publicnode.com' // `https://${network}.infura.io/v3/${infuraApiKey}`
   return {
     accounts: [privateKey],
     // accounts: {
@@ -67,9 +73,30 @@ const config = {
   defaultNetwork: 'hardhat',
   etherscan: {
     // apiKey: process.env.ARBISCAN_API_KEY,
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    // apiKey: process.env.ETHERSCAN_API_KEY,
+    // apiKey: process.env.BASESCAN_API_KEY,
     // apiKey: process.env.BSCSCAN_API_KEY,
+    apiKey: process.env.MODE_API_KEY,
     // apiKey: process.env.POLYGONSCAN_API_KEY,
+
+    customChains: [
+      {
+        network: 'base',
+        chainId: 8453,
+        urls: {
+          apiURL: 'https://api.basescan.org/api',
+          browserURL: 'https://basescan.org',
+        },
+      },
+      {
+        network: 'mode',
+        chainId: 34443,
+        urls: {
+          apiURL: 'https://explorer.mode.network/api',
+          browserURL: 'https://explorer.mode.network',
+        },
+      },
+    ],
   },
   gasReporter: {
     currency: 'USD',
@@ -90,6 +117,8 @@ const config = {
       'arbgoerli',
       'https://endpoints.omniatech.io/v1/arbitrum/goerli/public'
     ),
+    arbsep: createConfig('arbsep', 'https://sepolia-rollup.arbitrum.io/rpc'),
+    base: createConfig('base', 'https://base-rpc.publicnode.com'),
     bsc: createConfig('bsc', 'https://bsc-dataseed.binance.org'),
     kcc: createConfig('kcc', 'https://rpc-mainnet.kcc.network'),
     polygon: createConfig(
@@ -97,8 +126,10 @@ const config = {
       'https://matic-mainnet.chainstacklabs.com'
     ),
     mainnet: createConfig('mainnet'),
+    mode: createConfig('mode', 'https://mainnet.mode.network'),
     goerli: createConfig('goerli'),
-    sepolia: createConfig('sepolia'),
+    sepolia: createConfig('sepolia', 'https://ethereum-sepolia.publicnode.com'),
+    opsep: createConfig('opsep', 'https://sepolia.optimism.io'),
   },
   paths: {
     artifacts: './artifacts',

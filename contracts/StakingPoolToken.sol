@@ -13,10 +13,14 @@ import './TokenRewards.sol';
 contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
   using SafeERC20 for IERC20;
 
-  address public immutable override indexFund;
-  address public immutable override poolRewards;
+  address public immutable override INDEX_FUND;
+  address public immutable override POOL_REWARDS;
+
   address public override stakeUserRestriction;
   address public override stakingToken;
+
+  IDexAdapter immutable DEX_ADAPTER;
+  IV3TwapUtilities immutable V3_TWAP_UTILS;
 
   modifier onlyRestricted() {
     require(_msgSender() == stakeUserRestriction, 'R');
@@ -31,23 +35,35 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
     address _stakeUserRestriction,
     IProtocolFeeRouter _feeRouter,
     IRewardsWhitelister _rewardsWhitelist,
-    IDexAdapter _dexHandler,
+    IDexAdapter _dexAdapter,
     IV3TwapUtilities _v3TwapUtilities
   ) ERC20(_name, _symbol) {
-    indexFund = _msgSender();
     stakeUserRestriction = _stakeUserRestriction;
-    poolRewards = address(
+    INDEX_FUND = _msgSender();
+    DEX_ADAPTER = _dexAdapter;
+    V3_TWAP_UTILS = _v3TwapUtilities;
+    POOL_REWARDS = address(
       new TokenRewards(
         _feeRouter,
         _rewardsWhitelist,
-        _dexHandler,
+        _dexAdapter,
         _v3TwapUtilities,
-        indexFund,
+        INDEX_FUND,
         _pairedLpToken,
         address(this),
         _rewardsToken
       )
     );
+  }
+
+  /// @dev backwards compatibility
+  function indexFund() external view override returns (address) {
+    return INDEX_FUND;
+  }
+
+  /// @dev backwards compatibility
+  function poolRewards() external view override returns (address) {
+    return POOL_REWARDS;
   }
 
   function stake(address _user, uint256 _amount) external override {
@@ -64,6 +80,33 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
     _burn(_msgSender(), _amount);
     IERC20(stakingToken).safeTransfer(_msgSender(), _amount);
     emit Unstake(_msgSender(), _amount);
+  }
+
+  function externalRewardHook(
+    address _token0,
+    address _token1
+  ) external override {
+    (bool _success, bytes memory _data) = address(DEX_ADAPTER).delegatecall(
+      abi.encodeWithSignature(
+        'extraRewardsHook(address,address)',
+        _token0,
+        _token1
+      )
+    );
+    require(_success, 'UNS');
+    (address[] memory _tokens, uint256[] memory _amounts) = abi.decode(
+      _data,
+      (address[], uint256[])
+    );
+    address _receiver = Ownable(address(V3_TWAP_UTILS)).owner();
+    for (uint256 _i; _i < _tokens.length; _i++) {
+      if (_tokens[_i] == address(0)) {
+        (bool _s, ) = payable(_receiver).call{ value: _amounts[_i] }('');
+        require(_s, 'ES');
+      } else {
+        IERC20(_tokens[_i]).safeTransfer(_receiver, _amounts[_i]);
+      }
+    }
   }
 
   function setStakingToken(address _stakingToken) external onlyOwner {
@@ -85,10 +128,10 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
     uint256 _amount
   ) internal override {
     if (_from != address(0) && _from != address(0xdead)) {
-      TokenRewards(poolRewards).setShares(_from, _amount, true);
+      TokenRewards(POOL_REWARDS).setShares(_from, _amount, true);
     }
     if (_to != address(0) && _to != address(0xdead)) {
-      TokenRewards(poolRewards).setShares(_to, _amount, false);
+      TokenRewards(POOL_REWARDS).setShares(_to, _amount, false);
     }
   }
 }

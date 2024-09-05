@@ -32,6 +32,11 @@ interface IV3TwapUtilities {
     address pool
   ) external view returns (uint160);
 
+  function sqrtPriceX96FromPoolAndPassedInterval(
+    address pool,
+    uint32 interval
+  ) external view returns (uint160);
+
   function priceX96FromSqrtPriceX96(
     uint160 sqrtPriceX96
   ) external pure returns (uint256);

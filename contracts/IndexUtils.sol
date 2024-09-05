@@ -7,7 +7,7 @@ import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import './interfaces/IDecentralizedIndex.sol';
-import './interfaces/IERC20Metadata.sol';
+import './interfaces/IDexAdapter.sol';
 import './interfaces/IIndexUtils.sol';
 import './interfaces/IStakingPoolToken.sol';
 import './interfaces/ITokenRewards.sol';
@@ -21,9 +21,9 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
   using SafeERC20 for IERC20;
 
   constructor(
-    address _v2Router,
-    IV3TwapUtilities _v3TwapUtilities
-  ) Zapper(_v2Router, _v3TwapUtilities) {}
+    IV3TwapUtilities _v3TwapUtilities,
+    IDexAdapter _dexAdapter
+  ) Zapper(_v3TwapUtilities, _dexAdapter) {}
 
   function bond(
     IDecentralizedIndex _indexFund,
@@ -152,17 +152,14 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
     uint256 _slippage,
     uint256 _deadline
   ) external payable override returns (uint256 _amountOut) {
-    address _v2Pool = IUniswapV2Factory(V2_FACTORY).getPair(
-      address(_indexFund),
-      _indexFund.PAIRED_LP_TOKEN()
-    );
-    uint256 _idxTokensBefore = IERC20(address(_indexFund)).balanceOf(
+    address _indexFundAddy = address(_indexFund);
+    address _pairedLpToken = _indexFund.PAIRED_LP_TOKEN();
+    uint256 _idxTokensBefore = IERC20(_indexFundAddy).balanceOf(address(this));
+    uint256 _pairedLpTokenBefore = IERC20(_pairedLpToken).balanceOf(
       address(this)
     );
-    uint256 _pairedLpTokenBefore = IERC20(_indexFund.PAIRED_LP_TOKEN())
-      .balanceOf(address(this));
     uint256 _ethBefore = address(this).balance - msg.value;
-    IERC20(address(_indexFund)).safeTransferFrom(
+    IERC20(_indexFundAddy).safeTransferFrom(
       _msgSender(),
       address(this),
       _amountIdxTokens
@@ -177,32 +174,28 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
         _amtPairedLpTokenProvided
       );
     }
-    if (_pairedLpTokenProvided != _indexFund.PAIRED_LP_TOKEN()) {
+    if (_pairedLpTokenProvided != _pairedLpToken) {
       _zap(
         _pairedLpTokenProvided,
-        _indexFund.PAIRED_LP_TOKEN(),
+        _pairedLpToken,
         _amtPairedLpTokenProvided,
         _amountPairedLpTokenMin
       );
     }
 
-    IERC20(_indexFund.PAIRED_LP_TOKEN()).safeIncreaseAllowance(
-      address(_indexFund),
-      IERC20(_indexFund.PAIRED_LP_TOKEN()).balanceOf(address(this)) -
-        _pairedLpTokenBefore
+    IERC20(_pairedLpToken).safeIncreaseAllowance(
+      _indexFundAddy,
+      IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore
     );
     _amountOut = _indexFund.addLiquidityV2(
-      IERC20(address(_indexFund)).balanceOf(address(this)) - _idxTokensBefore,
-      IERC20(_indexFund.PAIRED_LP_TOKEN()).balanceOf(address(this)) -
-        _pairedLpTokenBefore,
+      IERC20(_indexFundAddy).balanceOf(address(this)) - _idxTokensBefore,
+      IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore,
       _slippage,
       _deadline
     );
 
-    IERC20(_v2Pool).safeIncreaseAllowance(
-      _indexFund.lpStakingPool(),
-      _amountOut
-    );
+    IERC20(DEX_ADAPTER.getV2Pool(_indexFundAddy, _pairedLpToken))
+      .safeIncreaseAllowance(_indexFund.lpStakingPool(), _amountOut);
     IStakingPoolToken(_indexFund.lpStakingPool()).stake(
       _msgSender(),
       _amountOut
@@ -215,13 +208,8 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
       }('');
       require(_s && address(this).balance >= _ethBefore, 'TOOMUCH');
     }
-    _checkAndRefundERC20(_msgSender(), address(_indexFund), _idxTokensBefore);
-    _checkAndRefundERC20(
-      _msgSender(),
-      _indexFund.PAIRED_LP_TOKEN(),
-      _pairedLpTokenBefore
-    );
-    return _amountOut;
+    _checkAndRefundERC20(_msgSender(), _indexFundAddy, _idxTokensBefore);
+    _checkAndRefundERC20(_msgSender(), _pairedLpToken, _pairedLpTokenBefore);
   }
 
   function unstakeAndRemoveLP(
@@ -230,7 +218,7 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
     uint256 _minLPTokens,
     uint256 _minPairedLpToken,
     uint256 _deadline
-  ) external {
+  ) external override {
     address _stakingPool = _indexFund.lpStakingPool();
     address _pairedLpToken = _indexFund.PAIRED_LP_TOKEN();
     uint256 _stakingBalBefore = IERC20(_stakingPool).balanceOf(address(this));
@@ -320,22 +308,26 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
       uint256 _amountReceived
     )
   {
-    uint256 _nativeBefore = address(this).balance;
+    address _weth = DEX_ADAPTER.WETH();
+    if (address(this).balance > 0) {
+      IWETH(WETH).deposit{ value: address(this).balance }();
+    }
+    uint256 _nativeBefore = IERC20(_weth).balanceOf(address(this));
     _amountBefore = IERC20(_outToken).balanceOf(address(this));
     uint256 _amountOut = _indexFund.totalSupply() == 0
       ? _indexFund.getInitialAmount(_initToken, _initTokenAmount, _outToken)
       : (IERC20(_outToken).balanceOf(address(_indexFund)) *
         _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
-    address[] memory _path = new address[](2);
-    _path[0] = IUniswapV2Router02(V2_ROUTER).WETH();
-    _path[1] = _outToken;
-    IUniswapV2Router02(V2_ROUTER).swapETHForExactTokens{ value: _nativeLeft }(
+    DEX_ADAPTER.swapV2Single(
+      _weth,
+      _outToken,
+      _nativeLeft,
       _amountOut,
-      _path,
-      address(this),
-      block.timestamp
+      address(this)
     );
-    _newNativeLeft = _nativeLeft - (_nativeBefore - address(this).balance);
+    _newNativeLeft =
+      _nativeLeft -
+      (_nativeBefore - IERC20(_weth).balanceOf(address(this)));
     _amountReceived =
       IERC20(_outToken).balanceOf(address(this)) -
       _amountBefore;
@@ -350,7 +342,7 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
     uint256 _deadline
   ) internal returns (uint256 _fundTokensBefore) {
     address _pairedLpToken = _indexFund.PAIRED_LP_TOKEN();
-    address _v2Pool = IUniswapV2Factory(V2_FACTORY).getPair(
+    address _v2Pool = DEX_ADAPTER.getV2Pool(
       address(_indexFund),
       _pairedLpToken
     );
@@ -411,7 +403,7 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
 
     _zap(address(0), _pairedLpToken, _amountETH, _amtPairedLpTokenMin);
 
-    address _v2Pool = IUniswapV2Factory(V2_FACTORY).getPair(
+    address _v2Pool = DEX_ADAPTER.getV2Pool(
       address(_indexFund),
       _pairedLpToken
     );

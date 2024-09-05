@@ -73,6 +73,8 @@ contract WeightedIndex is DecentralizedIndex {
     }
   }
 
+  /// @notice The ```_getNativePriceUSDX96``` function gets an *unsafe* native tkn (ETH) price from a UniswapV2 pool
+  /// @return _priceX96 USD/native price scaled by Q96
   function _getNativePriceUSDX96() internal view returns (uint256) {
     IUniswapV2Pair _nativeStablePool = IUniswapV2Pair(
       DEX_HANDLER.getV2Pool(DAI, WETH)
@@ -93,6 +95,9 @@ contract WeightedIndex is DecentralizedIndex {
           10 ** _decimals1;
   }
 
+  /// @notice The ```_getTokenPriceUSDX96``` function gets an *unsafe* tkn price from a UniswapV2 pool
+  /// @param _token token we're getting the price for
+  /// @return _priceX96 USD/TKN price scaled by Q96
   function _getTokenPriceUSDX96(
     address _token
   ) internal view returns (uint256) {
@@ -115,6 +120,10 @@ contract WeightedIndex is DecentralizedIndex {
           10 ** _decimals1;
   }
 
+  /// @notice The ```bond``` function wraps a user into a pod and mints new pTKN
+  /// @param _token The token used to calculate the amount of pTKN minted
+  /// @param _amount Number of _tokens used to wrap into the pod
+  /// @param _amountMintMin Number of pTKN minimum that should be minted (slippage)
   function bond(
     address _token,
     uint256 _amount,
@@ -162,6 +171,8 @@ contract WeightedIndex is DecentralizedIndex {
     emit Bond(_msgSender(), _token, _amount, _tokensMinted);
   }
 
+  /// @notice The ```debond``` function unwraps a user out of a pod and burns pTKN
+  /// @param _amount Number of pTKN to burn
   function debond(
     uint256 _amount,
     address[] memory,
@@ -192,6 +203,12 @@ contract WeightedIndex is DecentralizedIndex {
     emit Debond(_msgSender(), _amount);
   }
 
+  /// @notice The ```getInitialAmount``` function determines the initial amount of TKN2 needed
+  /// @notice based on an amount of TKN1 to wrap with. After an initial bond, vault share takes over
+  /// @param _sourceToken TKN we're referencing
+  /// @param _sourceAmount Amount of TKN we're referencing
+  /// @param _targetToken Target TKN we will return the amount that is needed
+  /// @return _amtTargetTkn Amount of _targetToken needed to wrap with
   function getInitialAmount(
     address _sourceToken,
     uint256 _sourceAmount,
@@ -207,14 +224,19 @@ contract WeightedIndex is DecentralizedIndex {
       10 ** IERC20Metadata(_sourceToken).decimals();
   }
 
+  /// @notice The ```getTokenPriceUSDX96``` function is an external version of _getTokenPriceUSDX96, which gets an *unsafe* tkn price from a UniswapV2 pool
   /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
+  /// @param _token token we're getting the price for
+  /// @return _priceX96 USD/TKN price scaled by Q96
   function getTokenPriceUSDX96(
     address _token
   ) external view override returns (uint256) {
     return _getTokenPriceUSDX96(_token);
   }
 
+  /// @notice The ```getIdxPriceUSDX96``` function gets an *unsafe* pTKN price from all TKNs using UniswapV2 pools
   /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
+  /// @return _priceX96 USD/TKN price scaled by Q96
   function getIdxPriceUSDX96()
     external
     view

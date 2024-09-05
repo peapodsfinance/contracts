@@ -14,18 +14,19 @@ import './interfaces/IProtocolFees.sol';
 import './interfaces/IProtocolFeeRouter.sol';
 import './interfaces/ITokenRewards.sol';
 import './interfaces/IV3TwapUtilities.sol';
-import './libraries/BokkyPooBahsDateTimeLibrary.sol';
 
 contract TokenRewards is ITokenRewards, Context {
   using SafeERC20 for IERC20;
 
   uint256 constant PRECISION = 10 ** 36;
+  uint256 constant REWARDS_SWAP_SLIPPAGE = 20; // 2%
   uint24 constant REWARDS_POOL_FEE = 10000; // 1%
+  int24 constant REWARDS_TICK_SPACING = 200;
   address immutable INDEX_FUND;
   address immutable PAIRED_LP_TOKEN;
   IProtocolFeeRouter immutable PROTOCOL_FEE_ROUTER;
   IRewardsWhitelister immutable REWARDS_WHITELISTER;
-  IDexAdapter immutable DEX_HANDLER;
+  IDexAdapter immutable DEX_ADAPTER;
   IV3TwapUtilities immutable V3_TWAP_UTILS;
 
   struct Reward {
@@ -41,15 +42,13 @@ contract TokenRewards is ITokenRewards, Context {
   // reward token => user => Reward
   mapping(address => mapping(address => Reward)) public rewards;
 
-  uint256 _rewardsSwapSlippage = 20; // 2%
+  uint256 _rewardsSwapAmountInOverride;
   // reward token => amount
   mapping(address => uint256) _rewardsPerShare;
   // reward token => amount
   mapping(address => uint256) public rewardsDistributed;
   // reward token => amount
   mapping(address => uint256) public rewardsDeposited;
-  // reward token => month => amount
-  mapping(address => mapping(uint256 => uint256)) public rewardsDepMonthly;
   // all deposited rewards tokens
   address[] _allRewardsTokens;
   mapping(address => bool) _depositedRewardsToken;
@@ -66,7 +65,7 @@ contract TokenRewards is ITokenRewards, Context {
   ) {
     PROTOCOL_FEE_ROUTER = _feeRouter;
     REWARDS_WHITELISTER = _rewardsWhitelist;
-    DEX_HANDLER = _dexHandler;
+    DEX_ADAPTER = _dexHandler;
     V3_TWAP_UTILS = _v3TwapUtilities;
     INDEX_FUND = _indexFund;
     PAIRED_LP_TOKEN = _pairedLpToken;
@@ -127,11 +126,9 @@ contract TokenRewards is ITokenRewards, Context {
   }
 
   function depositFromPairedLpToken(
-    uint256 _amountTknDepositing,
-    uint256 _slippageOverride
+    uint256 _amountTknDepositing
   ) public override {
     require(PAIRED_LP_TOKEN != rewardsToken, 'R');
-    require(_slippageOverride <= 200, 'MS'); // 20%
     if (_amountTknDepositing > 0) {
       IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
         _msgSender(),
@@ -146,7 +143,14 @@ contract TokenRewards is ITokenRewards, Context {
     (address _token0, address _token1) = PAIRED_LP_TOKEN < rewardsToken
       ? (PAIRED_LP_TOKEN, rewardsToken)
       : (rewardsToken, PAIRED_LP_TOKEN);
-    address _pool = DEX_HANDLER.getV3Pool(_token0, _token1, REWARDS_POOL_FEE);
+    address _pool;
+    try DEX_ADAPTER.getV3Pool(_token0, _token1, REWARDS_POOL_FEE) returns (
+      address __pool
+    ) {
+      _pool = __pool;
+    } catch {
+      _pool = DEX_ADAPTER.getV3Pool(_token0, _token1, REWARDS_TICK_SPACING);
+    }
     uint160 _rewardsSqrtPriceX96 = V3_TWAP_UTILS
       .sqrtPriceX96FromPoolAndInterval(_pool);
     uint256 _rewardsPriceX96 = V3_TWAP_UTILS.priceX96FromSqrtPriceX96(
@@ -155,17 +159,7 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 _amountOut = _token0 == PAIRED_LP_TOKEN
       ? (_rewardsPriceX96 * _amountTkn) / FixedPoint96.Q96
       : (_amountTkn * FixedPoint96.Q96) / _rewardsPriceX96;
-
-    uint256 _slippage = _slippageOverride > 0
-      ? _slippageOverride
-      : _rewardsSwapSlippage;
-    _swapForRewards(
-      _amountTkn,
-      _amountOut,
-      _slippage,
-      _slippageOverride > 0,
-      _adminAmt
-    );
+    _swapForRewards(_amountTkn, _amountOut, _adminAmt);
   }
 
   function depositRewards(address _token, uint256 _amount) external override {
@@ -232,9 +226,6 @@ contract TokenRewards is ITokenRewards, Context {
       }
     }
     rewardsDeposited[_token] += _depositAmount;
-    rewardsDepMonthly[_token][
-      beginningOfMonth(block.timestamp)
-    ] += _depositAmount;
     _rewardsPerShare[_token] += (PRECISION * _depositAmount) / totalShares;
     emit DepositRewards(_msgSender(), _token, _depositAmount);
   }
@@ -305,52 +296,45 @@ contract TokenRewards is ITokenRewards, Context {
   function _swapForRewards(
     uint256 _amountIn,
     uint256 _amountOut,
-    uint256 _slippage,
-    bool _isSlipOverride,
     uint256 _adminAmt
   ) internal {
+    _amountIn = _rewardsSwapAmountInOverride > 0
+      ? _rewardsSwapAmountInOverride
+      : _amountIn;
     uint256 _balBefore = IERC20(rewardsToken).balanceOf(address(this));
     IERC20(PAIRED_LP_TOKEN).safeIncreaseAllowance(
-      address(DEX_HANDLER),
+      address(DEX_ADAPTER),
       _amountIn
     );
     try
-      DEX_HANDLER.swapV3Single(
+      DEX_ADAPTER.swapV3Single(
         PAIRED_LP_TOKEN,
         rewardsToken,
         REWARDS_POOL_FEE,
         _amountIn,
-        (_amountOut * (1000 - _slippage)) / 1000,
+        (_amountOut * (1000 - REWARDS_SWAP_SLIPPAGE)) / 1000,
         address(this)
       )
     {
+      _rewardsSwapAmountInOverride = 0;
       if (_adminAmt > 0) {
         IERC20(PAIRED_LP_TOKEN).safeTransfer(
           Ownable(address(V3_TWAP_UTILS)).owner(),
           _adminAmt
         );
       }
-      _rewardsSwapSlippage = 20;
       _depositRewards(
         rewardsToken,
         IERC20(rewardsToken).balanceOf(address(this)) - _balBefore
       );
     } catch {
-      if (!_isSlipOverride && _rewardsSwapSlippage < 200) {
-        _rewardsSwapSlippage += 10;
-      }
+      _rewardsSwapAmountInOverride = _amountIn / 2;
       IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(
-        address(DEX_HANDLER),
+        address(DEX_ADAPTER),
         _amountIn
       );
+      emit RewardSwapError(_amountIn);
     }
-  }
-
-  function beginningOfMonth(uint256 _timestamp) public pure returns (uint256) {
-    (, , uint256 _dayOfMonth) = BokkyPooBahsDateTimeLibrary.timestampToDate(
-      _timestamp
-    );
-    return _timestamp - ((_dayOfMonth - 1) * 1 days) - (_timestamp % 1 days);
   }
 
   function claimReward(address _wallet) external override {

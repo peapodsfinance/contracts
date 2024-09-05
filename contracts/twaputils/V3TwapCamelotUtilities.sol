@@ -3,29 +3,42 @@ pragma solidity ^0.8.19;
 
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
-import './interfaces/IERC20Metadata.sol';
-import './interfaces/ICLPool.sol';
-import './interfaces/IV3TwapUtilities.sol';
-import './libraries/FullMath.sol';
-import './libraries/PoolAddressSlipstream.sol';
-import './libraries/TickMath.sol';
+import '../interfaces/IERC20Metadata.sol';
+import '../interfaces/IAlgebraFactory.sol';
+import '../interfaces/IAlgebraV3Pool.sol';
+import '../interfaces/IV3TwapUtilities.sol';
+import '../libraries/FullMath.sol';
+import '../libraries/PoolAddressAlgebra.sol';
+import '../libraries/TickMath.sol';
 
-contract V3TwapAerodromeUtilities is IV3TwapUtilities, Ownable {
+contract V3TwapCamelotUtilities is IV3TwapUtilities, Ownable {
   uint32 constant INTERVAL = 10 minutes;
 
   function getV3Pool(
     address _v3Factory,
     address _t0,
-    address _t1,
-    int24 _tickSpacing
+    address _t1
   ) external view override returns (address) {
     (address _token0, address _token1) = _t0 < _t1 ? (_t0, _t1) : (_t1, _t0);
-    PoolAddressSlipstream.PoolKey memory _key = PoolAddressSlipstream.PoolKey({
+    PoolAddressAlgebra.PoolKey memory _key = PoolAddressAlgebra.PoolKey({
       token0: _token0,
-      token1: _token1,
-      tickSpacing: _tickSpacing
+      token1: _token1
     });
-    return PoolAddressSlipstream.computeAddress(_v3Factory, _key);
+    return
+      PoolAddressAlgebra.computeAddress(
+        IAlgebraFactory(_v3Factory).poolDeployer(),
+        _key
+      );
+  }
+
+  function getV3Pool(
+    address,
+    address,
+    address,
+    int24
+  ) external pure override returns (address) {
+    require(false, 'I0');
+    return address(0);
   }
 
   function getV3Pool(
@@ -34,16 +47,7 @@ contract V3TwapAerodromeUtilities is IV3TwapUtilities, Ownable {
     address,
     uint24
   ) external pure override returns (address) {
-    require(false, 'INVALID0');
-    return address(0);
-  }
-
-  function getV3Pool(
-    address,
-    address,
-    address
-  ) external pure override returns (address) {
-    require(false, 'INVALID1');
+    require(false, 'I1');
     return address(0);
   }
 
@@ -52,31 +56,48 @@ contract V3TwapAerodromeUtilities is IV3TwapUtilities, Ownable {
     address _nativeStablePool,
     address _WETH9
   ) public view override returns (uint256) {
-    address _token0 = ICLPool(_nativeStablePool).token0();
+    address _token0 = IAlgebraV3Pool(_nativeStablePool).token0();
     uint256 _priceStableWETH9X96 = _adjustedPriceX96(
-      ICLPool(_nativeStablePool),
-      _token0 == _WETH9 ? ICLPool(_nativeStablePool).token1() : _token0
+      IAlgebraV3Pool(_nativeStablePool),
+      _token0 == _WETH9 ? IAlgebraV3Pool(_nativeStablePool).token1() : _token0
     );
     if (_pricePool == _nativeStablePool) {
       return _priceStableWETH9X96;
     }
-    uint256 _priceMainX96 = _adjustedPriceX96(ICLPool(_pricePool), _WETH9);
+    uint256 _priceMainX96 = _adjustedPriceX96(
+      IAlgebraV3Pool(_pricePool),
+      _WETH9
+    );
     return (_priceStableWETH9X96 * _priceMainX96) / FixedPoint96.Q96;
   }
 
   function sqrtPriceX96FromPoolAndInterval(
     address _poolAddress
   ) public view override returns (uint160 sqrtPriceX96) {
-    ICLPool _pool = ICLPool(_poolAddress);
-    if (INTERVAL == 0) {
-      (sqrtPriceX96, , , , , ) = _pool.slot0();
+    sqrtPriceX96 = _sqrtPriceX96FromPoolAndInterval(_poolAddress, INTERVAL);
+  }
+
+  function sqrtPriceX96FromPoolAndPassedInterval(
+    address _poolAddress,
+    uint32 _interval
+  ) external view override returns (uint160 sqrtPriceX96) {
+    sqrtPriceX96 = _sqrtPriceX96FromPoolAndInterval(_poolAddress, _interval);
+  }
+
+  function _sqrtPriceX96FromPoolAndInterval(
+    address _poolAddress,
+    uint32 _interval
+  ) internal view returns (uint160 sqrtPriceX96) {
+    IAlgebraV3Pool _pool = IAlgebraV3Pool(_poolAddress);
+    if (_interval == 0) {
+      (sqrtPriceX96, , , , , , , ) = _pool.globalState();
     } else {
       uint32[] memory secondsAgo = new uint32[](2);
-      secondsAgo[0] = INTERVAL;
+      secondsAgo[0] = _interval;
       secondsAgo[1] = 0;
-      (int56[] memory tickCumulatives, ) = _pool.observe(secondsAgo);
+      (int56[] memory tickCumulatives, , , ) = _pool.getTimepoints(secondsAgo);
       sqrtPriceX96 = TickMath.getSqrtRatioAtTick(
-        int24((tickCumulatives[1] - tickCumulatives[0]) / int32(INTERVAL))
+        int24((tickCumulatives[1] - tickCumulatives[0]) / int32(_interval))
       );
     }
   }
@@ -88,7 +109,7 @@ contract V3TwapAerodromeUtilities is IV3TwapUtilities, Ownable {
   }
 
   function _adjustedPriceX96(
-    ICLPool _pool,
+    IAlgebraV3Pool _pool,
     address _numeratorToken
   ) internal view returns (uint256) {
     address _token1 = _pool.token1();
