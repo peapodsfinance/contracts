@@ -32,7 +32,7 @@ contract LendingAssetVault is
   uint8 public maxVaults = 12;
   uint256 public lastAssetChange;
   mapping(address => bool) public vaultWhitelist;
-  mapping(address => uint256) public vaultUtilization;
+  mapping(address => uint256) public override vaultUtilization;
   mapping(address => uint256) _vaultMaxPerc;
   mapping(address => uint256) _vaultWhitelistCbr;
 

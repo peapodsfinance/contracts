@@ -16,6 +16,8 @@ interface ILendingAssetVault {
 
   event WhitelistWithdraw(address indexed user, uint256 amount);
 
+  function vaultUtilization(address vault) external view returns (uint256);
+
   function totalAssetsUtilized() external view returns (uint256);
 
   function totalAvailableAssets() external view returns (uint256);
