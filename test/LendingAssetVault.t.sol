@@ -163,4 +163,142 @@ contract LendingAssetVaultTest is Test {
     assertEq(_lendingAssetVault.vaultUtilization(address(_testVault)), 0);
     assertApproxEqAbs(_lendingAssetVault.totalAssets(), _lavDepAmt, 1e2);
   }
+
+  function test_redeemFromVaultAll() public {
+    uint256 _lavDepAmt = 10e18;
+    uint256 _extDepAmt = _lavDepAmt / 2;
+    _lendingAssetVault.deposit(_lavDepAmt, address(this));
+    _lendingAssetVault.setVaultMaxPerc(address(_testVault), 10000);
+
+    _testVault.depositFromLendingAssetVault(
+      address(_lendingAssetVault),
+      _extDepAmt
+    );
+
+    // uint256 _initialVaultUtilization = _lendingAssetVault.vaultUtilization(
+    //   address(_testVault)
+    // );
+    uint256 _initialTotalAssetsUtilized = _lendingAssetVault.totalAssets() -
+      _lendingAssetVault.totalAvailableAssets();
+
+    vm.expectEmit(true, true, true, true);
+    emit ILendingAssetVault.RedeemFromVault(
+      address(_testVault),
+      _testVault.balanceOf(address(_lendingAssetVault)),
+      _extDepAmt
+    );
+
+    _lendingAssetVault.redeemFromVault(address(_testVault), 0);
+
+    assertEq(_lendingAssetVault.vaultUtilization(address(_testVault)), 0);
+    assertEq(
+      _lendingAssetVault.totalAssets() -
+        _lendingAssetVault.totalAvailableAssets(),
+      _initialTotalAssetsUtilized - _extDepAmt
+    );
+    assertEq(_asset.balanceOf(address(_lendingAssetVault)), _lavDepAmt);
+  }
+
+  function test_redeemFromVaultPartial() public {
+    uint256 _lavDepAmt = 10e18;
+    uint256 _extDepAmt = _lavDepAmt / 2;
+    _lendingAssetVault.deposit(_lavDepAmt, address(this));
+    _lendingAssetVault.setVaultMaxPerc(address(_testVault), 10000);
+
+    _testVault.depositFromLendingAssetVault(
+      address(_lendingAssetVault),
+      _extDepAmt
+    );
+
+    uint256 _redeemShares = _testVault.balanceOf(address(_lendingAssetVault)) /
+      2;
+    uint256 _expectedAssets = _testVault.convertToAssets(_redeemShares);
+
+    uint256 _initialVaultUtilization = _lendingAssetVault.vaultUtilization(
+      address(_testVault)
+    );
+    uint256 _initialTotalAssetsUtilized = _lendingAssetVault.totalAssets() -
+      _lendingAssetVault.totalAvailableAssets();
+
+    vm.expectEmit(true, true, true, true);
+    emit ILendingAssetVault.RedeemFromVault(
+      address(_testVault),
+      _redeemShares,
+      _expectedAssets
+    );
+
+    _lendingAssetVault.redeemFromVault(address(_testVault), _redeemShares);
+
+    assertEq(
+      _lendingAssetVault.vaultUtilization(address(_testVault)),
+      _initialVaultUtilization - _expectedAssets
+    );
+    assertEq(
+      _lendingAssetVault.totalAssets() -
+        _lendingAssetVault.totalAvailableAssets(),
+      _initialTotalAssetsUtilized - _expectedAssets
+    );
+    assertEq(
+      _asset.balanceOf(address(_lendingAssetVault)),
+      _lavDepAmt - _extDepAmt + _expectedAssets
+    );
+  }
+
+  function test_redeemFromVaultZeroShares() public {
+    uint256 _lavDepAmt = 10e18;
+    uint256 _extDepAmt = _lavDepAmt / 2;
+    _lendingAssetVault.deposit(_lavDepAmt, address(this));
+    _lendingAssetVault.setVaultMaxPerc(address(_testVault), 10000);
+
+    _testVault.depositFromLendingAssetVault(
+      address(_lendingAssetVault),
+      _extDepAmt
+    );
+
+    // uint256 _initialVaultUtilization = _lendingAssetVault.vaultUtilization(
+    //   address(_testVault)
+    // );
+    uint256 _initialTotalAssetsUtilized = _lendingAssetVault.totalAssets() -
+      _lendingAssetVault.totalAvailableAssets();
+
+    uint256 _expectedShares = _testVault.balanceOf(address(_lendingAssetVault));
+    uint256 _expectedAssets = _testVault.convertToAssets(_expectedShares);
+
+    vm.expectEmit(true, true, true, true);
+    emit ILendingAssetVault.RedeemFromVault(
+      address(_testVault),
+      _expectedShares,
+      _expectedAssets
+    );
+
+    _lendingAssetVault.redeemFromVault(address(_testVault), 0);
+
+    assertEq(_lendingAssetVault.vaultUtilization(address(_testVault)), 0);
+    assertEq(
+      _lendingAssetVault.totalAssets() -
+        _lendingAssetVault.totalAvailableAssets(),
+      _initialTotalAssetsUtilized - _expectedAssets
+    );
+    assertEq(_asset.balanceOf(address(_lendingAssetVault)), _lavDepAmt);
+  }
+
+  function test_redeemFromVaultMoreThanAvailable() public {
+    uint256 _lavDepAmt = 10e18;
+    uint256 _extDepAmt = _lavDepAmt / 2;
+    _lendingAssetVault.deposit(_lavDepAmt, address(this));
+    _lendingAssetVault.setVaultMaxPerc(address(_testVault), 10000);
+
+    _testVault.depositFromLendingAssetVault(
+      address(_lendingAssetVault),
+      _extDepAmt
+    );
+
+    uint256 _availableShares = _testVault.balanceOf(
+      address(_lendingAssetVault)
+    );
+    uint256 _moreThanAvailable = _availableShares + 1e18;
+
+    vm.expectRevert();
+    _lendingAssetVault.redeemFromVault(address(_testVault), _moreThanAvailable);
+  }
 }

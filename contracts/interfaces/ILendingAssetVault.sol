@@ -6,6 +6,8 @@ interface ILendingAssetVault {
 
   event PayBackUsedAssets(address indexed user, uint256 amount);
 
+  event RedeemFromVault(address indexed vault, uint256 shares, uint256 assets);
+
   event SetVaultWhitelist(address indexed vault, bool isWhitelisted);
 
   event SetVaultMaxAlloPercentage(address indexed vault, uint256 percentage);

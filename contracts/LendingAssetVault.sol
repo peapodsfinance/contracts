@@ -100,12 +100,12 @@ contract LendingAssetVault is
     uint256 _assets,
     address _receiver
   ) internal returns (uint256 _shares) {
+    _updateInterestAndMdInAllVaults();
     lastAssetChange = block.timestamp;
     _shares = convertToShares(_assets);
     _totalAssets += _assets;
     _mint(_receiver, _shares);
     IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _assets);
-    _updateInterestInAllVaults();
     emit Deposit(_msgSender(), _receiver, _assets, _shares);
   }
 
@@ -247,12 +247,13 @@ contract LendingAssetVault is
     uint256 _shares,
     address _receiver
   ) internal returns (uint256 _assets) {
+    _updateInterestAndMdInAllVaults();
     lastAssetChange = block.timestamp;
     _assets = convertToAssets(_shares);
+    require(totalAvailableAssets() >= _assets, 'AV');
     _burn(_msgSender(), _shares);
     IERC20(_asset).safeTransfer(_receiver, _assets);
     _totalAssets -= _assets;
-    _updateInterestInAllVaults();
     emit Withdraw(_msgSender(), _receiver, _receiver, _assets, _shares);
   }
 
@@ -266,13 +267,30 @@ contract LendingAssetVault is
     return IERC20Metadata(_asset).decimals();
   }
 
-  function _updateInterestInAllVaults() internal {
+  function _updateInterestAndMdInAllVaults() internal {
     if (!_updateInterestOnVaults) {
       return;
     }
     for (uint256 _i; _i < _vaultWhitelistAry.length; _i++) {
-      IVaultInterestUpdate(_vaultWhitelistAry[_i]).addInterest();
+      address _vault = _vaultWhitelistAry[_i];
+      IVaultInterestUpdate(_vault).addInterest();
+      _updateAssetMetadataFromVault(_vault);
     }
+  }
+
+  function redeemFromVault(address _vault, uint256 _amountShares) external {
+    _updateAssetMetadataFromVault(_vault);
+    _amountShares = _amountShares == 0
+      ? IERC20(_vault).balanceOf(address(this))
+      : _amountShares;
+    uint256 _amountAssets = IERC4626(_vault).redeem(
+      _amountShares,
+      address(this),
+      address(this)
+    );
+    vaultUtilization[_vault] -= _amountAssets;
+    _totalAssetsUtilized -= _amountAssets;
+    emit RedeemFromVault(_vault, _amountShares, _amountAssets);
   }
 
   function setMaxVaults(uint8 _newMax) external onlyOwner {

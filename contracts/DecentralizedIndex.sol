@@ -273,8 +273,8 @@ abstract contract DecentralizedIndex is
     require(_token.balanceOf(address(this)) >= _balanceBefore + _amount, 'TV');
   }
 
-  /// @notice The ```_bond``` function should be called from external bond() to handle validation and partner logic
-  function _bond() internal {
+  /// @notice The ```_internalBond``` function should be called from external bond() to handle validation and partner logic
+  function _internalBond() internal {
     require(_initialized, 'I');
     if (_partnerFirstWrapped == 0 && _msgSender() == config.partner) {
       _partnerFirstWrapped = uint64(block.timestamp);

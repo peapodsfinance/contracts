@@ -120,6 +120,50 @@ contract WeightedIndex is DecentralizedIndex {
           10 ** _decimals1;
   }
 
+  /// @notice The ```totalAssets``` function returns the number of assets for the first underlying TKN in the pod
+  /// @return _totalManagedAssets Number of TKN[0] currently in the pod
+  function totalAssets()
+    public
+    view
+    override
+    returns (uint256 _totalManagedAssets)
+  {
+    _totalManagedAssets = IERC20(indexTokens[0].token).balanceOf(address(this));
+  }
+
+  /// @notice The ```convertToShares``` function returns the number of pTKN minted based on _assets TKN excluding fees
+  /// @param _assets Number of underlying TKN[0] to determine how many pTKNs to be minted
+  /// @return _shares Number of pTKN to be minted
+  function convertToShares(
+    uint256 _assets
+  ) external view override returns (uint256 _shares) {
+    bool _firstIn = _isFirstIn();
+    uint256 _tokenCurSupply = totalAssets();
+    uint256 _tokenAmtSupplyRatioX96 = _firstIn
+      ? FixedPoint96.Q96
+      : (_assets * FixedPoint96.Q96) / _tokenCurSupply;
+    if (_firstIn) {
+      _shares =
+        (_assets * FixedPoint96.Q96 * 10 ** decimals()) /
+        indexTokens[0].q1;
+    } else {
+      _shares = (totalSupply() * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+    }
+  }
+
+  /// @notice The ```convertToAssets``` function returns the number of TKN returned based on burning _shares pTKN excluding fees
+  /// @param _shares Number of pTKN to burn
+  /// @return _assets Number of TKN[0] to be returned to user from pod
+  function convertToAssets(
+    uint256 _shares
+  ) external view override returns (uint256 _assets) {
+    uint256 _percAfterFeeX96 = (_shares * FixedPoint96.Q96) / totalSupply();
+    uint256 _tokenSupply = IERC20(indexTokens[0].token).balanceOf(
+      address(this)
+    );
+    _assets = (_tokenSupply * _percAfterFeeX96) / FixedPoint96.Q96;
+  }
+
   /// @notice The ```bond``` function wraps a user into a pod and mints new pTKN
   /// @param _token The token used to calculate the amount of pTKN minted
   /// @param _amount Number of _tokens used to wrap into the pod
@@ -129,6 +173,15 @@ contract WeightedIndex is DecentralizedIndex {
     uint256 _amount,
     uint256 _amountMintMin
   ) external override lock noSwapOrFee {
+    _bond(_token, _amount, _amountMintMin, _msgSender());
+  }
+
+  function _bond(
+    address _token,
+    uint256 _amount,
+    uint256 _amountMintMin,
+    address _user
+  ) internal {
     require(_isTokenInIndex[_token], 'IT');
     uint256 _tokenIdx = _fundTokenIdx[_token];
     uint256 _tokenCurSupply = IERC20(_token).balanceOf(address(this));
@@ -146,11 +199,11 @@ contract WeightedIndex is DecentralizedIndex {
         (totalSupply() * _tokenAmtSupplyRatioX96) /
         FixedPoint96.Q96;
     }
-    uint256 _feeTokens = _canWrapFeeFree(_msgSender())
+    uint256 _feeTokens = _canWrapFeeFree(_user)
       ? 0
       : (_tokensMinted * fees.bond) / DEN;
     require(_tokensMinted - _feeTokens >= _amountMintMin, 'M');
-    _mint(_msgSender(), _tokensMinted - _feeTokens);
+    _mint(_user, _tokensMinted - _feeTokens);
     if (_feeTokens > 0) {
       _mint(address(this), _feeTokens);
       _processBurnFee(_feeTokens);
@@ -163,12 +216,12 @@ contract WeightedIndex is DecentralizedIndex {
           _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
       _transferFromAndValidate(
         IERC20(indexTokens[_i].token),
-        _msgSender(),
+        _user,
         _transferAmt
       );
     }
-    _bond();
-    emit Bond(_msgSender(), _token, _amount, _tokensMinted);
+    _internalBond();
+    emit Bond(_user, _token, _amount, _tokensMinted);
   }
 
   /// @notice The ```debond``` function unwraps a user out of a pod and burns pTKN
