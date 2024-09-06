@@ -61,6 +61,10 @@ contract LendingAssetVault is
     return _totalAssets;
   }
 
+  function totalAssetsUtilized() public view override returns (uint256) {
+    return _totalAssetsUtilized;
+  }
+
   function totalAvailableAssets() public view override returns (uint256) {
     return _totalAssets - _totalAssetsUtilized;
   }
@@ -174,6 +178,45 @@ contract LendingAssetVault is
     emit DonateAssets(_msgSender(), _assetAmt);
   }
 
+  function _withdraw(
+    uint256 _shares,
+    address _receiver
+  ) internal returns (uint256 _assets) {
+    _updateInterestAndMdInAllVaults();
+    lastAssetChange = block.timestamp;
+    _assets = convertToAssets(_shares);
+    require(totalAvailableAssets() >= _assets, 'AV');
+    _burn(_msgSender(), _shares);
+    IERC20(_asset).safeTransfer(_receiver, _assets);
+    _totalAssets -= _assets;
+    emit Withdraw(_msgSender(), _receiver, _receiver, _assets, _shares);
+  }
+
+  /// @notice Assumes underlying vault asset has decimals == 18
+  function _cbr() internal view returns (uint256) {
+    uint256 _supply = totalSupply();
+    return _supply == 0 ? PRECISION : (PRECISION * _totalAssets) / _supply;
+  }
+
+  function _assetDecimals() internal view returns (uint8) {
+    return IERC20Metadata(_asset).decimals();
+  }
+
+  function _updateInterestAndMdInAllVaults() internal {
+    if (!_updateInterestOnVaults) {
+      return;
+    }
+    for (uint256 _i; _i < _vaultWhitelistAry.length; _i++) {
+      address _vault = _vaultWhitelistAry[_i];
+      IVaultInterestUpdate(_vault).addInterest();
+      _updateAssetMetadataFromVault(_vault);
+    }
+  }
+
+  function whitelistUpdate() external override onlyWhitelist {
+    _updateAssetMetadataFromVault(_msgSender());
+  }
+
   /// @notice The ```whitelistWithdraw``` is called by any whitelisted vault to withdraw assets.
   /// @param _assetAmt the amount of underlying assets to withdraw
   function whitelistWithdraw(
@@ -241,41 +284,6 @@ contract LendingAssetVault is
       _totalAssets -
       _currentAssetsUtilized +
       vaultUtilization[_vault];
-  }
-
-  function _withdraw(
-    uint256 _shares,
-    address _receiver
-  ) internal returns (uint256 _assets) {
-    _updateInterestAndMdInAllVaults();
-    lastAssetChange = block.timestamp;
-    _assets = convertToAssets(_shares);
-    require(totalAvailableAssets() >= _assets, 'AV');
-    _burn(_msgSender(), _shares);
-    IERC20(_asset).safeTransfer(_receiver, _assets);
-    _totalAssets -= _assets;
-    emit Withdraw(_msgSender(), _receiver, _receiver, _assets, _shares);
-  }
-
-  /// @notice Assumes underlying vault asset has decimals == 18
-  function _cbr() internal view returns (uint256) {
-    uint256 _supply = totalSupply();
-    return _supply == 0 ? PRECISION : (PRECISION * _totalAssets) / _supply;
-  }
-
-  function _assetDecimals() internal view returns (uint8) {
-    return IERC20Metadata(_asset).decimals();
-  }
-
-  function _updateInterestAndMdInAllVaults() internal {
-    if (!_updateInterestOnVaults) {
-      return;
-    }
-    for (uint256 _i; _i < _vaultWhitelistAry.length; _i++) {
-      address _vault = _vaultWhitelistAry[_i];
-      IVaultInterestUpdate(_vault).addInterest();
-      _updateAssetMetadataFromVault(_vault);
-    }
   }
 
   function redeemFromVault(address _vault, uint256 _amountShares) external {
