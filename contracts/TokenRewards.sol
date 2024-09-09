@@ -298,9 +298,10 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 _amountOut,
     uint256 _adminAmt
   ) internal {
-    _amountIn = _rewardsSwapAmountInOverride > 0
-      ? _rewardsSwapAmountInOverride
-      : _amountIn;
+    if (_rewardsSwapAmountInOverride > 0) {
+      _amountOut = (_amountOut * _rewardsSwapAmountInOverride) / _amountIn;
+      _amountIn = _rewardsSwapAmountInOverride;
+    }
     uint256 _balBefore = IERC20(rewardsToken).balanceOf(address(this));
     IERC20(PAIRED_LP_TOKEN).safeIncreaseAllowance(
       address(DEX_ADAPTER),

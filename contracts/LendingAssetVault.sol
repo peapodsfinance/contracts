@@ -72,8 +72,16 @@ contract LendingAssetVault is
   function totalAvailableAssetsForVault(
     address _vault
   ) public view override returns (uint256) {
+    uint256 _overallAvailable = totalAvailableAssets();
     uint256 _totalVaultAvailable = (_totalAssets * _vaultMaxPerc[_vault]) /
       PERCENTAGE_PRECISION;
+
+    // If what's available in the vault is less than the calculated vault available based
+    // on max allocation against overall total we should override with what's currently available overall
+    _totalVaultAvailable = _overallAvailable < _totalVaultAvailable
+      ? _overallAvailable
+      : _totalVaultAvailable;
+
     return
       _totalVaultAvailable > vaultUtilization[_vault]
         ? _totalVaultAvailable - vaultUtilization[_vault]
@@ -115,7 +123,7 @@ contract LendingAssetVault is
     uint256 _assets,
     address _receiver
   ) internal returns (uint256 _shares) {
-    _updateInterestAndMdInAllVaults();
+    _updateInterestAndMdInAllVaults(address(0));
     lastAssetChange = block.timestamp;
     _shares = convertToShares(_assets);
     _totalAssets += _assets;
@@ -193,7 +201,7 @@ contract LendingAssetVault is
     uint256 _shares,
     address _receiver
   ) internal returns (uint256 _assets) {
-    _updateInterestAndMdInAllVaults();
+    _updateInterestAndMdInAllVaults(address(0));
     lastAssetChange = block.timestamp;
     _assets = convertToAssets(_shares);
     require(totalAvailableAssets() >= _assets, 'AV');
@@ -213,19 +221,26 @@ contract LendingAssetVault is
     return IERC20Metadata(_asset).decimals();
   }
 
-  function _updateInterestAndMdInAllVaults() internal {
+  function _updateInterestAndMdInAllVaults(address _vaultToExclude) internal {
     if (!_updateInterestOnVaults) {
       return;
     }
     for (uint256 _i; _i < _vaultWhitelistAry.length; _i++) {
       address _vault = _vaultWhitelistAry[_i];
+      if (_vault == _vaultToExclude) {
+        continue;
+      }
       IVaultInterestUpdate(_vault).addInterest();
       _updateAssetMetadataFromVault(_vault);
     }
   }
 
-  function whitelistUpdate() external override onlyWhitelist {
-    _updateAssetMetadataFromVault(_msgSender());
+  function whitelistUpdate(bool _onlyCaller) external override onlyWhitelist {
+    if (_onlyCaller) {
+      _updateAssetMetadataFromVault(_msgSender());
+    } else {
+      _updateInterestAndMdInAllVaults(_msgSender());
+    }
   }
 
   /// @notice The ```whitelistWithdraw``` is called by any whitelisted vault to withdraw assets.

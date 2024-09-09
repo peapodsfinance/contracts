@@ -269,7 +269,10 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     uint256 _amountInOverride = _tokenToPairedSwapAmountInOverride[
       _rewardsToken
     ][_pairedLpToken];
-    _amountIn = _amountInOverride > 0 ? _amountInOverride : _amountIn;
+    if (_amountInOverride > 0) {
+      _amountOutMin = (_amountOutMin * _amountInOverride) / _amountIn;
+      _amountIn = _amountInOverride;
+    }
     (address _token0, address _token1) = _pairedLpToken < _rewardsToken
       ? (_pairedLpToken, _rewardsToken)
       : (_rewardsToken, _pairedLpToken);

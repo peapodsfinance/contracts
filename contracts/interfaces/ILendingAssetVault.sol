@@ -26,7 +26,7 @@ interface ILendingAssetVault {
     address vault
   ) external view returns (uint256);
 
-  function whitelistUpdate() external;
+  function whitelistUpdate(bool onlyCaller) external;
 
   function whitelistDeposit(uint256 amount) external;
 
