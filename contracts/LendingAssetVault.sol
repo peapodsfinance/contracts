@@ -69,6 +69,17 @@ contract LendingAssetVault is
     return _totalAssets - _totalAssetsUtilized;
   }
 
+  function totalAvailableAssetsForVault(
+    address _vault
+  ) public view override returns (uint256) {
+    uint256 _totalVaultAvailable = (_totalAssets * _vaultMaxPerc[_vault]) /
+      PERCENTAGE_PRECISION;
+    return
+      _totalVaultAvailable > vaultUtilization[_vault]
+        ? _totalVaultAvailable - vaultUtilization[_vault]
+        : 0;
+  }
+
   function convertToShares(
     uint256 _assets
   ) public view override returns (uint256 _shares) {
@@ -225,16 +236,8 @@ contract LendingAssetVault is
     address _vault = _msgSender();
     _updateAssetMetadataFromVault(_vault);
 
-    // validate that our new vault utilization does not exceed our max. Since we
-    // call this after updating _totalAssets above it reflects the latest total,
-    // but this is okay since we should validate total utilization after we account
-    // for changes from this vault anyways
-    require(
-      (PERCENTAGE_PRECISION * (vaultUtilization[_vault] + _assetAmt)) /
-        _totalAssets <=
-        _vaultMaxPerc[_vault],
-      'MAX'
-    );
+    // validate max after doing vault accounting above
+    require(totalAvailableAssetsForVault(_vault) >= _assetAmt, 'MAX');
     vaultUtilization[_vault] += _assetAmt;
     _totalAssetsUtilized += _assetAmt;
     IERC20(_asset).safeTransfer(_vault, _assetAmt);

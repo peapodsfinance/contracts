@@ -22,6 +22,10 @@ interface ILendingAssetVault {
 
   function totalAvailableAssets() external view returns (uint256);
 
+  function totalAvailableAssetsForVault(
+    address vault
+  ) external view returns (uint256);
+
   function whitelistUpdate() external;
 
   function whitelistDeposit(uint256 amount) external;
