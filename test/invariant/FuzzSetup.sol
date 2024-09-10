@@ -1,0 +1,762 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.19;
+
+// fuzzlib
+import {FuzzBase} from "fuzzlib/FuzzBase.sol";
+
+// forge
+import {Test} from "forge-std/Test.sol";
+
+// PEAS
+import {PEAS} from "../../contracts/PEAS.sol";
+import {V3TwapUtilities} from '../../contracts/twaputils/V3TwapUtilities.sol';
+import {UniswapDexAdapter} from '../../contracts/dex/UniswapDexAdapter.sol';
+import {IDecentralizedIndex} from '../../contracts/interfaces/IDecentralizedIndex.sol';
+import {WeightedIndex} from '../../contracts/WeightedIndex.sol';
+import {StakingPoolToken} from "../../contracts/StakingPoolToken.sol"; 
+import {LendingAssetVault} from "../../contracts/LendingAssetVault.sol";
+import {IndexUtils} from "../../contracts/IndexUtils.sol";
+import {RewardsWhitelist} from "../../contracts/RewardsWhitelist.sol";
+
+// oracles
+import {ChainlinkSinglePriceOracle} from "../../contracts/oracle/ChainlinkSinglePriceOracle.sol";
+import {UniswapV3SinglePriceOracle} from "../../contracts/oracle/UniswapV3SinglePriceOracle.sol";
+import {V2ReservesUniswap} from "../../contracts/oracle/V2ReservesUniswap.sol";
+import {aspTKNMinimalOracle} from "../../contracts/oracle/aspTKNMinimalOracle.sol";
+
+// autocompounding
+import {AutoCompoundingPodLpFactory} from "../../contracts/AutoCompoundingPodLpFactory.sol";
+import {AutoCompoundingPodLp} from "../../contracts/AutoCompoundingPodLp.sol";
+
+// lvf
+import {LeverageManager} from "../../contracts/lvf/LeverageManager.sol";
+
+// fraxlend
+import {FraxlendPairDeployer, ConstructorParams} from "./modules/fraxlend/FraxlendPairDeployer.sol";
+import {FraxlendWhitelist} from "./modules/fraxlend/FraxlendWhitelist.sol";
+import {FraxlendPairRegistry} from "./modules/fraxlend/FraxlendPairRegistry.sol";
+import {FraxlendPair} from "./modules/fraxlend/FraxlendPair.sol";
+import {VariableInterestRate} from "./modules/fraxlend/VariableInterestRate.sol";
+
+// uniswap-v2-core
+import {UniswapV2Factory} from "v2-core/UniswapV2Factory.sol";
+import {UniswapV2Pair} from "v2-core/UniswapV2Pair.sol";
+
+// uniswap-v2-periphery
+import {UniswapV2Router02} from "v2-periphery/UniswapV2Router02.sol";
+
+// uniswap-v3-core
+import {UniswapV3Factory} from "v3-core/UniswapV3Factory.sol";
+import {UniswapV3Pool} from "v3-core/UniswapV3Pool.sol";
+import {IUniswapV3MintCallback} from "v3-core/interfaces/callback/IUniswapV3MintCallback.sol";
+
+// uniswap-v3-periphery
+import {SwapRouter} from "v3-periphery/SwapRouter.sol";
+import {LiquidityManagement} from "v3-periphery/base/LiquidityManagement.sol";
+import {PeripheryPayments} from "v3-periphery/base/PeripheryPayments.sol";
+import {PoolAddress} from "v3-periphery/libraries/PoolAddress.sol";
+
+
+// mocks
+import {WETH9} from "./mocks/WETH.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {MockERC20} from "./mocks/MockERC20.sol";
+import {TestERC20} from "../../contracts/test/TestERC20.sol";
+import {TestERC4626Vault} from "../../contracts/test/TestERC4626Vault.sol";
+import {MockV3Aggregator} from "./mocks/MockV3Aggregator.sol";
+
+contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
+
+    /*///////////////////////////////////////////////////////////////
+                            GLOBAL VARIABLES
+    ///////////////////////////////////////////////////////////////*/
+
+    // external actors
+    address internal user0 = vm.addr(uint256(keccak256("User0")));
+    address internal user1 = vm.addr(uint256(keccak256("User1")));
+    address internal user2 = vm.addr(uint256(keccak256("User2")));
+
+    address[] internal users = [user0, user1, user2];
+
+    // fraxlend protocol actors
+    address internal comptroller = vm.addr(uint256(keccak256("comptroller")));
+    address internal circuitBreaker = vm.addr(uint256(keccak256("circuitBreaker")));
+    address internal timelock = vm.addr(uint256(keccak256("comptroller")));
+
+    uint16 internal fee = 100;
+
+    /*///////////////////////////////////////////////////////////////
+                            TEST CONTRACTS
+    ///////////////////////////////////////////////////////////////*/
+
+    PEAS internal _peas;
+    V3TwapUtilities internal _twapUtils;
+    UniswapDexAdapter internal _dexAdapter;
+    LendingAssetVault internal _lendingAssetVault;
+    RewardsWhitelist internal _rewardsWhitelist;
+
+    // oracles
+    V2ReservesUniswap internal _v2Res;
+    ChainlinkSinglePriceOracle internal _clOracle;
+    UniswapV3SinglePriceOracle internal _uniOracle;
+    aspTKNMinimalOracle internal _aspTKNMinOracle1;
+    aspTKNMinimalOracle internal _aspTKNMinOracle2;
+    aspTKNMinimalOracle internal _aspTKNMinOracle4;
+
+    // pods
+    WeightedIndex internal _pod1; // 1 token
+    WeightedIndex internal _pod2; // 2 tokens
+    WeightedIndex internal _pod4; // 4 tokens *_*
+
+    WeightedIndex[] internal _pods = [_pod1, _pod2, _pod4];
+
+    // index utils
+    IndexUtils internal _indexUtils;
+
+    // autocompounding
+    AutoCompoundingPodLpFactory internal _aspTKNFactory;
+    AutoCompoundingPodLp internal _aspTKN1;
+    address internal _aspTKN1Address;
+    AutoCompoundingPodLp internal _aspTKN2;
+    address internal _aspTKN2Address;
+    AutoCompoundingPodLp internal _aspTKN4;
+    address internal _aspTKN4Address;
+
+    // lvf 
+    LeverageManager internal _leverageManager;
+
+    // fraxlend
+    FraxlendPairDeployer internal _fraxDeployer;
+    FraxlendWhitelist internal _fraxWhitelist;
+    FraxlendPairRegistry internal _fraxRegistry;
+    VariableInterestRate internal _variableInterestRate;
+
+    FraxlendPair internal _fraxLPToken1;
+    FraxlendPair internal _fraxLPToken2;
+    FraxlendPair internal _fraxLPToken4;
+
+    // mocks
+    MockERC20 _mockDai;
+    TestERC20 _vaultAsset;
+    TestERC4626Vault _testVault;
+    WETH9 internal _weth;
+    MockERC20 internal _tokenA;
+    MockERC20 internal _tokenB;
+    MockERC20 internal _tokenC;
+    address[] internal tokens = [address(_weth), address(_tokenA), address(_tokenB), address(_tokenC)];
+
+    // mock price feeds
+    MockV3Aggregator internal _peasPriceFeed;
+    MockV3Aggregator internal _daiPriceFeed;
+    MockV3Aggregator internal _wethPriceFeed;
+    MockV3Aggregator internal _tokenAPriceFeed;
+    MockV3Aggregator internal _tokenBPriceFeed;
+    MockV3Aggregator internal _tokenCPriceFeed;
+
+    // uniswap-v2-core
+    UniswapV2Factory internal _uniV2Factory;
+    UniswapV2Pair internal _uniV2Pool;
+
+    // uniswap-v2-periphery
+    UniswapV2Router02 internal _v2SwapRouter;
+
+    // uniswap-v3-core
+    UniswapV3Factory internal _uniV3Factory;
+    UniswapV3Pool internal _v3peasDaiPool;
+    UniswapV3Pool internal _v3wethDaiPool;
+
+    // uniswap=v3-periphery
+    SwapRouter internal _v3SwapRouter;
+
+    /*///////////////////////////////////////////////////////////////
+                            SETUP FUNCTIONS
+    ///////////////////////////////////////////////////////////////*/
+
+    function setup() internal {
+
+        _deployWETH();
+        _deployTokens();
+        _deployPeas();
+        _deployUniV2();
+        _deployUniV3();
+        _deployTwapUtils();
+        _deployDexAdapter();
+        _deployRewardsWhitelist();
+        _deployIndexUtils();
+        _deployPriceFeeds();
+        _deployWeightedIndexes();
+        _deployAutoCompoundingPodLpFactory();
+        _getAutoCompoundingPodLpAddresses();
+        _deployAspTKNOracles();
+        _deployAspTKNs();
+        _deployVariableInterestRate();
+        _deployFraxWhitelist();
+        _deployFraxPairRegistry();
+        _deployFraxPairDeployer();
+        _deployFraxPairs();
+        _deployLendingAssetVault();
+        _deployLeverageManager();
+    }
+
+    function _deployWETH() internal {
+        _weth = new WETH9();
+
+        vm.deal(address(this), 10000 ether);
+        _weth.deposit{value: 10000 ether}();
+    }
+
+    function _deployTokens() internal {
+
+        if (address(this) == 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496) {
+            _vaultAsset = new TestERC20('Vault Token', 'tVault');
+            _mockDai = new MockERC20();
+            _tokenA = new MockERC20();
+            _tokenB = new MockERC20();
+            _tokenC = new MockERC20();
+
+            _tokenA.initialize("TOKEN A", "TA", 18);
+            _tokenB.initialize("TOKEN B", "TB", 6);
+            _tokenC.initialize("TOKEN C", "TC", 18);
+            bytes memory code = address(_mockDai).code;
+            vm.etch(0x6B175474E89094C44Da98b954EedeAC495271d0F, code);
+
+            _mockDai = MockERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+            _mockDai.initialize("MockDAI", "mDAI", 18);
+
+            _mockDai.mint(address(this), 10000 ether);
+            _tokenA.mint(address(this), 10000 ether);
+            _tokenB.mint(address(this), 10000 ether);
+            _tokenC.mint(address(this), 10000 ether);
+        } else {
+            _vaultAsset = new TestERC20('Vault Token', 'tVault');
+            _mockDai = MockERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+            _tokenA = new MockERC20();
+            _tokenB = new MockERC20();
+            _tokenC = new MockERC20();
+
+            _mockDai.initialize("MockDAI", "mDAI", 18);
+            _tokenA.initialize("TOKEN A", "TA", 18);
+            _tokenB.initialize("TOKEN B", "TB", 6);
+            _tokenC.initialize("TOKEN C", "TC", 18);
+
+            _mockDai.mint(address(this), 10000 ether);
+            _tokenA.mint(address(this), 10000 ether);
+            _tokenB.mint(address(this), 10000 ether);
+            _tokenC.mint(address(this), 10000 ether);
+        }
+
+    }
+
+    function _deployPeas() internal {
+        _peas = new PEAS('Peapods', 'PEAS');
+    }
+
+    function _deployUniV2() internal {
+        _uniV2Factory = new UniswapV2Factory(address(this));
+        _v2SwapRouter = new UniswapV2Router02(address(_uniV2Factory), address(_weth));
+    }
+
+    function _deployUniV3() internal {
+        _uniV3Factory = new UniswapV3Factory();
+
+        _v3peasDaiPool = UniswapV3Pool(
+            _uniV3Factory.createPool(
+                address(_peas),
+                address(_mockDai),
+                500
+            )
+        );
+        _v3peasDaiPool.initialize(1<<96);
+
+        PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
+            token0: _v3peasDaiPool.token0(),
+            token1: _v3peasDaiPool.token1(),
+            fee: _v3peasDaiPool.fee()
+        });
+
+        _v3peasDaiPool.mint(
+            address(this),
+            -887200,
+            887200,
+            100 ether,
+            abi.encode(LiquidityManagement.MintCallbackData({
+                poolKey: poolKey,
+                payer: address(this)
+                })
+            )
+        );
+
+        _v3wethDaiPool = UniswapV3Pool(
+            _uniV3Factory.createPool(
+                address(_weth),
+                address(_mockDai),
+                500
+            )
+        );
+        _v3wethDaiPool.initialize(1<<96);
+
+        PoolAddress.PoolKey memory poolKey1 = PoolAddress.PoolKey({
+            token0: _v3wethDaiPool.token0(),
+            token1: _v3wethDaiPool.token1(),
+            fee: _v3wethDaiPool.fee()
+        });
+
+        _v3wethDaiPool.mint(
+            address(this),
+            -887200,
+            887200,
+            100 ether,
+            abi.encode(LiquidityManagement.MintCallbackData({
+                poolKey: poolKey1,
+                payer: address(this)
+                })
+            )
+        );
+
+        _v3SwapRouter = new SwapRouter(address(_uniV3Factory), address(_weth));
+
+    }
+
+    function _deployTwapUtils() internal {
+        _twapUtils = new V3TwapUtilities();
+    }
+
+    function _deployDexAdapter() internal {
+        _dexAdapter = new UniswapDexAdapter(_twapUtils, address(_v2SwapRouter), address(_v3SwapRouter), false);
+    }
+
+    function _deployRewardsWhitelist() internal {
+        _rewardsWhitelist = new RewardsWhitelist();
+    }
+
+    function _deployIndexUtils() internal {
+        _indexUtils = new IndexUtils(
+            _twapUtils,
+            _dexAdapter
+        );
+    }
+
+    function _deployPriceFeeds() internal {
+        _peasPriceFeed = new MockV3Aggregator(_peas.decimals(), 3e18);
+        _daiPriceFeed = new MockV3Aggregator(_mockDai.decimals(), 1e18);
+        _wethPriceFeed = new MockV3Aggregator(_weth.decimals(), 3000e18);
+        _tokenAPriceFeed = new MockV3Aggregator(_tokenA.decimals(), 1e18);
+        _tokenBPriceFeed = new MockV3Aggregator(_tokenB.decimals(), 100e6);
+        _tokenCPriceFeed = new MockV3Aggregator(_tokenC.decimals(), 50e18);
+    }
+
+    function _deployWeightedIndexes() internal {
+        IDecentralizedIndex.Config memory _c;
+        IDecentralizedIndex.Fees memory _f;
+        _f.bond = fee;
+        _f.debond = fee;
+
+        // POD1
+        address[] memory _t1 = new address[](1);
+        _t1[0] = address(_peas);
+        uint256[] memory _w1 = new uint256[](1);
+        _w1[0] = 100;
+        _pod1 = new WeightedIndex('Test1', 'pTEST1', _c, _f, _t1, _w1, address(0), address(_peas), address(_dexAdapter), false);
+
+        // approve pod asset & pair asset
+        _peas.approve(address(_pod1), type(uint256).max);
+        _mockDai.approve(address(_pod1), type(uint256).max);
+        // mint some pTKNs
+        _pod1.bond(
+            address(_peas),
+            100 ether,
+            100 ether
+        );
+        // add Liquidity
+        _pod1.addLiquidityV2(
+            100 ether,
+            100 ether,
+            100,
+            block.timestamp
+        );
+
+        // POD2
+        address[] memory _t2 = new address[](2);
+        _t2[0] = address(_peas);
+        _t2[1] = address(_weth);
+        uint256[] memory _w2 = new uint256[](2);
+        _w2[0] = 50;
+        _w2[1] = 50;
+        _pod2 = new WeightedIndex('Test2', 'pTEST2', _c, _f, _t2, _w2, address(0), address(_peas), address(_dexAdapter), false);
+
+        // approve pod asset & pair asset
+        _peas.approve(address(_pod2), type(uint256).max);
+        _weth.approve(address(_pod2), type(uint256).max);
+        _mockDai.approve(address(_pod2), type(uint256).max);
+        // mint some pTKNs
+        _pod2.bond(
+            address(_peas),
+            100 ether,
+            100 ether
+        );
+        // add Liquidity
+        _pod2.addLiquidityV2(
+            100 ether,
+            100 ether,
+            100,
+            block.timestamp
+        );
+
+        // POD4
+        address[] memory _t4 = new address[](4);
+        _t4[0] = address(_weth);
+        _t4[1] = address(_tokenA);
+        _t4[2] = address(_tokenB);
+        _t4[3] = address(_tokenC);
+        uint256[] memory _w4 = new uint256[](4);
+        _w4[0] = 25;
+        _w4[1] = 25;
+        _w4[2] = 25;
+        _w4[3] = 25;
+        _pod4 = new WeightedIndex('Test4', 'pTEST4', _c, _f, _t4, _w4, address(0), address(_peas), address(_dexAdapter), false);
+
+        // approve pod asset & pair asset
+        _weth.approve(address(_pod4), type(uint256).max);
+        _tokenA.approve(address(_pod4), type(uint256).max);
+        _tokenB.approve(address(_pod4), type(uint256).max);
+        _tokenC.approve(address(_pod4), type(uint256).max);
+        _mockDai.approve(address(_pod4), type(uint256).max);
+        // mint some pTKNs
+        _pod4.bond(
+            address(_weth),
+            1 ether,
+            1 ether
+        );
+        // add Liquidity
+        _pod4.addLiquidityV2(
+            1 ether,
+            1 ether,
+            100,
+            block.timestamp
+        );
+    }
+
+    function _deployAutoCompoundingPodLpFactory() internal {
+        _aspTKNFactory = new AutoCompoundingPodLpFactory();
+    }
+
+    function _getAutoCompoundingPodLpAddresses() internal {
+
+        _aspTKN1Address = _aspTKNFactory.getNewCaFromParams(
+            "Test aspTKN1",
+            "aspTKN1",
+            _pod1,
+            _dexAdapter,
+            _indexUtils,
+            _rewardsWhitelist,
+            _twapUtils,
+            0
+        );
+
+        _aspTKN2Address = _aspTKNFactory.getNewCaFromParams(
+            "Test aspTKN2",
+            "aspTKN2",
+            _pod2,
+            _dexAdapter,
+            _indexUtils,
+            _rewardsWhitelist,
+            _twapUtils,
+            0
+        );
+
+        _aspTKN4Address = _aspTKNFactory.getNewCaFromParams(
+            "Test aspTKN4",
+            "aspTKN4",
+            _pod4,
+            _dexAdapter,
+            _indexUtils,
+            _rewardsWhitelist,
+            _twapUtils,
+            0
+        );
+    }
+
+    function _deployAspTKNOracles() internal {
+        _v2Res = new V2ReservesUniswap();
+        _clOracle = new ChainlinkSinglePriceOracle();
+        _uniOracle = new UniswapV3SinglePriceOracle();
+
+        _aspTKNMinOracle1 = new aspTKNMinimalOracle(
+            _aspTKN1Address,
+            address(_mockDai), // DAI
+            false,
+            _pod1.lpStakingPool(),
+            address(_v3peasDaiPool), // UniV3: PEAS / DAI
+            address(_daiPriceFeed), // CL: DAI / USD
+            address(0),
+            address(0),
+            address(0),
+            address(_clOracle),
+            address(_uniOracle),
+            address(_v2Res)
+        );
+
+        _aspTKNMinOracle2 = new aspTKNMinimalOracle(
+            _aspTKN2Address,
+            address(_mockDai), // DAI
+            false,
+            _pod2.lpStakingPool(),
+            address(_v3peasDaiPool), // UniV3: PEAS / DAI
+            address(_daiPriceFeed), // CL: DAI / USD
+            address(0),
+            address(0),
+            address(0),
+            address(_clOracle),
+            address(_uniOracle),
+            address(_v2Res)
+        );
+
+        _aspTKNMinOracle4 = new aspTKNMinimalOracle(
+            _aspTKN4Address,
+            address(_mockDai), // DAI
+            false,
+            _pod4.lpStakingPool(),
+            address(_v3wethDaiPool), // UniV3: PEAS / DAI
+            address(_daiPriceFeed), // CL: DAI / USD
+            address(0),
+            address(0),
+            address(0),
+            address(_clOracle),
+            address(_uniOracle),
+            address(_v2Res)
+        );
+    }
+
+    function _deployAspTKNs() internal {
+
+        address _lpToken1 = _pod1.lpStakingPool();
+        address _stakingToken1 = StakingPoolToken(_lpToken1).stakingToken();
+        // Approve pod LP token
+        IERC20(_stakingToken1).approve(_lpToken1, 1000);
+        // Stake liquidity tokens for initial aspTKN deposit
+        StakingPoolToken(_lpToken1).stake(address(this), 1000);
+        // Approve staking token for min deposit
+        IERC20(_lpToken1).approve(address(_aspTKNFactory), 1000);
+
+        _aspTKNFactory.create(
+            "Test aspTKN1",
+            "aspTKN1",
+            _pod1,
+            _dexAdapter,
+            _indexUtils,
+            _rewardsWhitelist,
+            _twapUtils,
+            0
+        );
+        _aspTKN1 = AutoCompoundingPodLp(_aspTKN1Address);
+
+        address _lpToken2 = _pod2.lpStakingPool();
+        address _stakingToken2 = StakingPoolToken(_lpToken2).stakingToken();
+        // Approve pod LP token
+        IERC20(_stakingToken2).approve(_lpToken2, 1000);
+        // Stake liquidity tokens for initial aspTKN deposit
+        StakingPoolToken(_lpToken2).stake(address(this), 1000);
+        // Approve staking token for min deposit
+        IERC20(_lpToken2).approve(address(_aspTKNFactory), 1000);
+
+        _aspTKNFactory.create(
+            "Test aspTKN2",
+            "aspTKN2",
+            _pod2,
+            _dexAdapter,
+            _indexUtils,
+            _rewardsWhitelist,
+            _twapUtils,
+            0
+        );
+        _aspTKN2 = AutoCompoundingPodLp(_aspTKN2Address);
+
+        address _lpToken4 = _pod4.lpStakingPool();
+        address _stakingToken4 = StakingPoolToken(_lpToken4).stakingToken();
+        // Approve pod LP token
+        IERC20(_stakingToken4).approve(_lpToken4, 1000);
+        // Stake liquidity tokens for initial aspTKN deposit
+        StakingPoolToken(_lpToken4).stake(address(this), 1000);
+        // Approve staking token for min deposit
+        IERC20(_lpToken4).approve(address(_aspTKNFactory), 1000);
+
+        _aspTKNFactory.create(
+            "Test aspTKN4",
+            "aspTKN4",
+            _pod4,
+            _dexAdapter,
+            _indexUtils,
+            _rewardsWhitelist,
+            _twapUtils,
+            0
+        );
+        _aspTKN4 = AutoCompoundingPodLp(_aspTKN4Address);
+    }
+
+    function _deployVariableInterestRate() internal {
+        // These values taken from existing Fraxlend Variable Rate Contract
+        _variableInterestRate = new VariableInterestRate(
+            "[0.5 0.5@.875 5-10k] 2 days (.75-.85)",
+            75000,
+            85000,
+            87500,
+            158247046,
+            1582470460,
+            3164940920000,
+            172800,
+            500000000000000000
+        );
+    }
+
+    function _deployFraxWhitelist() internal {
+        _fraxWhitelist = new FraxlendWhitelist();
+    }
+
+    function _deployFraxPairRegistry() internal {
+        address[] memory _initialDeployers = new address[](0);
+        _fraxRegistry = new FraxlendPairRegistry(
+            address(this),
+            _initialDeployers
+        );
+    }
+
+    function _deployFraxPairDeployer() internal {
+        ConstructorParams memory _params = ConstructorParams(
+            circuitBreaker,
+            comptroller,
+            timelock,
+            address(_fraxWhitelist),
+            address(_fraxRegistry)
+        );
+        _fraxDeployer = new FraxlendPairDeployer(
+            _params
+        );
+
+        _fraxDeployer.setCreationCode(type(FraxlendPair).creationCode);
+
+        address[] memory _whitelistDeployer = new address[](1);
+        _whitelistDeployer[0] = address(this);
+
+        _fraxWhitelist.setFraxlendDeployerWhitelist(
+            _whitelistDeployer,
+            true
+        );
+
+        address[] memory _registryDeployer = new address[](1);
+        _registryDeployer[0] = address(_fraxDeployer);
+
+        _fraxRegistry.setDeployers(
+            _registryDeployer,
+            true
+        );
+    }
+
+    function _deployFraxPairs() internal {
+        vm.warp(block.timestamp + 1 days);
+
+        (bool _isBadData, uint256 _priceLow, uint256 _priceHigh) = _aspTKNMinOracle1.getPrices();
+        fl.log("_aspTKNMinOracle1.getPrices()", _isBadData);
+        fl.log("_aspTKNMinOracle1.getPrices()", _priceLow);
+        fl.log("_aspTKNMinOracle1.getPrices()", _priceHigh);
+        _fraxLPToken1 = FraxlendPair(
+            _fraxDeployer.deploy(
+                abi.encode(
+                    address(_pod1),
+                    _aspTKN1Address, 
+                    address(_aspTKNMinOracle1), 
+                    5000, 
+                    address(_variableInterestRate), 
+                    1000, 
+                    75000, 
+                    10000, 
+                    9000, 
+                    2000
+                )
+            )
+        );
+
+        _fraxLPToken2 = FraxlendPair(
+            _fraxDeployer.deploy(
+                abi.encode(
+                    address(_pod2),
+                    _aspTKN2Address, 
+                    address(_aspTKNMinOracle2), 
+                    5000, 
+                    address(_variableInterestRate), 
+                    1000, 
+                    75000, 
+                    10000, 
+                    9000, 
+                    2000
+                )
+            )
+        );
+
+        _fraxLPToken4 = FraxlendPair(
+            _fraxDeployer.deploy(
+                abi.encode(
+                    address(_pod4),
+                    _aspTKN4Address, 
+                    address(_aspTKNMinOracle4), 
+                    5000, 
+                    address(_variableInterestRate), 
+                    1000, 
+                    75000, 
+                    10000, 
+                    9000, 
+                    2000
+                )
+            )
+        );
+    }
+
+    function _deployLendingAssetVault() internal {
+
+        _lendingAssetVault = new LendingAssetVault(
+            "Test LAV",
+            "tLAV",
+            address(_mockDai)
+        );
+
+        IERC20 vaultAsset1 = IERC20(_fraxLPToken1.asset());
+        vaultAsset1.approve(address(_fraxLPToken1), vaultAsset1.totalSupply());
+        vaultAsset1.approve(address(_lendingAssetVault), vaultAsset1.totalSupply());
+        _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken1), true);
+        _lendingAssetVault.setVaultMaxPerc(address(_fraxLPToken1), 5000);
+
+        IERC20 vaultAsset2 = IERC20(_fraxLPToken2.asset());
+        vaultAsset2.approve(address(_fraxLPToken2), vaultAsset2.totalSupply());
+        vaultAsset2.approve(address(_lendingAssetVault), vaultAsset2.totalSupply());
+        _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken2), true);
+        _lendingAssetVault.setVaultMaxPerc(address(_fraxLPToken2), 2500);
+
+        IERC20 vaultAsset4 = IERC20(_fraxLPToken4.asset());
+        vaultAsset4.approve(address(_fraxLPToken4), vaultAsset4.totalSupply());
+        vaultAsset4.approve(address(_lendingAssetVault), vaultAsset4.totalSupply());
+        _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken4), true);
+        _lendingAssetVault.setVaultMaxPerc(address(_fraxLPToken4), 2500);
+    }
+
+    function _deployLeverageManager() internal {
+        _leverageManager = new LeverageManager(
+            "Test LM",
+            "tLM",
+            _indexUtils
+        );
+    }
+
+    /*////////////////////////////////////////////////////////////////
+                                    HELPERS
+    ////////////////////////////////////////////////////////////////*/
+
+    function uniswapV3MintCallback(
+        uint256 amount0Owed,
+        uint256 amount1Owed,
+        bytes calldata data
+    ) external override {
+        LiquidityManagement.MintCallbackData memory decoded = abi.decode(data, (LiquidityManagement.MintCallbackData));
+
+        if (amount0Owed > 0) IERC20(decoded.poolKey.token0).transfer(msg.sender, amount0Owed);
+        if (amount1Owed > 0) IERC20(decoded.poolKey.token1).transfer(msg.sender, amount1Owed);
+    }
+}
