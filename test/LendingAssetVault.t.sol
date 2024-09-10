@@ -101,7 +101,11 @@ contract LendingAssetVaultTest is Test {
   }
 
   function test_vaultDepositAndWithdrawNoCbrChange() public {
-    _lendingAssetVault.setVaultMaxPerc(address(_testVault), 10000);
+    address[] memory vaults = new address[](1);
+    vaults[0] = address(_testVault);
+    uint256[] memory percentages = new uint256[](1);
+    percentages[0] = 10000;
+    _lendingAssetVault.setVaultMaxPerc(vaults, percentages);
 
     uint256 _lavDepAmt = 10e18;
     uint256 _extDepAmt = _lavDepAmt / 2;
@@ -129,7 +133,11 @@ contract LendingAssetVaultTest is Test {
   }
 
   function test_vaultDepositAndWithdrawWithCbrChange() public {
-    _lendingAssetVault.setVaultMaxPerc(address(_testVault), 10000);
+    address[] memory vaults = new address[](1);
+    vaults[0] = address(_testVault);
+    uint256[] memory percentages = new uint256[](1);
+    percentages[0] = 10000;
+    _lendingAssetVault.setVaultMaxPerc(vaults, percentages);
 
     uint256 _lavDepAmt = 10e18;
     uint256 _extDepAmt = _lavDepAmt / 2;
@@ -168,16 +176,17 @@ contract LendingAssetVaultTest is Test {
     uint256 _lavDepAmt = 10e18;
     uint256 _extDepAmt = _lavDepAmt / 2;
     _lendingAssetVault.deposit(_lavDepAmt, address(this));
-    _lendingAssetVault.setVaultMaxPerc(address(_testVault), 10000);
+    address[] memory vaults = new address[](1);
+    vaults[0] = address(_testVault);
+    uint256[] memory percentages = new uint256[](1);
+    percentages[0] = 10000;
+    _lendingAssetVault.setVaultMaxPerc(vaults, percentages);
 
     _testVault.depositFromLendingAssetVault(
       address(_lendingAssetVault),
       _extDepAmt
     );
 
-    // uint256 _initialVaultUtilization = _lendingAssetVault.vaultUtilization(
-    //   address(_testVault)
-    // );
     uint256 _initialTotalAssetsUtilized = _lendingAssetVault.totalAssets() -
       _lendingAssetVault.totalAvailableAssets();
 
@@ -203,7 +212,11 @@ contract LendingAssetVaultTest is Test {
     uint256 _lavDepAmt = 10e18;
     uint256 _extDepAmt = _lavDepAmt / 2;
     _lendingAssetVault.deposit(_lavDepAmt, address(this));
-    _lendingAssetVault.setVaultMaxPerc(address(_testVault), 10000);
+    address[] memory vaults = new address[](1);
+    vaults[0] = address(_testVault);
+    uint256[] memory percentages = new uint256[](1);
+    percentages[0] = 10000;
+    _lendingAssetVault.setVaultMaxPerc(vaults, percentages);
 
     _testVault.depositFromLendingAssetVault(
       address(_lendingAssetVault),
@@ -248,16 +261,17 @@ contract LendingAssetVaultTest is Test {
     uint256 _lavDepAmt = 10e18;
     uint256 _extDepAmt = _lavDepAmt / 2;
     _lendingAssetVault.deposit(_lavDepAmt, address(this));
-    _lendingAssetVault.setVaultMaxPerc(address(_testVault), 10000);
+    address[] memory vaults = new address[](1);
+    vaults[0] = address(_testVault);
+    uint256[] memory percentages = new uint256[](1);
+    percentages[0] = 10000;
+    _lendingAssetVault.setVaultMaxPerc(vaults, percentages);
 
     _testVault.depositFromLendingAssetVault(
       address(_lendingAssetVault),
       _extDepAmt
     );
 
-    // uint256 _initialVaultUtilization = _lendingAssetVault.vaultUtilization(
-    //   address(_testVault)
-    // );
     uint256 _initialTotalAssetsUtilized = _lendingAssetVault.totalAssets() -
       _lendingAssetVault.totalAvailableAssets();
 
@@ -286,7 +300,11 @@ contract LendingAssetVaultTest is Test {
     uint256 _lavDepAmt = 10e18;
     uint256 _extDepAmt = _lavDepAmt / 2;
     _lendingAssetVault.deposit(_lavDepAmt, address(this));
-    _lendingAssetVault.setVaultMaxPerc(address(_testVault), 10000);
+    address[] memory vaults = new address[](1);
+    vaults[0] = address(_testVault);
+    uint256[] memory percentages = new uint256[](1);
+    percentages[0] = 10000;
+    _lendingAssetVault.setVaultMaxPerc(vaults, percentages);
 
     _testVault.depositFromLendingAssetVault(
       address(_lendingAssetVault),
