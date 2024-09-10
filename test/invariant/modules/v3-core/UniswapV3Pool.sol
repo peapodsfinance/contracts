@@ -468,7 +468,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
             }
         }
     }
-
+    event MessageAddress(string a, address b);
     /// @inheritdoc IUniswapV3PoolActions
     /// @dev noDelegateCall is applied indirectly via _modifyPosition
     function mint(
@@ -496,6 +496,8 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
         uint256 balance1Before;
         if (amount0 > 0) balance0Before = balance0();
         if (amount1 > 0) balance1Before = balance1();
+        emit Message("BEFORE MINT");
+        emit MessageAddress("msg.sender", msg.sender);
         IUniswapV3MintCallback(msg.sender).uniswapV3MintCallback(amount0, amount1, data);
         if (amount0 > 0) require(balance0Before.add(amount0) <= balance0(), 'M0');
         if (amount1 > 0) require(balance1Before.add(amount1) <= balance1(), 'M1');

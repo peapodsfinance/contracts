@@ -116,7 +116,10 @@ contract MockERC20 is IERC20 {
         return true;
     }
 
-    function mint(address to, uint256 value) public virtual {
+    event Message(string a);
+
+    function mint(address to, uint256 value) public {
+        emit Message("HERE");
         _mint(to, value);
     }
 

@@ -16,6 +16,8 @@ import {WeightedIndex} from '../../contracts/WeightedIndex.sol';
 import {StakingPoolToken} from "../../contracts/StakingPoolToken.sol"; 
 import {LendingAssetVault} from "../../contracts/LendingAssetVault.sol";
 import {IndexUtils} from "../../contracts/IndexUtils.sol";
+import {IIndexUtils_LEGACY} from "../../contracts/interfaces/IIndexUtils_LEGACY.sol";
+import {MockIndexUtils} from "./mocks/MockIndexUtils.sol";
 import {RewardsWhitelist} from "../../contracts/RewardsWhitelist.sol";
 
 // oracles
@@ -48,7 +50,6 @@ import {UniswapV2Router02} from "v2-periphery/UniswapV2Router02.sol";
 // uniswap-v3-core
 import {UniswapV3Factory} from "v3-core/UniswapV3Factory.sol";
 import {UniswapV3Pool} from "v3-core/UniswapV3Pool.sol";
-import {IUniswapV3MintCallback} from "v3-core/interfaces/callback/IUniswapV3MintCallback.sol";
 
 // uniswap-v3-periphery
 import {SwapRouter} from "v3-periphery/SwapRouter.sol";
@@ -64,8 +65,9 @@ import {MockERC20} from "./mocks/MockERC20.sol";
 import {TestERC20} from "../../contracts/test/TestERC20.sol";
 import {TestERC4626Vault} from "../../contracts/test/TestERC4626Vault.sol";
 import {MockV3Aggregator} from "./mocks/MockV3Aggregator.sol";
+import {MockUniV3Minter} from "./mocks/MockUniV3Minter.sol";
 
-contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
+contract FuzzSetup is Test, FuzzBase {
 
     /*///////////////////////////////////////////////////////////////
                             GLOBAL VARIABLES
@@ -111,7 +113,7 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
     WeightedIndex[] internal _pods = [_pod1, _pod2, _pod4];
 
     // index utils
-    IndexUtils internal _indexUtils;
+    MockIndexUtils internal _indexUtils;
 
     // autocompounding
     AutoCompoundingPodLpFactory internal _aspTKNFactory;
@@ -121,6 +123,8 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
     address internal _aspTKN2Address;
     AutoCompoundingPodLp internal _aspTKN4;
     address internal _aspTKN4Address;
+
+    AutoCompoundingPodLp[] internal _aspTKNs = [_aspTKN1, _aspTKN2, _aspTKN4];
 
     // lvf 
     LeverageManager internal _leverageManager;
@@ -135,10 +139,11 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
     FraxlendPair internal _fraxLPToken2;
     FraxlendPair internal _fraxLPToken4;
 
+    FraxlendPair[] internal _fraxPairs = [_fraxLPToken1, _fraxLPToken2, _fraxLPToken4];
+
     // mocks
-    MockERC20 _mockDai;
-    TestERC20 _vaultAsset;
-    TestERC4626Vault _testVault;
+    MockUniV3Minter internal _uniV3Minter;
+    MockERC20 internal _mockDai;
     WETH9 internal _weth;
     MockERC20 internal _tokenA;
     MockERC20 internal _tokenB;
@@ -173,7 +178,8 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
     ///////////////////////////////////////////////////////////////*/
 
     function setup() internal {
-
+        
+        _deployUniV3Minter();
         _deployWETH();
         _deployTokens();
         _deployPeas();
@@ -198,17 +204,28 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
         _deployLeverageManager();
     }
 
+    function _deployUniV3Minter() internal {
+        _uniV3Minter = new MockUniV3Minter();
+    }
     function _deployWETH() internal {
         _weth = new WETH9();
 
         vm.deal(address(this), 10000 ether);
         _weth.deposit{value: 10000 ether}();
+
+        vm.deal(address(_uniV3Minter), 10000 ether);
+        vm.prank(address(_uniV3Minter));
+        _weth.deposit{value: 10000 ether}();
     }
+
+    event Message(string a);
+    event MessageUint(string a, uint256 b);
+    event MessageBool(string a, bool b);
+    event MessageAddress(string a, address b);
 
     function _deployTokens() internal {
 
         if (address(this) == 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496) {
-            _vaultAsset = new TestERC20('Vault Token', 'tVault');
             _mockDai = new MockERC20();
             _tokenA = new MockERC20();
             _tokenB = new MockERC20();
@@ -218,6 +235,7 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
             _tokenB.initialize("TOKEN B", "TB", 6);
             _tokenC.initialize("TOKEN C", "TC", 18);
             bytes memory code = address(_mockDai).code;
+        
             vm.etch(0x6B175474E89094C44Da98b954EedeAC495271d0F, code);
 
             _mockDai = MockERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
@@ -227,8 +245,13 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
             _tokenA.mint(address(this), 10000 ether);
             _tokenB.mint(address(this), 10000 ether);
             _tokenC.mint(address(this), 10000 ether);
+
+            _tokenA.mint(address(_uniV3Minter), 10000 ether);
+            _tokenB.mint(address(_uniV3Minter), 10000 ether);
+            _tokenC.mint(address(_uniV3Minter), 10000 ether);
+            _mockDai.mint(address(_uniV3Minter), 10000 ether);
         } else {
-            _vaultAsset = new TestERC20('Vault Token', 'tVault');
+
             _mockDai = MockERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
             _tokenA = new MockERC20();
             _tokenB = new MockERC20();
@@ -239,16 +262,22 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
             _tokenB.initialize("TOKEN B", "TB", 6);
             _tokenC.initialize("TOKEN C", "TC", 18);
 
-            _mockDai.mint(address(this), 10000 ether);
             _tokenA.mint(address(this), 10000 ether);
             _tokenB.mint(address(this), 10000 ether);
             _tokenC.mint(address(this), 10000 ether);
-        }
+            _mockDai.mint(address(this), 10000 ether);
 
+            _tokenA.mint(address(_uniV3Minter), 10000 ether);
+            _tokenB.mint(address(_uniV3Minter), 10000 ether);
+            _tokenC.mint(address(_uniV3Minter), 10000 ether);
+            _mockDai.mint(address(_uniV3Minter), 10000 ether);
+        }
     }
 
     function _deployPeas() internal {
         _peas = new PEAS('Peapods', 'PEAS');
+
+        _peas.transfer(address(_uniV3Minter), 10000 ether);
     }
 
     function _deployUniV2() internal {
@@ -258,7 +287,6 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
 
     function _deployUniV3() internal {
         _uniV3Factory = new UniswapV3Factory();
-
         _v3peasDaiPool = UniswapV3Pool(
             _uniV3Factory.createPool(
                 address(_peas),
@@ -267,25 +295,8 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
             )
         );
         _v3peasDaiPool.initialize(1<<96);
-
-        PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
-            token0: _v3peasDaiPool.token0(),
-            token1: _v3peasDaiPool.token1(),
-            fee: _v3peasDaiPool.fee()
-        });
-
-        _v3peasDaiPool.mint(
-            address(this),
-            -887200,
-            887200,
-            100 ether,
-            abi.encode(LiquidityManagement.MintCallbackData({
-                poolKey: poolKey,
-                payer: address(this)
-                })
-            )
-        );
-
+        
+        _uniV3Minter.V3addLiquidity(_v3peasDaiPool, 100e18);
         _v3wethDaiPool = UniswapV3Pool(
             _uniV3Factory.createPool(
                 address(_weth),
@@ -294,25 +305,7 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
             )
         );
         _v3wethDaiPool.initialize(1<<96);
-
-        PoolAddress.PoolKey memory poolKey1 = PoolAddress.PoolKey({
-            token0: _v3wethDaiPool.token0(),
-            token1: _v3wethDaiPool.token1(),
-            fee: _v3wethDaiPool.fee()
-        });
-
-        _v3wethDaiPool.mint(
-            address(this),
-            -887200,
-            887200,
-            100 ether,
-            abi.encode(LiquidityManagement.MintCallbackData({
-                poolKey: poolKey1,
-                payer: address(this)
-                })
-            )
-        );
-
+        _uniV3Minter.V3addLiquidity(_v3wethDaiPool, 100e18);
         _v3SwapRouter = new SwapRouter(address(_uniV3Factory), address(_weth));
 
     }
@@ -329,10 +322,19 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
         _rewardsWhitelist = new RewardsWhitelist();
     }
 
+    // function _deployProtocolFees() internal {
+    //     _protocolFees = new ProtocolFees();
+    //     _protocolFees.setYieldAdmin(10000);
+    //     _protocolFees.setYieldBurn(10000);
+
+    //     _protocolFeeRouter = new ProtocolFeeRouter(_protocolFees);
+    // }
+
     function _deployIndexUtils() internal {
-        _indexUtils = new IndexUtils(
+        _indexUtils = new MockIndexUtils(
             _twapUtils,
-            _dexAdapter
+            _dexAdapter,
+            address(_v3SwapRouter)
         );
     }
 
@@ -364,13 +366,13 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
         // mint some pTKNs
         _pod1.bond(
             address(_peas),
-            100 ether,
-            100 ether
+            1 ether,
+            1 ether
         );
         // add Liquidity
         _pod1.addLiquidityV2(
-            100 ether,
-            100 ether,
+            1 ether,
+            1 ether,
             100,
             block.timestamp
         );
@@ -441,7 +443,6 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
     }
 
     function _getAutoCompoundingPodLpAddresses() internal {
-
         _aspTKN1Address = _aspTKNFactory.getNewCaFromParams(
             "Test aspTKN1",
             "aspTKN1",
@@ -528,7 +529,6 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
     }
 
     function _deployAspTKNs() internal {
-
         address _lpToken1 = _pod1.lpStakingPool();
         address _stakingToken1 = StakingPoolToken(_lpToken1).stakingToken();
         // Approve pod LP token
@@ -711,7 +711,6 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
     }
 
     function _deployLendingAssetVault() internal {
-
         _lendingAssetVault = new LendingAssetVault(
             "Test LAV",
             "tLAV",
@@ -741,7 +740,7 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
         _leverageManager = new LeverageManager(
             "Test LM",
             "tLM",
-            _indexUtils
+            IIndexUtils_LEGACY(address(_indexUtils))
         );
     }
 
@@ -749,14 +748,4 @@ contract FuzzSetup is IUniswapV3MintCallback, Test, FuzzBase {
                                     HELPERS
     ////////////////////////////////////////////////////////////////*/
 
-    function uniswapV3MintCallback(
-        uint256 amount0Owed,
-        uint256 amount1Owed,
-        bytes calldata data
-    ) external override {
-        LiquidityManagement.MintCallbackData memory decoded = abi.decode(data, (LiquidityManagement.MintCallbackData));
-
-        if (amount0Owed > 0) IERC20(decoded.poolKey.token0).transfer(msg.sender, amount0Owed);
-        if (amount1Owed > 0) IERC20(decoded.poolKey.token1).transfer(msg.sender, amount1Owed);
-    }
 }
