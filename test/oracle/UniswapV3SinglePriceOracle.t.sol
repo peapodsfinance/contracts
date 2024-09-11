@@ -12,7 +12,7 @@ contract UniswapV3SinglePriceOracleTest is Test {
     oracle = new UniswapV3SinglePriceOracle();
   }
 
-  function test_getPriceUSD18_PEASDAI_NoCL() public view {
+  function test_getPriceUSD18_PEASDAI_NoCL() public  {
     (bool _isBadData, uint256 _price) = oracle.getPriceUSD18(
       address(0),
       0x02f92800F57BCD74066F5709F1Daa1A4302Df875, // PEAS
@@ -27,7 +27,7 @@ contract UniswapV3SinglePriceOracleTest is Test {
     assertGt(_price, 2 * 10 ** 18); // greater than 2 (please god)
   }
 
-  function test_getPriceUSD18_PEASDAI() public view {
+  function test_getPriceUSD18_PEASDAI() public  {
     (bool _isBadData, uint256 _price) = oracle.getPriceUSD18(
       0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9, // CL: DAI / USD
       0x02f92800F57BCD74066F5709F1Daa1A4302Df875, // PEAS
@@ -39,7 +39,7 @@ contract UniswapV3SinglePriceOracleTest is Test {
     assertGt(_price, 2 * 10 ** 18); // greater than 2 (please god)
   }
 
-  function test_getPriceUSD18_PEASWETH() public view {
+  function test_getPriceUSD18_PEASWETH() public  {
     (bool _isBadData, uint256 _price) = oracle.getPriceUSD18(
       0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419, // CL: ETH / USD
       0x02f92800F57BCD74066F5709F1Daa1A4302Df875, // PEAS
