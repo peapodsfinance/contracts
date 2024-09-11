@@ -41,34 +41,6 @@ To run (disabling Slither):
 PATH=./test/invariant/:$PATH echidna test/invariant/PeapodsInvariant.sol --contract PeapodsInvariant --config test/invariant/echidna.yaml
 ```
 
-## Source code changes to go deeper in testing
-
-LendingAssetVault.sol
-```diff
-interface IVaultInterestUpdate {
--  function addInterest() external;
-+  function addInterest(bool) external;
-}
-```
-
-```diff
-  /// @notice Updates interest and metadata for all whitelisted vaults
-  /// @param _vaultToExclude Address of the vault to exclude from the update
-  function _updateInterestAndMdInAllVaults(address _vaultToExclude) internal {
-    if (!_updateInterestOnVaults) {
-      return;
-    }
-    for (uint256 _i; _i < _vaultWhitelistAry.length; _i++) {
-      address _vault = _vaultWhitelistAry[_i];
-      if (_vault == _vaultToExclude) {
-        continue;
-      }
--      IVaultInterestUpdate(_vault).addInterest();
-+      IVaultInterestUpdate(_vault).addInterest(false);
-      _updateAssetMetadataFromVault(_vault);
-    }
-  }
-```
 # Invariants
 | **Invariant ID** | **Invariant Description** | **Passed** | **Remediation** | **Run Count** |
 |:--------------:|:-----|:-----------:|:-----------:|:-----------:|

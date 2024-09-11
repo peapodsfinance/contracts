@@ -191,11 +191,11 @@ contract LendingAssetVaultTest is Test {
       _lendingAssetVault.totalAvailableAssets();
 
     vm.expectEmit(true, true, true, true);
-    // emit ILendingAssetVault.RedeemFromVault(
-    //   address(_testVault),
-    //   _testVault.balanceOf(address(_lendingAssetVault)),
-    //   _extDepAmt
-    // );
+    emit ILendingAssetVault.RedeemFromVault(
+      address(_testVault),
+      _testVault.balanceOf(address(_lendingAssetVault)),
+      _extDepAmt
+    );
 
     _lendingAssetVault.redeemFromVault(address(_testVault), 0);
 
@@ -234,11 +234,11 @@ contract LendingAssetVaultTest is Test {
       _lendingAssetVault.totalAvailableAssets();
 
     vm.expectEmit(true, true, true, true);
-    // emit ILendingAssetVault.RedeemFromVault(
-    //   address(_testVault),
-    //   _redeemShares,
-    //   _expectedAssets
-    // );
+    emit ILendingAssetVault.RedeemFromVault(
+      address(_testVault),
+      _redeemShares,
+      _expectedAssets
+    );
 
     _lendingAssetVault.redeemFromVault(address(_testVault), _redeemShares);
 
@@ -279,11 +279,11 @@ contract LendingAssetVaultTest is Test {
     uint256 _expectedAssets = _testVault.convertToAssets(_expectedShares);
 
     vm.expectEmit(true, true, true, true);
-    // emit ILendingAssetVault.RedeemFromVault(
-    //   address(_testVault),
-    //   _expectedShares,
-    //   _expectedAssets
-    // );
+    emit ILendingAssetVault.RedeemFromVault(
+      address(_testVault),
+      _expectedShares,
+      _expectedAssets
+    );
 
     _lendingAssetVault.redeemFromVault(address(_testVault), 0);
 

@@ -749,28 +749,19 @@ contract FuzzSetup is Test, FuzzBase {
         vaultAsset1.approve(address(_fraxLPToken1), vaultAsset1.totalSupply());
         vaultAsset1.approve(address(_lendingAssetVault), vaultAsset1.totalSupply());
         _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken1), true);
+        _lendingAssetVault.setVaultMaxPerc(address(_fraxLPToken1), 5000);
 
         IERC20 vaultAsset2 = IERC20(_fraxLPToken2.asset());
         vaultAsset2.approve(address(_fraxLPToken2), vaultAsset2.totalSupply());
         vaultAsset2.approve(address(_lendingAssetVault), vaultAsset2.totalSupply());
         _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken2), true);
+        _lendingAssetVault.setVaultMaxPerc(address(_fraxLPToken2), 2500);
 
         IERC20 vaultAsset4 = IERC20(_fraxLPToken4.asset());
         vaultAsset4.approve(address(_fraxLPToken4), vaultAsset4.totalSupply());
         vaultAsset4.approve(address(_lendingAssetVault), vaultAsset4.totalSupply());
         _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken4), true);
-
-        address[] memory vaultAddresses = new address[](3);
-        vaultAddresses[0] = address(_fraxLPToken1);
-        vaultAddresses[1] = address(_fraxLPToken2);
-        vaultAddresses[2] = address(_fraxLPToken4);
-
-        uint256[] memory percentages = new uint256[](3);
-        percentages[0] = 5000;
-        percentages[0] = 2500;
-        percentages[0] = 2500;
-
-        _lendingAssetVault.setVaultMaxPerc(vaultAddresses, percentages);
+        _lendingAssetVault.setVaultMaxPerc(address(_fraxLPToken4), 2500);
     }
 
     function _deployLeverageManager() internal {

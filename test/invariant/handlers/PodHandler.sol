@@ -33,44 +33,8 @@ contract PodHandler is Properties {
             cache.token,
             amount,
             0
-        ) {
-
-        } catch {
+        ) {} catch {
             fl.t(false, "BOND FAILED");
-        }
-    }
-
-    struct DebondTemps{
-        address user;
-        WeightedIndex pod;
-        address[] array1;
-        uint8[] array2;
-    }
-
-    function pod_debond(uint256 userIndexSeed, uint256 podIndexSeed, uint256 amount) public {
-        
-        // PRE-CONDITIONS
-        DebondTemps memory cache;
-        cache.user = randomAddress(userIndexSeed);
-        cache.pod = randomPod(podIndexSeed);
-        cache.array1 = new address[](0);
-        cache.array2 = new uint8[](0);
-
-        amount = fl.clamp(amount, 0, IERC20(cache.pod).balanceOf(cache.user));
-        if (amount == 0) return;
-
-        // ACTION
-        vm.prank(cache.user);
-        try cache.pod.debond(
-            amount,
-            cache.array1,
-            cache.array2
-        ) {
-            
-        } catch Panic(uint256 lowLevelData) {
-            // If the external call fails with a low-level error
-            fl.log("CODE", lowLevelData);
-            fl.t(false, "DEBOND FAILED");
         }
     }
 }

@@ -9,7 +9,7 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './interfaces/ILendingAssetVault.sol';
 
 interface IVaultInterestUpdate {
-  function addInterest(bool) external;
+  function addInterest() external;
 }
 
 contract LendingAssetVault is
@@ -242,7 +242,7 @@ contract LendingAssetVault is
       if (_vault == _vaultToExclude) {
         continue;
       }
-      IVaultInterestUpdate(_vault).addInterest(false);
+      IVaultInterestUpdate(_vault).addInterest();
       _updateAssetMetadataFromVault(_vault);
     }
   }

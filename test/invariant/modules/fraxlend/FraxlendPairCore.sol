@@ -1002,13 +1002,11 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
         if (_payer != address(this)) {
             assetContract.safeTransferFrom(_payer, address(this), _amountToRepay);
         }
-        if (address(externalAssetVault) != address(0)) {
-             externalAssetVault.whitelistUpdate(true);
-             uint256 _externalAssetsToWithdraw = externalAssetVault.vaultUtilization(address(this));
-             if (_externalAssetsToWithdraw > 0) {
-                 uint256 _extAmount = _externalAssetsToWithdraw > _amountToRepay ? _amountToRepay : _externalAssetsToWithdraw;
-                 _withdrawToVault(_extAmount);
-             }
+        externalAssetVault.whitelistUpdate();
+        uint256 _externalAssetsToWithdraw = externalAssetVault.vaultUtilization(address(this));
+        if (_externalAssetsToWithdraw > 0) {
+            uint256 _extAmount = _externalAssetsToWithdraw > _amountToRepay ? _amountToRepay : _externalAssetsToWithdraw;
+            _withdrawToVault(_extAmount);
         }
         emit RepayAsset(_payer, _borrower, _amountToRepay, _shares);
     }
@@ -1129,9 +1127,6 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
                 // Determine if we need to adjust any shares
                 _sharesToAdjust = _borrowerShares - _sharesToLiquidate;
                 if (_sharesToAdjust > 0) {
-                    if (address(externalAssetVault) != address(0)) {
-                       externalAssetVault.whitelistUpdate(false);
-                    }
                     // Write off bad debt
                     _amountToAdjust = (_totalBorrow.toAmount(_sharesToAdjust, false)).toUint128();
 
