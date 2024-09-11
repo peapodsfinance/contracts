@@ -16,6 +16,35 @@ All of the invariants reside in the following contracts:
 * RewardTokenHandler.sol
 * V3PoolHandler.sol
 
+## Source code changes to go deeper in testing
+
+LendingAssetVault.sol
+```diff
+interface IVaultInterestUpdate {
+-  function addInterest() external;
++  function addInterest(bool) external;
+}
+```
+
+```diff
+  /// @notice Updates interest and metadata for all whitelisted vaults
+  /// @param _vaultToExclude Address of the vault to exclude from the update
+  function _updateInterestAndMdInAllVaults(address _vaultToExclude) internal {
+    if (!_updateInterestOnVaults) {
+      return;
+    }
+    for (uint256 _i; _i < _vaultWhitelistAry.length; _i++) {
+      address _vault = _vaultWhitelistAry[_i];
+      if (_vault == _vaultToExclude) {
+        continue;
+      }
+-      IVaultInterestUpdate(_vault).addInterest();
++      IVaultInterestUpdate(_vault).addInterest(false);
+      _updateAssetMetadataFromVault(_vault);
+    }
+  }
+```
+
 ## Setup and Run Instructions
 
 1. Install Echidna, following the steps here: [Installation Guide](https://github.com/crytic/echidna#installation)
