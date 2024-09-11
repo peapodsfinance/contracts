@@ -6,6 +6,8 @@ interface ILendingAssetVault {
 
   event PayBackUsedAssets(address indexed user, uint256 amount);
 
+  event RedeemFromVault(address indexed vault, uint256 shares, uint256 assets);
+
   event SetVaultWhitelist(address indexed vault, bool isWhitelisted);
 
   event SetVaultMaxAlloPercentage(address indexed vault, uint256 percentage);
@@ -14,7 +16,17 @@ interface ILendingAssetVault {
 
   event WhitelistWithdraw(address indexed user, uint256 amount);
 
+  function vaultUtilization(address vault) external view returns (uint256);
+
+  function totalAssetsUtilized() external view returns (uint256);
+
   function totalAvailableAssets() external view returns (uint256);
+
+  function totalAvailableAssetsForVault(
+    address vault
+  ) external view returns (uint256);
+
+  function whitelistUpdate(bool onlyCaller) external;
 
   function whitelistDeposit(uint256 amount) external;
 

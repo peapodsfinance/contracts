@@ -244,12 +244,14 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     uint256 _deadline
   ) internal returns (uint256 _lpAmtOut) {
     uint256 _pairedOut = _tokenToPairedLpToken(_token, _amountIn, 0);
-    if (protocolFee > 0) {
-      uint256 _pairedFee = (_pairedOut * protocolFee) / 1000;
-      IERC20(pod.PAIRED_LP_TOKEN()).safeTransfer(owner(), _pairedFee);
-      _pairedOut -= _pairedFee;
+    if (_pairedOut > 0) {
+      if (protocolFee > 0) {
+        uint256 _pairedFee = (_pairedOut * protocolFee) / 1000;
+        IERC20(pod.PAIRED_LP_TOKEN()).safeTransfer(owner(), _pairedFee);
+        _pairedOut -= _pairedFee;
+      }
+      _lpAmtOut = _pairedLpTokenToPodLp(_pairedOut, _amountLpOutMin, _deadline);
     }
-    _lpAmtOut = _pairedLpTokenToPodLp(_pairedOut, _amountLpOutMin, _deadline);
   }
 
   function _tokenToPairedLpToken(
@@ -269,7 +271,10 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     uint256 _amountInOverride = _tokenToPairedSwapAmountInOverride[
       _rewardsToken
     ][_pairedLpToken];
-    _amountIn = _amountInOverride > 0 ? _amountInOverride : _amountIn;
+    if (_amountInOverride > 0) {
+      _amountOutMin = (_amountOutMin * _amountInOverride) / _amountIn;
+      _amountIn = _amountInOverride;
+    }
     (address _token0, address _token1) = _pairedLpToken < _rewardsToken
       ? (_pairedLpToken, _rewardsToken)
       : (_rewardsToken, _pairedLpToken);

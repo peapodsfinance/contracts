@@ -116,6 +116,16 @@ interface IDecentralizedIndex is IERC20 {
 
   function processPreSwapFeesAndSwap() external;
 
+  function totalAssets() external view returns (uint256 totalManagedAssets);
+
+  function convertToShares(
+    uint256 assets
+  ) external view returns (uint256 shares);
+
+  function convertToAssets(
+    uint256 shares
+  ) external view returns (uint256 assets);
+
   function bond(address token, uint256 amount, uint256 amountMintMin) external;
 
   function debond(
