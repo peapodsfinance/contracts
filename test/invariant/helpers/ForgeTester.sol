@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.19;
 
-import {Handler} from "../handlers/Handler.sol";
+import {PodHandler} from "../handlers/PodHandler.sol";
 
-contract ForgeTest is Handler {
+contract ForgeTest is PodHandler {
 
     function setUp() public {
         setup();
     }
 
     function test_dev() public {
-        fl.t(false, "SETUP");
+        pod_bond(58674322, 132456758, 675342, 10e6);
+    }
+
+    function test_replay() public {
+        pod_bond(387378969389571021109923564558245385376140735747681917274,7596194136205663401643939052124478693597261016856,17247200342186505686684286055,3376897908474041158442932904952417274667835);
+        pod_bond(0,6977964582397520142515897388547156067464545597494214416098,5154495533662947239760585642947548375946323849727923,2263778101295867576051975417568071379001025043743);
     }
 }

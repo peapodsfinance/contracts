@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {Handler} from "./handlers/Handler.sol";
+import {PodHandler} from "./handlers/PodHandler.sol";
 
-contract PeapodsInvariant is Handler {
+contract PeapodsInvariant is PodHandler {
     constructor() payable {
         setup();
     }

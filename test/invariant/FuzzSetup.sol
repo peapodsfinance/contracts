@@ -60,7 +60,7 @@ import {PoolAddress} from "v3-periphery/libraries/PoolAddress.sol";
 
 // mocks
 import {WETH9} from "./mocks/WETH.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {TestERC20} from "../../contracts/test/TestERC20.sol";
 import {TestERC4626Vault} from "../../contracts/test/TestERC4626Vault.sol";
@@ -110,7 +110,7 @@ contract FuzzSetup is Test, FuzzBase {
     WeightedIndex internal _pod2; // 2 tokens
     WeightedIndex internal _pod4; // 4 tokens *_*
 
-    WeightedIndex[] internal _pods = [_pod1, _pod2, _pod4];
+    WeightedIndex[] internal _pods;
 
     // index utils
     MockIndexUtils internal _indexUtils;
@@ -124,7 +124,7 @@ contract FuzzSetup is Test, FuzzBase {
     AutoCompoundingPodLp internal _aspTKN4;
     address internal _aspTKN4Address;
 
-    AutoCompoundingPodLp[] internal _aspTKNs = [_aspTKN1, _aspTKN2, _aspTKN4];
+    AutoCompoundingPodLp[] internal _aspTKNs;
 
     // lvf 
     LeverageManager internal _leverageManager;
@@ -139,7 +139,7 @@ contract FuzzSetup is Test, FuzzBase {
     FraxlendPair internal _fraxLPToken2;
     FraxlendPair internal _fraxLPToken4;
 
-    FraxlendPair[] internal _fraxPairs = [_fraxLPToken1, _fraxLPToken2, _fraxLPToken4];
+    FraxlendPair[] internal _fraxPairs;
 
     // mocks
     MockUniV3Minter internal _uniV3Minter;
@@ -202,6 +202,9 @@ contract FuzzSetup is Test, FuzzBase {
         _deployFraxPairs();
         _deployLendingAssetVault();
         _deployLeverageManager();
+
+        _setupActors();
+
     }
 
     function _deployUniV3Minter() internal {
@@ -210,12 +213,12 @@ contract FuzzSetup is Test, FuzzBase {
     function _deployWETH() internal {
         _weth = new WETH9();
 
-        vm.deal(address(this), 10000 ether);
-        _weth.deposit{value: 10000 ether}();
+        vm.deal(address(this), 100000 ether);
+        _weth.deposit{value: 100000 ether}();
 
-        vm.deal(address(_uniV3Minter), 10000 ether);
+        vm.deal(address(_uniV3Minter), 100000 ether);
         vm.prank(address(_uniV3Minter));
-        _weth.deposit{value: 10000 ether}();
+        _weth.deposit{value: 100000 ether}();
     }
 
     event Message(string a);
@@ -241,15 +244,15 @@ contract FuzzSetup is Test, FuzzBase {
             _mockDai = MockERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
             _mockDai.initialize("MockDAI", "mDAI", 18);
 
-            _mockDai.mint(address(this), 10000 ether);
-            _tokenA.mint(address(this), 10000 ether);
-            _tokenB.mint(address(this), 10000 ether);
-            _tokenC.mint(address(this), 10000 ether);
+            _mockDai.mint(address(this), 100000 ether);
+            _tokenA.mint(address(this), 100000 ether);
+            _tokenB.mint(address(this), 100000e6);
+            _tokenC.mint(address(this), 100000 ether);
 
-            _tokenA.mint(address(_uniV3Minter), 10000 ether);
-            _tokenB.mint(address(_uniV3Minter), 10000 ether);
-            _tokenC.mint(address(_uniV3Minter), 10000 ether);
-            _mockDai.mint(address(_uniV3Minter), 10000 ether);
+            _tokenA.mint(address(_uniV3Minter), 100000 ether);
+            _tokenB.mint(address(_uniV3Minter), 100000e6);
+            _tokenC.mint(address(_uniV3Minter), 100000 ether);
+            _mockDai.mint(address(_uniV3Minter), 100000 ether);
         } else {
 
             _mockDai = MockERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
@@ -262,22 +265,22 @@ contract FuzzSetup is Test, FuzzBase {
             _tokenB.initialize("TOKEN B", "TB", 6);
             _tokenC.initialize("TOKEN C", "TC", 18);
 
-            _tokenA.mint(address(this), 10000 ether);
-            _tokenB.mint(address(this), 10000 ether);
-            _tokenC.mint(address(this), 10000 ether);
-            _mockDai.mint(address(this), 10000 ether);
+            _tokenA.mint(address(this), 100000 ether);
+            _tokenB.mint(address(this), 100000e6);
+            _tokenC.mint(address(this), 100000 ether);
+            _mockDai.mint(address(this), 100000 ether);
 
-            _tokenA.mint(address(_uniV3Minter), 10000 ether);
-            _tokenB.mint(address(_uniV3Minter), 10000 ether);
-            _tokenC.mint(address(_uniV3Minter), 10000 ether);
-            _mockDai.mint(address(_uniV3Minter), 10000 ether);
+            _tokenA.mint(address(_uniV3Minter), 100000 ether);
+            _tokenB.mint(address(_uniV3Minter), 100000e6);
+            _tokenC.mint(address(_uniV3Minter), 100000 ether);
+            _mockDai.mint(address(_uniV3Minter), 100000 ether);
         }
     }
 
     function _deployPeas() internal {
         _peas = new PEAS('Peapods', 'PEAS');
 
-        _peas.transfer(address(_uniV3Minter), 10000 ether);
+        _peas.transfer(address(_uniV3Minter), 100000 ether);
     }
 
     function _deployUniV2() internal {
@@ -377,6 +380,9 @@ contract FuzzSetup is Test, FuzzBase {
             block.timestamp
         );
 
+        // add to array for fuzzing
+        _pods.push(_pod1);
+
         // POD2
         address[] memory _t2 = new address[](2);
         _t2[0] = address(_peas);
@@ -403,6 +409,9 @@ contract FuzzSetup is Test, FuzzBase {
             100,
             block.timestamp
         );
+
+        // add to array for fuzzing
+        _pods.push(_pod2);
 
         // POD4
         address[] memory _t4 = new address[](4);
@@ -436,6 +445,9 @@ contract FuzzSetup is Test, FuzzBase {
             100,
             block.timestamp
         );
+
+        // add to array for fuzzing
+        _pods.push(_pod4);
     }
 
     function _deployAutoCompoundingPodLpFactory() internal {
@@ -550,6 +562,9 @@ contract FuzzSetup is Test, FuzzBase {
         );
         _aspTKN1 = AutoCompoundingPodLp(_aspTKN1Address);
 
+        // add to array for fuzzing
+        _aspTKNs.push(_aspTKN1);
+
         address _lpToken2 = _pod2.lpStakingPool();
         address _stakingToken2 = StakingPoolToken(_lpToken2).stakingToken();
         // Approve pod LP token
@@ -571,6 +586,9 @@ contract FuzzSetup is Test, FuzzBase {
         );
         _aspTKN2 = AutoCompoundingPodLp(_aspTKN2Address);
 
+        // add to array for fuzzing
+        _aspTKNs.push(_aspTKN2);
+
         address _lpToken4 = _pod4.lpStakingPool();
         address _stakingToken4 = StakingPoolToken(_lpToken4).stakingToken();
         // Approve pod LP token
@@ -591,6 +609,9 @@ contract FuzzSetup is Test, FuzzBase {
             0
         );
         _aspTKN4 = AutoCompoundingPodLp(_aspTKN4Address);
+
+        // add to array for fuzzing
+        _aspTKNs.push(_aspTKN4);
     }
 
     function _deployVariableInterestRate() internal {
@@ -652,12 +673,10 @@ contract FuzzSetup is Test, FuzzBase {
     }
 
     function _deployFraxPairs() internal {
+
+        // moving time to help out the twap
         vm.warp(block.timestamp + 1 days);
 
-        (bool _isBadData, uint256 _priceLow, uint256 _priceHigh) = _aspTKNMinOracle1.getPrices();
-        fl.log("_aspTKNMinOracle1.getPrices()", _isBadData);
-        fl.log("_aspTKNMinOracle1.getPrices()", _priceLow);
-        fl.log("_aspTKNMinOracle1.getPrices()", _priceHigh);
         _fraxLPToken1 = FraxlendPair(
             _fraxDeployer.deploy(
                 abi.encode(
@@ -674,6 +693,9 @@ contract FuzzSetup is Test, FuzzBase {
                 )
             )
         );
+
+        // add to array for fuzzing
+        _fraxPairs.push(_fraxLPToken1);
 
         _fraxLPToken2 = FraxlendPair(
             _fraxDeployer.deploy(
@@ -692,6 +714,9 @@ contract FuzzSetup is Test, FuzzBase {
             )
         );
 
+        // add to array for fuzzing
+        _fraxPairs.push(_fraxLPToken2);
+
         _fraxLPToken4 = FraxlendPair(
             _fraxDeployer.deploy(
                 abi.encode(
@@ -708,6 +733,9 @@ contract FuzzSetup is Test, FuzzBase {
                 )
             )
         );
+
+        // add to array for fuzzing
+        _fraxPairs.push(_fraxLPToken4);
     }
 
     function _deployLendingAssetVault() internal {
@@ -748,4 +776,67 @@ contract FuzzSetup is Test, FuzzBase {
                                     HELPERS
     ////////////////////////////////////////////////////////////////*/
 
+    function _setupActors() internal {
+        for (uint256 i; i < users.length; i++) {
+            vm.deal(users[i], 100000 ether);
+            vm.prank(users[i]);
+            _weth.deposit{value: 100000 ether}();
+
+            _tokenA.mint(users[i], 100000 ether);
+            _tokenB.mint(users[i], 100000e6);
+            _tokenC.mint(users[i], 100000 ether);
+            _mockDai.mint(users[i], 100000 ether);
+
+            _peas.transfer(users[i], 100000 ether);
+        }
+    }
+
+    function randomAddress(uint256 seed) internal view returns (address) {
+        return users[bound(seed, 0, users.length - 1)];
+    }
+
+    function randomPod(uint256 seed) internal returns (WeightedIndex) {
+        fl.log("POD 1", address(_pods[bound(seed, 0, _pods.length - 1)]));
+        return _pods[bound(seed, 0, _pods.length - 1)];
+    }
+
+    function randomIndexToken(WeightedIndex pod, uint256 seed) internal view returns (address) {
+        IDecentralizedIndex.IndexAssetInfo[] memory indexTokens = pod.getAllAssets();
+        return indexTokens[bound(seed, 0, indexTokens.length - 1)].token;
+    }
+
+    function randomAspTKN(uint256 seed) internal view returns (AutoCompoundingPodLp) {
+        return _aspTKNs[bound(seed, 0, _aspTKNs.length - 1)];
+    }
+
+    function randomFraxPair(uint256 seed) internal view returns (FraxlendPair) {
+        return _fraxPairs[bound(seed, 0, _fraxPairs.length - 1)];
+    }
+
+    function _approveIndexTokens(WeightedIndex pod, address user, uint256 amount) internal {
+        IDecentralizedIndex.IndexAssetInfo[] memory indexTokens = pod.getAllAssets();
+
+        for (uint256 i; i < indexTokens.length; i++) {
+            vm.prank(user);
+            MockERC20(indexTokens[i].token).approve(address(pod), type(uint256).max);
+        }
+    }
+
+    function _checkTokenBalances(WeightedIndex pod, address token, address user, uint256 amount) internal returns (bool hasEnough) {
+        IDecentralizedIndex.IndexAssetInfo[] memory indexTokens = pod.getAllAssets();
+
+        hasEnough = true;
+        for (uint256 i; i < indexTokens.length; i++) {
+            uint256 amountNeeded = pod.getInitialAmount(
+                token,
+                amount,
+                indexTokens[i].token
+            );
+
+            if (amountNeeded > IERC20(indexTokens[i].token).balanceOf(user)) {
+                hasEnough = false;
+                break;
+            }
+        }
+    }
 }
