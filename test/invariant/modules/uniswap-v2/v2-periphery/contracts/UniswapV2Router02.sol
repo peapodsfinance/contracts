@@ -361,10 +361,13 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         );
         uint256 balanceBefore = IERC20(path[path.length - 1]).balanceOf(to);
         _swapSupportingFeeOnTransferTokens(path, to);
+        emit MessageNum("Amount Out Actual", IERC20(path[path.length - 1]).balanceOf(to).sub(balanceBefore));
+        emit MessageNum("Amount Out Min", amountOutMin);
         require(
             IERC20(path[path.length - 1]).balanceOf(to).sub(balanceBefore) >= amountOutMin,
             "UniswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT"
         );
+        emit MessageNum("HERE SWAP", 1);
     }
 
     function swapExactETHForTokensSupportingFeeOnTransferTokens(

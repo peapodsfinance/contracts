@@ -10,7 +10,7 @@ interface IERC4626Extended is IERC4626 {
 
     function totalAvailableAssets() external view returns (uint256);
 
-    function whitelistUpdate() external;
+    function whitelistUpdate(bool onlyCaller) external;
 
     function whitelistWithdraw(uint256 amount) external;
 
