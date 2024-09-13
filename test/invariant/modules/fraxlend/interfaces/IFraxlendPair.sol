@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: ISC
 pragma solidity >=0.8.19;
 
+import {VaultAccount} from "../libraries/VaultAccount.sol";
+
 interface IFraxlendPair {
     function CIRCUIT_BREAKER_ADDRESS() external view returns (address);
 
@@ -200,9 +202,9 @@ interface IFraxlendPair {
 
     function toBorrowShares(uint256 _amount, bool _roundUp) external view returns (uint256);
 
-    function totalAsset() external view returns (uint128 amount, uint128 shares);
+    function totalAsset() external view returns (VaultAccount memory);
 
-    function totalBorrow() external view returns (uint128 amount, uint128 shares);
+    function totalBorrow() external view returns (VaultAccount memory);
 
     function totalCollateral() external view returns (uint256);
 

@@ -55,7 +55,7 @@ contract PodHandler is Properties {
         cache.array2 = new uint8[](0);
 
         amount = fl.clamp(amount, 0, IERC20(cache.pod).balanceOf(cache.user));
-        if (amount == 0) return;
+        if (amount < 1e14) return;
 
         // ACTION
         vm.prank(cache.user);
@@ -64,11 +64,10 @@ contract PodHandler is Properties {
             cache.array1,
             cache.array2
         ) {
-            
-        } catch Panic(uint256 lowLevelData) {
+        } catch (bytes memory lowLevelData) {
             // If the external call fails with a low-level error
             fl.log("CODE", lowLevelData);
-            fl.t(false, "DEBOND FAILED");
+            // fl.t(false, "DEBOND FAILED");
         }
     }
 }

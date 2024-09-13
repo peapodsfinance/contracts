@@ -299,6 +299,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
     }
 
     event Message(string a);
+    event MessageUint(string a, uint256 b);
     event MessageUint160(string a, uint160 b);
     event MessageUint128(string a, int128 b);
 
@@ -354,6 +355,9 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
                     _slot0.observationCardinality,
                     _slot0.observationCardinalityNext
                 );
+                emit MessageUint("slot0.observationIndex", uint256(slot0.observationIndex));
+                emit MessageUint("slot0.observationCardinality", uint256(slot0.observationCardinality));
+                emit MessageUint("mint block timestamp", block.timestamp);
                 emit Message("HERE4a");
                 emit MessageUint160("sqrtA", _slot0.sqrtPriceX96);
                 emit MessageUint160("sqrtB", TickMath.getSqrtRatioAtTick(params.tickUpper));
@@ -750,6 +754,9 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
 
         // update tick and write an oracle entry if the tick change
         if (state.tick != slot0Start.tick) {
+            emit Message("WRITING OBSERVATIOB");
+            emit MessageUint("cache.block.timestamp", cache.blockTimestamp);
+            emit MessageUint("current .block.timestamp", block.timestamp);
             (uint16 observationIndex, uint16 observationCardinality) =
                 observations.write(
                     slot0Start.observationIndex,
@@ -765,6 +772,11 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
                 observationIndex,
                 observationCardinality
             );
+            emit MessageUint("slot0start", uint256(slot0Start.observationIndex));
+                emit MessageUint("slot0start", uint256(slot0Start.observationCardinality));
+                emit MessageUint("slot0startcardinalityNext", uint256(slot0Start.observationCardinalityNext));
+            emit MessageUint("slot0.observationIndex", uint256(slot0.observationIndex));
+                emit MessageUint("slot0.observationCardinality", uint256(slot0.observationCardinality));
         } else {
             // otherwise just update the price
             slot0.sqrtPriceX96 = state.sqrtPriceX96;

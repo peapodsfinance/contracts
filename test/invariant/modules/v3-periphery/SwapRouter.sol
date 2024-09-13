@@ -109,6 +109,8 @@ contract SwapRouter is
         return uint256(-(zeroForOne ? amount1 : amount0));
     }
 
+    event Debug(string a);
+
     /// @inheritdoc ISwapRouter
     function exactInputSingle(ExactInputSingleParams calldata params)
         external
@@ -117,6 +119,7 @@ contract SwapRouter is
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
     {
+        emit Debug("HERE IN UNIV3");
         amountOut = exactInputInternal(
             params.amountIn,
             params.recipient,

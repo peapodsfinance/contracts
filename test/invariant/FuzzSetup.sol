@@ -26,6 +26,10 @@ import {UniswapV3SinglePriceOracle} from "../../contracts/oracle/UniswapV3Single
 import {V2ReservesUniswap} from "../../contracts/oracle/V2ReservesUniswap.sol";
 import {aspTKNMinimalOracle} from "../../contracts/oracle/aspTKNMinimalOracle.sol";
 
+// protocol fees
+import {ProtocolFees} from "../../contracts/ProtocolFees.sol";
+import {ProtocolFeeRouter} from "../../contracts/ProtocolFeeRouter.sol";
+
 // autocompounding
 import {AutoCompoundingPodLpFactory} from "../../contracts/AutoCompoundingPodLpFactory.sol";
 import {AutoCompoundingPodLp} from "../../contracts/AutoCompoundingPodLp.sol";
@@ -39,6 +43,12 @@ import {FraxlendWhitelist} from "./modules/fraxlend/FraxlendWhitelist.sol";
 import {FraxlendPairRegistry} from "./modules/fraxlend/FraxlendPairRegistry.sol";
 import {FraxlendPair} from "./modules/fraxlend/FraxlendPair.sol";
 import {VariableInterestRate} from "./modules/fraxlend/VariableInterestRate.sol";
+
+// flash
+import {IVault} from "./modules/balancer/interfaces/IVault.sol";
+import {BalancerFlashSource} from "../../contracts/flash/BalancerFlashSource.sol";
+import {PodFlashSource} from "../../contracts/flash/PodFlashSource.sol";
+import {UniswapV3FlashSource} from "../../contracts/flash/UniswapV3FlashSource.sol";
 
 // uniswap-v2-core
 import {UniswapV2Factory} from "v2-core/UniswapV2Factory.sol";
@@ -57,7 +67,6 @@ import {LiquidityManagement} from "v3-periphery/base/LiquidityManagement.sol";
 import {PeripheryPayments} from "v3-periphery/base/PeripheryPayments.sol";
 import {PoolAddress} from "v3-periphery/libraries/PoolAddress.sol";
 
-
 // mocks
 import {WETH9} from "./mocks/WETH.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -66,6 +75,10 @@ import {TestERC20} from "../../contracts/test/TestERC20.sol";
 import {TestERC4626Vault} from "../../contracts/test/TestERC4626Vault.sol";
 import {MockV3Aggregator} from "./mocks/MockV3Aggregator.sol";
 import {MockUniV3Minter} from "./mocks/MockUniV3Minter.sol";
+import {MockV3TwapUtilities} from './mocks/MockV3TwapUtilities.sol';
+
+// bytecode for etching with forge (echidna configures this in echidna.yaml)
+import {Bytecode} from "./helpers/Bytecode.sol";
 
 contract FuzzSetup is Test, FuzzBase {
 
@@ -92,7 +105,7 @@ contract FuzzSetup is Test, FuzzBase {
     ///////////////////////////////////////////////////////////////*/
 
     PEAS internal _peas;
-    V3TwapUtilities internal _twapUtils;
+    MockV3TwapUtilities internal _twapUtils;
     UniswapDexAdapter internal _dexAdapter;
     LendingAssetVault internal _lendingAssetVault;
     RewardsWhitelist internal _rewardsWhitelist;
@@ -101,12 +114,18 @@ contract FuzzSetup is Test, FuzzBase {
     V2ReservesUniswap internal _v2Res;
     ChainlinkSinglePriceOracle internal _clOracle;
     UniswapV3SinglePriceOracle internal _uniOracle;
-    aspTKNMinimalOracle internal _aspTKNMinOracle1;
+    aspTKNMinimalOracle internal _aspTKNMinOracle1Peas;
+    aspTKNMinimalOracle internal _aspTKNMinOracle1Weth;
     aspTKNMinimalOracle internal _aspTKNMinOracle2;
     aspTKNMinimalOracle internal _aspTKNMinOracle4;
 
+    // protocol fees
+    ProtocolFees internal _protocolFees;
+    ProtocolFeeRouter internal _protocolFeeRouter;
+
     // pods
-    WeightedIndex internal _pod1; // 1 token
+    WeightedIndex internal _pod1Peas; // 1 token (Peas)
+    WeightedIndex internal _pod1Weth; // 1 token (Weth)
     WeightedIndex internal _pod2; // 2 tokens
     WeightedIndex internal _pod4; // 4 tokens *_*
 
@@ -117,8 +136,10 @@ contract FuzzSetup is Test, FuzzBase {
 
     // autocompounding
     AutoCompoundingPodLpFactory internal _aspTKNFactory;
-    AutoCompoundingPodLp internal _aspTKN1;
-    address internal _aspTKN1Address;
+    AutoCompoundingPodLp internal _aspTKN1Peas;
+    address internal _aspTKN1PeasAddress;
+    AutoCompoundingPodLp internal _aspTKN1Weth;
+    address internal _aspTKN1WethAddress;
     AutoCompoundingPodLp internal _aspTKN2;
     address internal _aspTKN2Address;
     AutoCompoundingPodLp internal _aspTKN4;
@@ -135,11 +156,19 @@ contract FuzzSetup is Test, FuzzBase {
     FraxlendPairRegistry internal _fraxRegistry;
     VariableInterestRate internal _variableInterestRate;
 
-    FraxlendPair internal _fraxLPToken1;
+    FraxlendPair internal _fraxLPToken1Peas;
+    FraxlendPair internal _fraxLPToken1Weth;
     FraxlendPair internal _fraxLPToken2;
     FraxlendPair internal _fraxLPToken4;
 
     FraxlendPair[] internal _fraxPairs;
+
+    // flash
+    IVault internal _balancerVault;
+    BalancerFlashSource internal _balancerFlashSource;
+    PodFlashSource internal _podFlashSource;
+    UniswapV3FlashSource internal _uniswapV3FlashSourcePeas;
+    UniswapV3FlashSource internal _uniswapV3FlashSourceWeth;
 
     // mocks
     MockUniV3Minter internal _uniV3Minter;
@@ -170,8 +199,11 @@ contract FuzzSetup is Test, FuzzBase {
     UniswapV3Pool internal _v3peasDaiPool;
     UniswapV3Pool internal _v3wethDaiPool;
 
-    // uniswap=v3-periphery
+    // uniswap-v3-periphery
     SwapRouter internal _v3SwapRouter;
+
+    // bytecode
+    Bytecode internal _bytecode;
 
     /*///////////////////////////////////////////////////////////////
                             SETUP FUNCTIONS
@@ -185,9 +217,10 @@ contract FuzzSetup is Test, FuzzBase {
         _deployPeas();
         _deployUniV2();
         _deployUniV3();
+        _deployProtocolFees();
+        _deployRewardsWhitelist();
         _deployTwapUtils();
         _deployDexAdapter();
-        _deployRewardsWhitelist();
         _deployIndexUtils();
         _deployPriceFeeds();
         _deployWeightedIndexes();
@@ -201,7 +234,9 @@ contract FuzzSetup is Test, FuzzBase {
         _deployFraxPairDeployer();
         _deployFraxPairs();
         _deployLendingAssetVault();
+        _deployBalancerVault();
         _deployLeverageManager();
+        _deployFlashSources();
 
         _setupActors();
 
@@ -213,12 +248,12 @@ contract FuzzSetup is Test, FuzzBase {
     function _deployWETH() internal {
         _weth = new WETH9();
 
-        vm.deal(address(this), 100000 ether);
-        _weth.deposit{value: 100000 ether}();
+        vm.deal(address(this), 1000000 ether);
+        _weth.deposit{value: 1000000 ether}();
 
-        vm.deal(address(_uniV3Minter), 100000 ether);
+        vm.deal(address(_uniV3Minter), 1000000 ether);
         vm.prank(address(_uniV3Minter));
-        _weth.deposit{value: 100000 ether}();
+        _weth.deposit{value: 1000000 ether}();
     }
 
     event Message(string a);
@@ -244,15 +279,15 @@ contract FuzzSetup is Test, FuzzBase {
             _mockDai = MockERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
             _mockDai.initialize("MockDAI", "mDAI", 18);
 
-            _mockDai.mint(address(this), 100000 ether);
-            _tokenA.mint(address(this), 100000 ether);
-            _tokenB.mint(address(this), 100000e6);
-            _tokenC.mint(address(this), 100000 ether);
+            _mockDai.mint(address(this), 1000000 ether);
+            _tokenA.mint(address(this), 1000000 ether);
+            _tokenB.mint(address(this), 1000000e6);
+            _tokenC.mint(address(this), 1000000 ether);
 
-            _tokenA.mint(address(_uniV3Minter), 100000 ether);
+            _tokenA.mint(address(_uniV3Minter), 1000000 ether);
             _tokenB.mint(address(_uniV3Minter), 100000e6);
-            _tokenC.mint(address(_uniV3Minter), 100000 ether);
-            _mockDai.mint(address(_uniV3Minter), 100000 ether);
+            _tokenC.mint(address(_uniV3Minter), 1000000 ether);
+            _mockDai.mint(address(_uniV3Minter), 1000000 ether);
         } else {
 
             _mockDai = MockERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
@@ -265,22 +300,22 @@ contract FuzzSetup is Test, FuzzBase {
             _tokenB.initialize("TOKEN B", "TB", 6);
             _tokenC.initialize("TOKEN C", "TC", 18);
 
-            _tokenA.mint(address(this), 100000 ether);
-            _tokenB.mint(address(this), 100000e6);
-            _tokenC.mint(address(this), 100000 ether);
-            _mockDai.mint(address(this), 100000 ether);
+            _tokenA.mint(address(this), 1000000 ether);
+            _tokenB.mint(address(this), 1000000e6);
+            _tokenC.mint(address(this), 1000000 ether);
+            _mockDai.mint(address(this), 1000000 ether);
 
-            _tokenA.mint(address(_uniV3Minter), 100000 ether);
+            _tokenA.mint(address(_uniV3Minter), 1000000 ether);
             _tokenB.mint(address(_uniV3Minter), 100000e6);
-            _tokenC.mint(address(_uniV3Minter), 100000 ether);
-            _mockDai.mint(address(_uniV3Minter), 100000 ether);
+            _tokenC.mint(address(_uniV3Minter), 1000000 ether);
+            _mockDai.mint(address(_uniV3Minter), 1000000 ether);
         }
     }
 
     function _deployPeas() internal {
         _peas = new PEAS('Peapods', 'PEAS');
 
-        _peas.transfer(address(_uniV3Minter), 100000 ether);
+        _peas.transfer(address(_uniV3Minter), 1000000 ether);
     }
 
     function _deployUniV2() internal {
@@ -294,44 +329,91 @@ contract FuzzSetup is Test, FuzzBase {
             _uniV3Factory.createPool(
                 address(_peas),
                 address(_mockDai),
-                500
+                10000
             )
         );
         _v3peasDaiPool.initialize(1<<96);
+        _v3peasDaiPool.increaseObservationCardinalityNext(600);
         
-        _uniV3Minter.V3addLiquidity(_v3peasDaiPool, 100e18);
+        _uniV3Minter.V3addLiquidity(_v3peasDaiPool, 100000e18);
         _v3wethDaiPool = UniswapV3Pool(
             _uniV3Factory.createPool(
                 address(_weth),
                 address(_mockDai),
-                500
+                10000
             )
         );
         _v3wethDaiPool.initialize(1<<96);
-        _uniV3Minter.V3addLiquidity(_v3wethDaiPool, 100e18);
+        _v3wethDaiPool.increaseObservationCardinalityNext(600);
+
+        _uniV3Minter.V3addLiquidity(_v3wethDaiPool, 100000e18);
         _v3SwapRouter = new SwapRouter(address(_uniV3Factory), address(_weth));
 
     }
 
+    function _deployProtocolFees() internal {
+
+        _protocolFees = new ProtocolFees();
+        _protocolFees.setYieldAdmin(500);
+        _protocolFees.setYieldBurn(500);
+
+        if (address(this) == 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496) {
+
+            _protocolFeeRouter = new ProtocolFeeRouter(_protocolFees);
+
+            bytes memory code = address(_protocolFeeRouter).code;
+            vm.etch(0x7d544DD34ABbE24C8832db27820Ff53C151e949b, code);
+
+            _protocolFeeRouter = ProtocolFeeRouter(0x7d544DD34ABbE24C8832db27820Ff53C151e949b);
+
+            vm.prank(_protocolFeeRouter.owner());
+            _protocolFeeRouter.transferOwnership(address(this));
+
+            _protocolFeeRouter.setProtocolFees(_protocolFees);
+
+        } else {
+            _protocolFeeRouter = ProtocolFeeRouter(0x7d544DD34ABbE24C8832db27820Ff53C151e949b);
+
+            vm.prank(_protocolFeeRouter.owner());
+            _protocolFeeRouter.transferOwnership(address(this));
+
+            _protocolFeeRouter.setProtocolFees(_protocolFees);
+        }
+    }
+
+    function _deployRewardsWhitelist() internal {
+
+        if (address(this) == 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496) {
+
+            _rewardsWhitelist = new RewardsWhitelist();
+
+            bytes memory code = address(_rewardsWhitelist).code;
+            vm.etch(0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F, code);
+
+            _rewardsWhitelist = RewardsWhitelist(0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F);
+        } else {
+            _rewardsWhitelist = RewardsWhitelist(0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F);
+        }
+    }
+
     function _deployTwapUtils() internal {
-        _twapUtils = new V3TwapUtilities();
+        
+        if (address(this) == 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496) {
+
+            _twapUtils = new MockV3TwapUtilities();
+
+            bytes memory code = address(_twapUtils).code;
+            vm.etch(0x024ff47D552cB222b265D68C7aeB26E586D5229D, code);
+
+            _twapUtils = MockV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D);
+        } else {
+            _twapUtils = MockV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D);
+        }
     }
 
     function _deployDexAdapter() internal {
         _dexAdapter = new UniswapDexAdapter(_twapUtils, address(_v2SwapRouter), address(_v3SwapRouter), false);
     }
-
-    function _deployRewardsWhitelist() internal {
-        _rewardsWhitelist = new RewardsWhitelist();
-    }
-
-    // function _deployProtocolFees() internal {
-    //     _protocolFees = new ProtocolFees();
-    //     _protocolFees.setYieldAdmin(10000);
-    //     _protocolFees.setYieldBurn(10000);
-
-    //     _protocolFeeRouter = new ProtocolFeeRouter(_protocolFees);
-    // }
 
     function _deployIndexUtils() internal {
         _indexUtils = new MockIndexUtils(
@@ -356,24 +438,24 @@ contract FuzzSetup is Test, FuzzBase {
         _f.bond = fee;
         _f.debond = fee;
 
-        // POD1
+        // POD1 (Peas)
         address[] memory _t1 = new address[](1);
         _t1[0] = address(_peas);
         uint256[] memory _w1 = new uint256[](1);
         _w1[0] = 100;
-        _pod1 = new WeightedIndex('Test1', 'pTEST1', _c, _f, _t1, _w1, address(0), address(_peas), address(_dexAdapter), false);
+        _pod1Peas = new WeightedIndex('Weth Pod', 'pPeas', _c, _f, _t1, _w1, address(0), address(_peas), address(_dexAdapter), false);
 
         // approve pod asset & pair asset
-        _peas.approve(address(_pod1), type(uint256).max);
-        _mockDai.approve(address(_pod1), type(uint256).max);
+        _peas.approve(address(_pod1Peas), type(uint256).max);
+        _mockDai.approve(address(_pod1Peas), type(uint256).max);
         // mint some pTKNs
-        _pod1.bond(
+        _pod1Peas.bond(
             address(_peas),
             1 ether,
             1 ether
         );
         // add Liquidity
-        _pod1.addLiquidityV2(
+        _pod1Peas.addLiquidityV2(
             1 ether,
             1 ether,
             100,
@@ -381,7 +463,34 @@ contract FuzzSetup is Test, FuzzBase {
         );
 
         // add to array for fuzzing
-        _pods.push(_pod1);
+        _pods.push(_pod1Peas);
+
+        // POD1 (Weth)
+        address[] memory _t1W = new address[](1);
+        _t1W[0] = address(_weth);
+        uint256[] memory _w1W = new uint256[](1);
+        _w1W[0] = 100;
+        _pod1Weth = new WeightedIndex('Weth Pod', 'pWeth', _c, _f, _t1W, _w1W, address(0), address(_peas), address(_dexAdapter), false);
+
+        // approve pod asset & pair asset
+        _weth.approve(address(_pod1Weth), type(uint256).max);
+        _mockDai.approve(address(_pod1Weth), type(uint256).max);
+        // mint some pTKNs
+        _pod1Weth.bond(
+            address(_weth),
+            1 ether,
+            1 ether
+        );
+        // add Liquidity
+        _pod1Weth.addLiquidityV2(
+            1 ether,
+            1 ether,
+            100,
+            block.timestamp
+        );
+
+        // add to array for fuzzing
+        _pods.push(_pod1Weth);
 
         // POD2
         address[] memory _t2 = new address[](2);
@@ -455,10 +564,21 @@ contract FuzzSetup is Test, FuzzBase {
     }
 
     function _getAutoCompoundingPodLpAddresses() internal {
-        _aspTKN1Address = _aspTKNFactory.getNewCaFromParams(
-            "Test aspTKN1",
-            "aspTKN1",
-            _pod1,
+        _aspTKN1PeasAddress = _aspTKNFactory.getNewCaFromParams(
+            "Test aspTKN1Peas",
+            "aspTKN1Peas",
+            _pod1Peas,
+            _dexAdapter,
+            _indexUtils,
+            _rewardsWhitelist,
+            _twapUtils,
+            0
+        );
+
+        _aspTKN1WethAddress = _aspTKNFactory.getNewCaFromParams(
+            "Test aspTKN1Weth",
+            "aspTKN1Weth",
+            _pod1Weth,
             _dexAdapter,
             _indexUtils,
             _rewardsWhitelist,
@@ -494,12 +614,27 @@ contract FuzzSetup is Test, FuzzBase {
         _clOracle = new ChainlinkSinglePriceOracle();
         _uniOracle = new UniswapV3SinglePriceOracle();
 
-        _aspTKNMinOracle1 = new aspTKNMinimalOracle(
-            _aspTKN1Address,
+        _aspTKNMinOracle1Peas = new aspTKNMinimalOracle(
+            _aspTKN1PeasAddress,
             address(_mockDai), // DAI
             false,
-            _pod1.lpStakingPool(),
+            _pod1Peas.lpStakingPool(),
             address(_v3peasDaiPool), // UniV3: PEAS / DAI
+            address(_daiPriceFeed), // CL: DAI / USD
+            address(0),
+            address(0),
+            address(0),
+            address(_clOracle),
+            address(_uniOracle),
+            address(_v2Res)
+        );
+
+        _aspTKNMinOracle1Weth = new aspTKNMinimalOracle(
+            _aspTKN1WethAddress,
+            address(_mockDai), // DAI
+            false,
+            _pod1Weth.lpStakingPool(),
+            address(_v3wethDaiPool), // UniV3: WETH / DAI
             address(_daiPriceFeed), // CL: DAI / USD
             address(0),
             address(0),
@@ -529,7 +664,7 @@ contract FuzzSetup is Test, FuzzBase {
             address(_mockDai), // DAI
             false,
             _pod4.lpStakingPool(),
-            address(_v3wethDaiPool), // UniV3: PEAS / DAI
+            address(_v3wethDaiPool), // UniV3: WETH / DAI
             address(_daiPriceFeed), // CL: DAI / USD
             address(0),
             address(0),
@@ -541,29 +676,53 @@ contract FuzzSetup is Test, FuzzBase {
     }
 
     function _deployAspTKNs() internal {
-        address _lpToken1 = _pod1.lpStakingPool();
-        address _stakingToken1 = StakingPoolToken(_lpToken1).stakingToken();
+        address _lpPeas = _pod1Peas.lpStakingPool();
+        address _stakingPeas = StakingPoolToken(_lpPeas).stakingToken();
         // Approve pod LP token
-        IERC20(_stakingToken1).approve(_lpToken1, 1000);
+        IERC20(_stakingPeas).approve(_lpPeas, 1000);
         // Stake liquidity tokens for initial aspTKN deposit
-        StakingPoolToken(_lpToken1).stake(address(this), 1000);
+        StakingPoolToken(_lpPeas).stake(address(this), 1000);
         // Approve staking token for min deposit
-        IERC20(_lpToken1).approve(address(_aspTKNFactory), 1000);
+        IERC20(_lpPeas).approve(address(_aspTKNFactory), 1000);
 
         _aspTKNFactory.create(
-            "Test aspTKN1",
-            "aspTKN1",
-            _pod1,
+            "Test aspTKN1Peas",
+            "aspTKN1Peas",
+            _pod1Peas,
             _dexAdapter,
             _indexUtils,
             _rewardsWhitelist,
             _twapUtils,
             0
         );
-        _aspTKN1 = AutoCompoundingPodLp(_aspTKN1Address);
+        _aspTKN1Peas = AutoCompoundingPodLp(_aspTKN1PeasAddress);
 
         // add to array for fuzzing
-        _aspTKNs.push(_aspTKN1);
+        _aspTKNs.push(_aspTKN1Peas);
+
+        address _lpWeth = _pod1Weth.lpStakingPool();
+        address _stakingWeth = StakingPoolToken(_lpWeth).stakingToken();
+        // Approve pod LP token
+        IERC20(_stakingWeth).approve(_lpWeth, 1000);
+        // Stake liquidity tokens for initial aspTKN deposit
+        StakingPoolToken(_lpWeth).stake(address(this), 1000);
+        // Approve staking token for min deposit
+        IERC20(_lpWeth).approve(address(_aspTKNFactory), 1000);
+
+        _aspTKNFactory.create(
+            "Test aspTKN1Weth",
+            "aspTKN1Weth",
+            _pod1Weth,
+            _dexAdapter,
+            _indexUtils,
+            _rewardsWhitelist,
+            _twapUtils,
+            0
+        );
+        _aspTKN1Weth = AutoCompoundingPodLp(_aspTKN1WethAddress);
+
+        // add to array for fuzzing
+        _aspTKNs.push(_aspTKN1Weth);
 
         address _lpToken2 = _pod2.lpStakingPool();
         address _stakingToken2 = StakingPoolToken(_lpToken2).stakingToken();
@@ -617,15 +776,15 @@ contract FuzzSetup is Test, FuzzBase {
     function _deployVariableInterestRate() internal {
         // These values taken from existing Fraxlend Variable Rate Contract
         _variableInterestRate = new VariableInterestRate(
-            "[0.5 0.5@.875 5-10k] 2 days (.75-.85)",
+            "[0.5 0.2@.875 5-10k] 2 days (.75-.85)",
+            87500,
+            200000000000000000,
             75000,
             85000,
-            87500,
             158247046,
             1582470460,
             3164940920000,
-            172800,
-            500000000000000000
+            172800
         );
     }
 
@@ -677,12 +836,12 @@ contract FuzzSetup is Test, FuzzBase {
         // moving time to help out the twap
         vm.warp(block.timestamp + 1 days);
 
-        _fraxLPToken1 = FraxlendPair(
+        _fraxLPToken1Peas = FraxlendPair(
             _fraxDeployer.deploy(
                 abi.encode(
-                    address(_pod1),
-                    _aspTKN1Address, 
-                    address(_aspTKNMinOracle1), 
+                    _pod1Peas.PAIRED_LP_TOKEN(),
+                    _aspTKN1PeasAddress, 
+                    address(_aspTKNMinOracle1Peas), 
                     5000, 
                     address(_variableInterestRate), 
                     1000, 
@@ -694,13 +853,41 @@ contract FuzzSetup is Test, FuzzBase {
             )
         );
 
+        // deposit some asset
+        IERC20(_pod1Peas.PAIRED_LP_TOKEN()).approve(address(_fraxLPToken1Peas), type(uint256).max);
+        _fraxLPToken1Peas.deposit(100000 ether, address(this));
+
         // add to array for fuzzing
-        _fraxPairs.push(_fraxLPToken1);
+        _fraxPairs.push(_fraxLPToken1Peas);
+
+        _fraxLPToken1Weth = FraxlendPair(
+            _fraxDeployer.deploy(
+                abi.encode(
+                    _pod1Weth.PAIRED_LP_TOKEN(),
+                    _aspTKN1WethAddress, 
+                    address(_aspTKNMinOracle1Weth), 
+                    5000, 
+                    address(_variableInterestRate), 
+                    1000, 
+                    75000, 
+                    10000, 
+                    9000, 
+                    2000
+                )
+            )
+        );
+
+        // deposit some asset
+        IERC20(_pod1Weth.PAIRED_LP_TOKEN()).approve(address(_fraxLPToken1Weth), type(uint256).max);
+        _fraxLPToken1Weth.deposit(100000 ether, address(this));
+
+        // add to array for fuzzing
+        _fraxPairs.push(_fraxLPToken1Weth);
 
         _fraxLPToken2 = FraxlendPair(
             _fraxDeployer.deploy(
                 abi.encode(
-                    address(_pod2),
+                    _pod2.PAIRED_LP_TOKEN(),
                     _aspTKN2Address, 
                     address(_aspTKNMinOracle2), 
                     5000, 
@@ -714,13 +901,17 @@ contract FuzzSetup is Test, FuzzBase {
             )
         );
 
+        // deposit some asset
+        IERC20(_pod2.PAIRED_LP_TOKEN()).approve(address(_fraxLPToken2), type(uint256).max);
+        _fraxLPToken2.deposit(100000 ether, address(this));
+
         // add to array for fuzzing
         _fraxPairs.push(_fraxLPToken2);
 
         _fraxLPToken4 = FraxlendPair(
             _fraxDeployer.deploy(
                 abi.encode(
-                    address(_pod4),
+                    _pod4.PAIRED_LP_TOKEN(),
                     _aspTKN4Address, 
                     address(_aspTKNMinOracle4), 
                     5000, 
@@ -734,6 +925,10 @@ contract FuzzSetup is Test, FuzzBase {
             )
         );
 
+        // deposit some asset
+        IERC20(_pod4.PAIRED_LP_TOKEN()).approve(address(_fraxLPToken4), type(uint256).max);
+        _fraxLPToken4.deposit(100000 ether, address(this));
+
         // add to array for fuzzing
         _fraxPairs.push(_fraxLPToken4);
     }
@@ -745,10 +940,15 @@ contract FuzzSetup is Test, FuzzBase {
             address(_mockDai)
         );
 
-        IERC20 vaultAsset1 = IERC20(_fraxLPToken1.asset());
-        vaultAsset1.approve(address(_fraxLPToken1), vaultAsset1.totalSupply());
-        vaultAsset1.approve(address(_lendingAssetVault), vaultAsset1.totalSupply());
-        _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken1), true);
+        IERC20 vaultAsset1Peas = IERC20(_fraxLPToken1Peas.asset());
+        vaultAsset1Peas.approve(address(_fraxLPToken1Peas), vaultAsset1Peas.totalSupply());
+        vaultAsset1Peas.approve(address(_lendingAssetVault), vaultAsset1Peas.totalSupply());
+        _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken1Peas), true);
+
+        IERC20 vaultAsset1Weth = IERC20(_fraxLPToken1Weth.asset());
+        vaultAsset1Weth.approve(address(_fraxLPToken1Weth), vaultAsset1Weth.totalSupply());
+        vaultAsset1Weth.approve(address(_lendingAssetVault), vaultAsset1Weth.totalSupply());
+        _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken1Weth), true);
 
         IERC20 vaultAsset2 = IERC20(_fraxLPToken2.asset());
         vaultAsset2.approve(address(_fraxLPToken2), vaultAsset2.totalSupply());
@@ -760,17 +960,31 @@ contract FuzzSetup is Test, FuzzBase {
         vaultAsset4.approve(address(_lendingAssetVault), vaultAsset4.totalSupply());
         _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken4), true);
 
-        address[] memory vaultAddresses = new address[](3);
-        vaultAddresses[0] = address(_fraxLPToken1);
-        vaultAddresses[1] = address(_fraxLPToken2);
-        vaultAddresses[2] = address(_fraxLPToken4);
+        address[] memory vaultAddresses = new address[](4);
+        vaultAddresses[0] = address(_fraxLPToken1Peas);
+        vaultAddresses[1] = address(_fraxLPToken1Weth);
+        vaultAddresses[2] = address(_fraxLPToken2);
+        vaultAddresses[3] = address(_fraxLPToken4);
 
-        uint256[] memory percentages = new uint256[](3);
-        percentages[0] = 5000;
+        uint256[] memory percentages = new uint256[](4);
         percentages[0] = 2500;
-        percentages[0] = 2500;
+        percentages[1] = 2500;
+        percentages[2] = 2500;
+        percentages[3] = 2500;
 
         _lendingAssetVault.setVaultMaxPerc(vaultAddresses, percentages);
+    }
+
+    function _deployBalancerVault() internal {
+        _bytecode = new Bytecode();
+        if (address(this) == 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496) {
+        
+            vm.etch(0xBA12222222228d8Ba445958a75a0704d566BF2C8, _bytecode.BALANCER_VAULT_BYTECODE());
+
+            _balancerVault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+        } else {
+            _balancerVault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+        }
     }
 
     function _deployLeverageManager() internal {
@@ -779,6 +993,34 @@ contract FuzzSetup is Test, FuzzBase {
             "tLM",
             IIndexUtils_LEGACY(address(_indexUtils))
         );
+
+        _leverageManager.setLendingPair(address(_pod1Peas), address(_fraxLPToken1Peas));
+        _leverageManager.setLendingPair(address(_pod1Weth), address(_fraxLPToken1Weth));
+        _leverageManager.setLendingPair(address(_pod2), address(_fraxLPToken2));
+        _leverageManager.setLendingPair(address(_pod4), address(_fraxLPToken4));
+    }
+
+    function _deployFlashSources() internal {
+
+        // _balancerFlashSource = new BalancerFlashSource(address(_leverageManager));
+        // _podFlashSource = new PodFlashSource(
+        //     address(_pod1Peas),
+        //     address(_mockDai),
+        //     address(_leverageManager)
+        //     );
+        _uniswapV3FlashSourcePeas = new UniswapV3FlashSource(
+            address(_v3peasDaiPool),
+            address(_leverageManager)
+            );
+        _uniswapV3FlashSourceWeth = new UniswapV3FlashSource(
+            address(_v3wethDaiPool),
+            address(_leverageManager)
+            );
+
+        _leverageManager.setFlashSource(address(_pod1Peas), address(_uniswapV3FlashSourcePeas));
+        _leverageManager.setFlashSource(address(_pod1Weth), address(_uniswapV3FlashSourceWeth));
+        _leverageManager.setFlashSource(address(_pod2), address(_uniswapV3FlashSourcePeas));
+        _leverageManager.setFlashSource(address(_pod4), address(_uniswapV3FlashSourceWeth));
     }
 
     /*////////////////////////////////////////////////////////////////
