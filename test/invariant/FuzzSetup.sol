@@ -19,6 +19,7 @@ import {IndexUtils} from "../../contracts/IndexUtils.sol";
 import {IIndexUtils_LEGACY} from "../../contracts/interfaces/IIndexUtils_LEGACY.sol";
 import {MockIndexUtils} from "./mocks/MockIndexUtils.sol";
 import {RewardsWhitelist} from "../../contracts/RewardsWhitelist.sol";
+import {TokenRewards} from "../../contracts/TokenRewards.sol";
 
 // oracles
 import {ChainlinkSinglePriceOracle} from "../../contracts/oracle/ChainlinkSinglePriceOracle.sol";
@@ -62,7 +63,7 @@ import {UniswapV3Factory} from "v3-core/UniswapV3Factory.sol";
 import {UniswapV3Pool} from "v3-core/UniswapV3Pool.sol";
 
 // uniswap-v3-periphery
-import {SwapRouter} from "v3-periphery/SwapRouter.sol";
+import {SwapRouter02} from "swap-router/SwapRouter02.sol";
 import {LiquidityManagement} from "v3-periphery/base/LiquidityManagement.sol";
 import {PeripheryPayments} from "v3-periphery/base/PeripheryPayments.sol";
 import {PoolAddress} from "v3-periphery/libraries/PoolAddress.sol";
@@ -200,7 +201,7 @@ contract FuzzSetup is Test, FuzzBase {
     UniswapV3Pool internal _v3wethDaiPool;
 
     // uniswap-v3-periphery
-    SwapRouter internal _v3SwapRouter;
+    SwapRouter02 internal _v3SwapRouter;
 
     // bytecode
     Bytecode internal _bytecode;
@@ -347,7 +348,7 @@ contract FuzzSetup is Test, FuzzBase {
         _v3wethDaiPool.increaseObservationCardinalityNext(600);
 
         _uniV3Minter.V3addLiquidity(_v3wethDaiPool, 100000e18);
-        _v3SwapRouter = new SwapRouter(address(_uniV3Factory), address(_weth));
+        _v3SwapRouter = new SwapRouter02(address(_uniV2Factory), address(_uniV3Factory), address(0), address(_weth));
 
     }
 
@@ -444,7 +445,7 @@ contract FuzzSetup is Test, FuzzBase {
         uint256[] memory _w1 = new uint256[](1);
         _w1[0] = 100;
         _pod1Peas = new WeightedIndex('Weth Pod', 'pPeas', _c, _f, _t1, _w1, address(0), address(_peas), address(_dexAdapter), false);
-
+        
         // approve pod asset & pair asset
         _peas.approve(address(_pod1Peas), type(uint256).max);
         _mockDai.approve(address(_pod1Peas), type(uint256).max);

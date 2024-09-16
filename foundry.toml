@@ -9,6 +9,7 @@ ffi = true
 remappings = [
     "@chainlink/=node_modules/@chainlink/",
     "fuzzlib/=lib/fuzzlib/src/",
+    "swap-router/=test/invariant/modules/v3-periphery/swapRouter/",
     "v3-core/=test/invariant/modules/v3-core/",
     "v3-periphery/=test/invariant/modules/v3-periphery/",
     "v2-core/=test/invariant/modules/uniswap-v2/v2-core/contracts/",
