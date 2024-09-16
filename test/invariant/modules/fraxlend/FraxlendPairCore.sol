@@ -633,13 +633,13 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
         // Calculate the number of shares to burn based on the assets to transfer
         _shares = _totalAsset.toShares(_amountToReturn, true);
 
-        // Execute the withdraw effects for vault
-        // receive assets here in order to call whitelistDeposit and handle accounting in external vault
-        _redeem(_totalAsset, _amountToReturn.toUint128(), _shares.toUint128(), address(this), address(externalAssetVault), true);
-
         // Deposit assets to external vault
         assetContract.approve(address(externalAssetVault), _amountToReturn);
         externalAssetVault.whitelistDeposit(_amountToReturn);
+
+        // Execute the withdraw effects for vault
+        // receive assets here in order to call whitelistDeposit and handle accounting in external vault
+        _redeem(_totalAsset, _amountToReturn.toUint128(), _shares.toUint128(), address(this), address(externalAssetVault), true);
     }
 
     function previewMint(uint256 _shares) external view returns (uint256 _amount) {
@@ -729,7 +729,9 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
         _burn(_owner, _shares);
 
         // Interactions
-        assetContract.safeTransfer(_receiver, _amountToReturn);
+        if (_receiver != address(this)) {
+            assetContract.safeTransfer(_receiver, _amountToReturn);
+        }
         emit Withdraw(msg.sender, _receiver, _owner, _amountToReturn, _shares);
     }
 
@@ -1003,12 +1005,12 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
             assetContract.safeTransferFrom(_payer, address(this), _amountToRepay);
         }
         if (address(externalAssetVault) != address(0)) {
-             externalAssetVault.whitelistUpdate(true);
-             uint256 _externalAssetsToWithdraw = externalAssetVault.vaultUtilization(address(this));
-             if (_externalAssetsToWithdraw > 0) {
-                 uint256 _extAmount = _externalAssetsToWithdraw > _amountToRepay ? _amountToRepay : _externalAssetsToWithdraw;
-                 _withdrawToVault(_extAmount);
-             }
+            externalAssetVault.whitelistUpdate(true);
+            uint256 _externalAssetsToWithdraw = externalAssetVault.vaultUtilization(address(this));
+            if (_externalAssetsToWithdraw > 0) {
+                uint256 _extAmount = _externalAssetsToWithdraw > _amountToRepay ? _amountToRepay : _externalAssetsToWithdraw;
+                _withdrawToVault(_extAmount);
+            }
         }
         emit RepayAsset(_payer, _borrower, _amountToRepay, _shares);
     }
@@ -1029,7 +1031,7 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
 
         // Calculate amount to repay based on shares
         VaultAccount memory _totalBorrow = totalBorrow;
-        _amountToRepay = _totalBorrow.toAmount(_shares, false);
+        _amountToRepay = _totalBorrow.toAmount(_shares, true);
 
         // Execute repayment effects
         _repayAsset(_totalBorrow, _amountToRepay.toUint128(), _shares.toUint128(), msg.sender, _borrower);
@@ -1130,8 +1132,9 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
                 _sharesToAdjust = _borrowerShares - _sharesToLiquidate;
                 if (_sharesToAdjust > 0) {
                     if (address(externalAssetVault) != address(0)) {
-                       externalAssetVault.whitelistUpdate(false);
+                      externalAssetVault.whitelistUpdate(false);
                     }
+
                     // Write off bad debt
                     _amountToAdjust = (_totalBorrow.toAmount(_sharesToAdjust, false)).toUint128();
 

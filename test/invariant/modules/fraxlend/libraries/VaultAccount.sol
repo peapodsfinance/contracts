@@ -17,7 +17,7 @@ library VaultAccountingLibrary {
         if (vault == address(0)) {
           return total.amount;
         }
-        return total.amount + IERC4626Extended(vault).totalAvailableAssets();
+        return total.amount + IERC4626Extended(vault).totalAvailableAssetsForVault(address(this));
     }
 
     /// @notice Calculates the shares value in relationship to `amount` and `total`

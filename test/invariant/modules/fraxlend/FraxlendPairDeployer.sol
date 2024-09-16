@@ -243,17 +243,14 @@ contract FraxlendPairDeployer is Ownable {
         bytes memory _customConfigData
     ) private returns (address _pairAddress) {
         // Get creation code
-        emit Debug("GETTING CREATION CODE");
         bytes memory _creationCode = BytesLib.concat(SSTORE2.read(contractAddress1), SSTORE2.read(contractAddress2));
 
-        emit Debug("GETTING BYTECODE");
         // Get bytecode
         bytes memory bytecode = abi.encodePacked(
             _creationCode,
             abi.encode(_configData, _immutables, _customConfigData)
         );
 
-        emit Debug("GETTING SALT");
         // Generate salt using constructor params
         bytes32 salt = keccak256(abi.encodePacked(_configData, _immutables, _customConfigData));
 
@@ -279,8 +276,6 @@ contract FraxlendPairDeployer is Ownable {
     // Functions: External Deploy Methods
     // ============================================================================================
 
-    event Debug(string a);
-
     /// @notice The ```deploy``` function allows the deployment of a FraxlendPair with default values
     /// @param _configData abi.encode(address _asset, address _collateral, address _oracle, uint32 _maxOracleDeviation, address _rateContract, uint64 _fullUtilizationRate, uint256 _maxLTV, uint256 _cleanLiquidationFee, uint256 _dirtyLiquidationFee, uint256 _protocolLiquidationFee)
     /// @return _pairAddress The address to which the Pair was deployed
@@ -299,7 +294,6 @@ contract FraxlendPairDeployer is Ownable {
         bytes memory _immutables = abi.encode(circuitBreakerAddress, comptrollerAddress, timelockAddress);
         bytes memory _customConfigData = abi.encode(_name, _symbol, IERC20(_asset).safeDecimals());
 
-        emit Debug("ABOUT TO DEPLOY");
         _pairAddress = _deploy(_configData, _immutables, _customConfigData);
 
         IFraxlendPairRegistry(fraxlendPairRegistryAddress).addPair(_pairAddress);
