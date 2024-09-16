@@ -159,14 +159,14 @@ contract LeverageManagerHandler is Properties {
 
         collateralAmount = fl.clamp(collateralAmount, 0, IFraxlendPair(cache.lendingPair).userCollateralBalance(cache.custodian));
 
-        if (borrowAssets == 0 || borrowAssets > reserve0 || collateralAmount <= 1000) return;
+        if (borrowAssets <= 1000 || borrowAssets > reserve0 || collateralAmount <= 1000) return;
 
         if (!_solventCheckAfterRepay(
             cache.custodian,
             cache.lendingPair,
             IFraxlendPair(cache.lendingPair).userBorrowShares(cache.custodian),
             cache.repayShares,
-            IFraxlendPair(cache.lendingPair).userCollateralBalance(cache.custodian) - collateralAmount
+            IFraxlendPair(cache.lendingPair).userCollateralBalance(cache.custodian) - borrowAssets
         )) return;
 
         vm.prank(cache.user);
@@ -176,7 +176,7 @@ contract LeverageManagerHandler is Properties {
         try _leverageManager.removeLeverage(
             cache.positionId,
             borrowAssets,
-            collateralAmount,
+            borrowAssets,
             0,
             0,
             address(_dexAdapter),
