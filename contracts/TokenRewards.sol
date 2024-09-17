@@ -5,6 +5,7 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Context.sol';
+import '@openzeppelin/contracts/utils/math/Math.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
 import './interfaces/IDecentralizedIndex.sol';
 import './interfaces/IDexAdapter.sol';
@@ -52,6 +53,8 @@ contract TokenRewards is ITokenRewards, Context {
   // all deposited rewards tokens
   address[] _allRewardsTokens;
   mapping(address => bool) _depositedRewardsToken;
+
+    event Debug(string a);
 
   constructor(
     IProtocolFeeRouter _feeRouter,
@@ -230,6 +233,8 @@ contract TokenRewards is ITokenRewards, Context {
     emit DepositRewards(_msgSender(), _token, _depositAmount);
   }
 
+  event DebugUint(string a, uint256 b);
+
   function _distributeReward(address _wallet) internal {
     if (shares[_wallet] == 0) {
       return;
@@ -240,10 +245,13 @@ contract TokenRewards is ITokenRewards, Context {
       rewards[_token][_wallet].realized += _amount;
       rewards[_token][_wallet].excluded = _cumulativeRewards(
         _token,
-        shares[_wallet]
+        shares[_wallet],
+        Math.Rounding.Up
       );
       if (_amount > 0) {
         rewardsDistributed[_token] += _amount;
+        emit Debug("WE ARE HERE");
+        emit DebugUint("PEAS BALANCE", IERC20(_token).balanceOf(address(this)));
         IERC20(_token).safeTransfer(_wallet, _amount);
         emit DistributeReward(_wallet, _token, _amount);
       }
@@ -255,7 +263,8 @@ contract TokenRewards is ITokenRewards, Context {
       address _token = _allRewardsTokens[_i];
       rewards[_token][_wallet].excluded = _cumulativeRewards(
         _token,
-        shares[_wallet]
+        shares[_wallet],
+        Math.Rounding.Up
       );
     }
   }
@@ -350,7 +359,7 @@ contract TokenRewards is ITokenRewards, Context {
     if (shares[_wallet] == 0) {
       return 0;
     }
-    uint256 earnedRewards = _cumulativeRewards(_token, shares[_wallet]);
+    uint256 earnedRewards = _cumulativeRewards(_token, shares[_wallet], Math.Rounding.Down);
     uint256 rewardsExcluded = rewards[_token][_wallet].excluded;
     if (earnedRewards <= rewardsExcluded) {
       return 0;
@@ -360,8 +369,12 @@ contract TokenRewards is ITokenRewards, Context {
 
   function _cumulativeRewards(
     address _token,
-    uint256 _share
+    uint256 _share,
+    Math.Rounding rounding
   ) internal view returns (uint256) {
-    return (_share * _rewardsPerShare[_token]) / PRECISION;
+
+    return Math.mulDiv(_share, _rewardsPerShare[_token], PRECISION, rounding);
+
+    // return (_share * _rewardsPerShare[_token]) / PRECISION;
   }
 }

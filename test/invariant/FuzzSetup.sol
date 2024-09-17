@@ -392,8 +392,18 @@ contract FuzzSetup is Test, FuzzBase {
             vm.etch(0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F, code);
 
             _rewardsWhitelist = RewardsWhitelist(0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F);
+            
+            vm.prank(_rewardsWhitelist.owner());
+            _rewardsWhitelist.transferOwnership(address(this));
+
+            _rewardsWhitelist.toggleRewardsToken(address(_peas), true);
         } else {
             _rewardsWhitelist = RewardsWhitelist(0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F);
+
+            vm.prank(_rewardsWhitelist.owner());
+            _rewardsWhitelist.transferOwnership(address(this));
+
+            _rewardsWhitelist.toggleRewardsToken(address(_peas), true);
         }
     }
 
@@ -1090,5 +1100,9 @@ contract FuzzSetup is Test, FuzzBase {
                 break;
             }
         }
+    }
+
+    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 }

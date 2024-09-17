@@ -46,8 +46,23 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try cache.aspTKN.deposit(assets, cache.receiver) {} catch {
-            fl.t(false, "DEPOSIT FAILED");
+        try cache.aspTKN.deposit(assets, cache.receiver) {} catch Error(string memory reason) {
+            
+            string[2] memory stringErrors = [
+                "UniswapV2: INSUFFICIENT_A_AMOUNT",
+                "UniswapV2: INSUFFICIENT_B_AMOUNT"
+            ];
+
+            bool expected = false;
+            for (uint256 i = 0; i < stringErrors.length; i++) {
+                if (compareStrings(stringErrors[i], reason)) {
+                    expected = true;
+                    fl.t(
+                        expected,
+                        stringErrors[i]
+                    );
+                }
+            }
         }
     }
 
@@ -80,8 +95,73 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try cache.aspTKN.mint(shares, cache.receiver) {} catch {
-            fl.t(false, "MINT FAILED");
+        try cache.aspTKN.mint(shares, cache.receiver) {} catch Error(string memory reason) {
+            
+            string[2] memory stringErrors = [
+                "UniswapV2: INSUFFICIENT_A_AMOUNT",
+                "UniswapV2: INSUFFICIENT_B_AMOUNT"
+            ];
+
+            bool expected = false;
+            for (uint256 i = 0; i < stringErrors.length; i++) {
+                if (compareStrings(stringErrors[i], reason)) {
+                    expected = true;
+                    fl.t(
+                        expected,
+                        stringErrors[i]
+                    );
+                }
+            }
+        }
+    }
+
+    struct WithdrawTemps {
+        address user;
+        address receiver;
+        address aspTKNAsset;
+        address aspTKNAddress;
+        uint256 assets;
+        AutoCompoundingPodLp aspTKN;
+    }
+
+    function aspTKN_withdraw(uint256 userIndexSeed, uint256 receiverIndexSeed, uint256 aspTKNSeed, uint256 assets) public {
+
+        // PRE-CONDITIONS
+        WithdrawTemps memory cache;
+        cache.user = randomAddress(userIndexSeed);
+        cache.receiver = randomAddress(receiverIndexSeed);
+        cache.aspTKN = randomAspTKN(aspTKNSeed);
+        cache.aspTKNAddress = address(cache.aspTKN);
+        cache.aspTKNAsset = cache.aspTKN.asset();
+
+        assets = fl.clamp(assets, 0, cache.aspTKN.maxWithdraw(cache.user));
+        if (assets == 0 || cache.aspTKN.convertToShares(assets) == 0) return;
+
+        uint256 FACTOR = 10 ** 18;
+
+        fl.log("ASSETS", assets);
+        fl.log("FACTOR", FACTOR);
+        fl.log("CBR", cache.aspTKN._cbr());
+
+        // ACTION
+        vm.prank(cache.user);
+        try cache.aspTKN.withdraw(assets, cache.receiver, address(0)) {} catch Error(string memory reason) {
+            
+            string[2] memory stringErrors = [
+                "UniswapV2: INSUFFICIENT_A_AMOUNT",
+                "UniswapV2: INSUFFICIENT_B_AMOUNT"
+            ];
+
+            bool expected = false;
+            for (uint256 i = 0; i < stringErrors.length; i++) {
+                if (compareStrings(stringErrors[i], reason)) {
+                    expected = true;
+                    fl.t(
+                        expected,
+                        stringErrors[i]
+                    );
+                }
+            }
         }
     }
 }

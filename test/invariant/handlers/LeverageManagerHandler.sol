@@ -3,18 +3,24 @@ pragma solidity ^0.8.19;
 
 import {Properties} from "../helpers/Properties.sol";
 
+import {FuzzLibString} from "fuzzlib/FuzzLibString.sol";
+
 import {WeightedIndex} from "../../../contracts/WeightedIndex.sol";
 import {IDecentralizedIndex} from "../../../contracts/interfaces/IDecentralizedIndex.sol";
 import {LeveragePositions} from "../../../contracts/lvf/LeveragePositions.sol";
 import {ILeverageManager} from "../../../contracts/interfaces/ILeverageManager.sol";
 import {IFlashLoanSource} from "../../../contracts/interfaces/IFlashLoanSource.sol";
+import {AutoCompoundingPodLp} from "../../../contracts/AutoCompoundingPodLp.sol";
 
 import {IUniswapV2Pair} from "uniswap-v2/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import {FullMath} from "v3-core/libraries/FullMath.sol";
+import {Math} from "v2-core/libraries/Math.sol";
 
 import {VaultAccount, VaultAccountingLibrary} from "../modules/fraxlend/libraries/VaultAccount.sol";
 import {IFraxlendPair} from "../modules/fraxlend/interfaces/IFraxlendPair.sol";
 import {FraxlendPair} from "../modules/fraxlend/FraxlendPair.sol";
+import {FraxlendPairCore} from "../modules/fraxlend/FraxlendPairCore.sol";
+import {FraxlendPairConstants} from "../modules/fraxlend/FraxlendPairConstants.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract LeverageManagerHandler is Properties {
@@ -49,8 +55,10 @@ contract LeverageManagerHandler is Properties {
         address lendingPair;
         uint256 fraxAssetsAvailable;
         address custodian;
-        address selfLendingPod;
+        uint256 pairTotalSupply;
+        uint256 liquidityMinted;
         WeightedIndex pod;
+        AutoCompoundingPodLp aspTKN;
         address flashSource;
         address flashPaymentToken;
     }
@@ -62,9 +70,10 @@ contract LeverageManagerHandler is Properties {
         cache.positionNFT = _leverageManager.positionNFT();
         cache.positionId = fl.clamp(positionIdSeed, 0, cache.positionNFT.totalSupply());
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
-        (cache.podAddress, cache.lendingPair, cache.custodian, cache.selfLendingPod) = _leverageManager.positionProps(cache.positionId);
+        (cache.podAddress, cache.lendingPair, cache.custodian,) = _leverageManager.positionProps(cache.positionId);
         cache.pod = WeightedIndex(payable(cache.podAddress));
         cache.flashSource = _leverageManager.flashSource(cache.podAddress);
+        cache.aspTKN = AutoCompoundingPodLp(IFraxlendPair(cache.lendingPair).collateralContract());
 
         podAmount = fl.clamp(podAmount, 0, cache.pod.balanceOf(cache.user));
         if (podAmount < 1e14) return;
@@ -107,8 +116,38 @@ contract LeverageManagerHandler is Properties {
                 "USER ASSET BALANCE", 
                 _borrowAssetssToRepay
             );
-        } catch {
-            fl.t(false, "ADD LEVERAGE FAILED");
+        } catch (bytes memory err) {
+            bytes4[1] memory errors =
+                [FraxlendPairConstants.Insolvent.selector];
+            fl.log("ERROR", errors[0]);
+            fl.log("SELECTOR", bytes4(err));
+            bool expected = false;
+            for (uint256 i = 0; i < errors.length; i++) {
+                if (errors[i] == bytes4(err)) {
+                    expected = true;
+                    fl.log("EXPECTED", expected);
+                    break;
+                }
+            }
+            fl.t(expected, FuzzLibString.getRevertMsg(err));
+            // return;
+        } catch Error(string memory reason) {
+            
+            string[2] memory stringErrors = [
+                "UniswapV2: INSUFFICIENT_A_AMOUNT",
+                "UniswapV2: INSUFFICIENT_B_AMOUNT"
+            ];
+
+            bool expected = false;
+            for (uint256 i = 0; i < stringErrors.length; i++) {
+                if (compareStrings(stringErrors[i], reason)) {
+                    expected = true;
+                    fl.t(
+                        expected,
+                        stringErrors[i]
+                    );
+                }
+            }
         }
     }
 
@@ -181,8 +220,23 @@ contract LeverageManagerHandler is Properties {
             0,
             address(_dexAdapter),
             borrowAssets + feeAmount
-        ) {} catch {
-            fl.t(false, "ADD LEVERAGE FAILED");
+        ) {} catch Error(string memory reason) {
+            
+            string[2] memory stringErrors = [
+                "UniswapV2: INSUFFICIENT_A_AMOUNT",
+                "UniswapV2: INSUFFICIENT_B_AMOUNT"
+            ];
+
+            bool expected = false;
+            for (uint256 i = 0; i < stringErrors.length; i++) {
+                if (compareStrings(stringErrors[i], reason)) {
+                    expected = true;
+                    fl.t(
+                        expected,
+                        stringErrors[i]
+                    );
+                }
+            }
         }
     }
 
@@ -202,5 +256,15 @@ contract LeverageManagerHandler is Properties {
         isSolvent = true;
         uint256 _ltv = (((sharesAfterRepay * highExchangeRate) / FraxlendPair(lendingPair).EXCHANGE_PRECISION()) * FraxlendPair(lendingPair).LTV_PRECISION()) / _collateralAmount;
         isSolvent = _ltv <= FraxlendPair(lendingPair).maxLTV();
+    }
+
+    function _calculateLiquidity(
+        uint112 _reserve0,
+        uint112 _reserve1,
+        uint256 amount0,
+        uint256 amount1,
+        uint256 _totalSupply
+        ) internal returns (uint256) {
+        return Math.min((amount0 * _totalSupply) / _reserve0, (amount1 * _totalSupply) / _reserve1);
     }
 }

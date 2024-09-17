@@ -1031,7 +1031,7 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
 
         // Calculate amount to repay based on shares
         VaultAccount memory _totalBorrow = totalBorrow;
-        _amountToRepay = _totalBorrow.toAmount(_shares, true);
+        _amountToRepay = _totalBorrow.toAmount(_shares, false);
 
         // Execute repayment effects
         _repayAsset(_totalBorrow, _amountToRepay.toUint128(), _shares.toUint128(), msg.sender, _borrower);
