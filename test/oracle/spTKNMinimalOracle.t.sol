@@ -230,10 +230,23 @@ contract spTKNMinimalOracleTest is Test {
         _w,
         _pairedLpToken,
         0x02f92800F57BCD74066F5709F1Daa1A4302Df875,
-        _dexAdapter,
-        false
+        false,
+        _getImmutables(_dexAdapter)
       )
     );
+  }
+
+  function _getImmutables(
+    address _dexAdapter
+  ) internal pure returns (bytes memory) {
+    return
+      abi.encode(
+        0x6B175474E89094C44Da98b954EedeAC495271d0F,
+        0x7d544DD34ABbE24C8832db27820Ff53C151e949b,
+        0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F,
+        0x024ff47D552cB222b265D68C7aeB26E586D5229D,
+        _dexAdapter
+      );
   }
 
   function _getPodFees(

@@ -53,6 +53,38 @@ contract AutoCompoundingPodLpTest is Test {
     mockPod.setLpRewardsToken(address(rewardToken1));
   }
 
+  function testConvertToShares() public view {
+    uint256 assets = 1000 * 1e18;
+    uint256 shares = autoCompoundingPodLp.convertToShares(assets);
+    assertEq(shares, assets);
+  }
+
+  function testConvertToAssets() public view {
+    uint256 shares = 1000 * 1e18;
+    uint256 assets = autoCompoundingPodLp.convertToAssets(shares);
+    assertEq(assets, shares);
+  }
+
+  function testSetYieldConvEnabled() public {
+    assertEq(autoCompoundingPodLp.yieldConvEnabled(), true);
+
+    autoCompoundingPodLp.setYieldConvEnabled(false);
+    assertEq(autoCompoundingPodLp.yieldConvEnabled(), false);
+
+    autoCompoundingPodLp.setYieldConvEnabled(true);
+    assertEq(autoCompoundingPodLp.yieldConvEnabled(), true);
+  }
+
+  function testSetProtocolFee() public {
+    assertEq(autoCompoundingPodLp.protocolFee(), 50);
+
+    autoCompoundingPodLp.setProtocolFee(100);
+    assertEq(autoCompoundingPodLp.protocolFee(), 100);
+
+    vm.expectRevert(bytes('MAX'));
+    autoCompoundingPodLp.setProtocolFee(1001);
+  }
+
   function testProcessAllRewardsTokensToPodLp() public {
     // Mock the necessary functions and set up the test scenario
     address[] memory rewardTokens = new address[](2);

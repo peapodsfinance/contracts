@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import '@openzeppelin/contracts/interfaces/IERC20.sol';
 import { Test, console2 } from 'forge-std/Test.sol';
 import { PEAS } from '../contracts/PEAS.sol';
 import { V3TwapUtilities } from '../contracts/twaputils/V3TwapUtilities.sol';
 import { UniswapDexAdapter } from '../contracts/dex/UniswapDexAdapter.sol';
 import { IDecentralizedIndex } from '../contracts/interfaces/IDecentralizedIndex.sol';
+import { IStakingPoolToken } from '../contracts/interfaces/IStakingPoolToken.sol';
 import { WeightedIndex } from '../contracts/WeightedIndex.sol';
+import 'forge-std/console.sol';
 
 contract WeightedIndexTest is Test {
   PEAS public peas;
@@ -14,16 +17,17 @@ contract WeightedIndexTest is Test {
   UniswapDexAdapter public dexAdapter;
   WeightedIndex public pod;
 
+  address public dai = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
   uint256 public bondAmt = 1e18;
   uint16 fee = 100;
 
   function setUp() public {
-    peas = new PEAS('Peapods', 'PEAS');
+    peas = PEAS(0x02f92800F57BCD74066F5709F1Daa1A4302Df875);
     twapUtils = new V3TwapUtilities();
     dexAdapter = new UniswapDexAdapter(
       twapUtils,
-      0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D,
-      0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45,
+      0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, // Uniswap V2 Router
+      0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45, // Uniswap SwapRouter02
       false
     );
     IDecentralizedIndex.Config memory _c;
@@ -41,11 +45,20 @@ contract WeightedIndexTest is Test {
       _f,
       _t,
       _w,
-      address(0),
+      dai,
       address(peas),
-      address(dexAdapter),
-      false
+      false,
+      abi.encode(
+        0x6B175474E89094C44Da98b954EedeAC495271d0F,
+        0x7d544DD34ABbE24C8832db27820Ff53C151e949b,
+        0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F,
+        0x024ff47D552cB222b265D68C7aeB26E586D5229D,
+        dexAdapter
+      )
     );
+
+    deal(address(peas), address(this), bondAmt * 100);
+    deal(dai, address(this), 5 * 10e18);
   }
 
   function test_symbol() public view {
@@ -83,5 +96,50 @@ contract WeightedIndexTest is Test {
     uint8[] memory _n2;
     pod.debond(bondAmt / 2, _n1, _n2);
     assertEq(pod.totalSupply(), bondAmt / 2 + ((bondAmt / 2) * fee) / 10000);
+  }
+
+  function test_addLiquidityV2AndStake() public {
+    (, uint256 uniBal, uint256 spTknBal) = _addLp();
+    assertEq(pod.totalSupply(), bondAmt);
+    assertEq(spTknBal, uniBal);
+  }
+
+  function test_addLpStakeAndProcessRewards() public {
+    (address spTkn, , ) = _addLp();
+    address tknRew = IStakingPoolToken(spTkn).poolRewards();
+    assertEq(pod.totalSupply(), bondAmt);
+    assertEq(peas.balanceOf(tknRew), 0);
+
+    pod.bond(address(peas), bondAmt, 0);
+    pod.transfer(address(pod), pod.balanceOf(address(this)));
+    // 2nd time to trigger rewards
+    pod.transfer(address(pod), pod.balanceOf(address(this)));
+
+    console.log('Token rewards balance:', peas.balanceOf(tknRew));
+    assertGt(peas.balanceOf(tknRew), 0);
+  }
+
+  function _addLp()
+    internal
+    returns (address spTkn, uint256 uniBal, uint256 spTknBal)
+  {
+    peas.approve(address(pod), peas.totalSupply());
+    pod.bond(address(peas), bondAmt, 0);
+
+    IERC20(dai).approve(address(pod), IERC20(dai).balanceOf(address(this)));
+    pod.addLiquidityV2(
+      pod.balanceOf(address(this)),
+      IERC20(dai).balanceOf(address(this)),
+      1000,
+      block.timestamp
+    );
+
+    address spTknUniTkn = dexAdapter.getV2Pool(address(pod), dai);
+    spTkn = pod.lpStakingPool();
+    uniBal = IERC20(spTknUniTkn).balanceOf(address(this));
+
+    IERC20(spTknUniTkn).approve(spTkn, uniBal);
+    IStakingPoolToken(spTkn).stake(address(this), uniBal);
+    spTknBal = IERC20(spTkn).balanceOf(address(this));
   }
 }

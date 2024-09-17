@@ -22,19 +22,17 @@ abstract contract DecentralizedIndex is
 
   uint16 constant DEN = 10000;
   uint8 constant SWAP_DELAY = 20; // seconds
-  address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-  IProtocolFeeRouter constant PROTOCOL_FEE_ROUTER =
-    IProtocolFeeRouter(0x7d544DD34ABbE24C8832db27820Ff53C151e949b);
-  IRewardsWhitelister constant REWARDS_WHITELIST =
-    IRewardsWhitelister(0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F);
-  IV3TwapUtilities constant V3_TWAP_UTILS =
-    IV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D);
+
+  IProtocolFeeRouter immutable PROTOCOL_FEE_ROUTER;
+  IRewardsWhitelister immutable REWARDS_WHITELIST;
+  IDexAdapter public immutable DEX_HANDLER;
+  IV3TwapUtilities immutable V3_TWAP_UTILS;
 
   uint256 public immutable override FLASH_FEE_AMOUNT_DAI; // 10 DAI
   address public immutable override PAIRED_LP_TOKEN;
-  IDexAdapter public immutable DEX_HANDLER;
   address immutable V2_ROUTER;
   address immutable V3_ROUTER;
+  address immutable DAI;
   address immutable WETH;
   address V2_POOL;
 
@@ -91,8 +89,8 @@ abstract contract DecentralizedIndex is
     Fees memory _fees,
     address _pairedLpToken,
     address _lpRewardsToken,
-    address _dexHandler,
-    bool _stakeRestriction
+    bool _stakeRestriction,
+    bytes memory _immutables
   ) ERC20(_name, _symbol) ERC20Permit(_name) {
     require(_fees.buy <= (uint256(DEN) * 20) / 100);
     require(_fees.sell <= (uint256(DEN) * 20) / 100);
@@ -106,7 +104,19 @@ abstract contract DecentralizedIndex is
     fees = _fees;
     config = _config;
     lpRewardsToken = _lpRewardsToken;
-    DEX_HANDLER = IDexAdapter(_dexHandler);
+
+    (
+      address _dai,
+      address _feeRouter,
+      address _rewardsWhitelister,
+      address _v3TwapUtils,
+      address _dexAdapter
+    ) = abi.decode(_immutables, (address, address, address, address, address));
+    DAI = _dai;
+    PROTOCOL_FEE_ROUTER = IProtocolFeeRouter(_feeRouter);
+    REWARDS_WHITELIST = IRewardsWhitelister(_rewardsWhitelister);
+    V3_TWAP_UTILS = IV3TwapUtilities(_v3TwapUtils);
+    DEX_HANDLER = IDexAdapter(_dexAdapter);
     address _v2Router = DEX_HANDLER.V2_ROUTER();
     V2_ROUTER = _v2Router;
     V3_ROUTER = DEX_HANDLER.V3_ROUTER();
@@ -131,7 +141,7 @@ abstract contract DecentralizedIndex is
     if (!DEX_HANDLER.ASYNC_INITIALIZE()) {
       _initialize();
     }
-    WETH = IDexAdapter(_dexHandler).WETH();
+    WETH = IDexAdapter(_dexAdapter).WETH();
     emit Create(address(this), _msgSender());
   }
 

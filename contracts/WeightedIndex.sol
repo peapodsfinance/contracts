@@ -22,8 +22,8 @@ contract WeightedIndex is DecentralizedIndex {
     uint256[] memory _weights,
     address _pairedLpToken,
     address _lpRewardsToken,
-    address _dexHandler,
-    bool _stakeRestriction
+    bool _stakeRestriction,
+    bytes memory _immutables
   )
     DecentralizedIndex(
       _name,
@@ -33,8 +33,8 @@ contract WeightedIndex is DecentralizedIndex {
       _fees,
       _pairedLpToken,
       _lpRewardsToken,
-      _dexHandler,
-      _stakeRestriction
+      _stakeRestriction,
+      _immutables
     )
   {
     require(_tokens.length == _weights.length, 'V');
@@ -56,7 +56,11 @@ contract WeightedIndex is DecentralizedIndex {
       _isTokenInIndex[_tokens[_i]] = true;
 
       if (_config.blacklistTKNpTKNPoolV2 && _tokens[_i] != _pairedLpToken) {
-        address _blkPool = IDexAdapter(_dexHandler).createV2Pool(
+        (, , , , address _dexAdapter) = abi.decode(
+          _immutables,
+          (address, address, address, address, address)
+        );
+        address _blkPool = IDexAdapter(_dexAdapter).createV2Pool(
           address(this),
           _tokens[_i]
         );

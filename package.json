@@ -11,6 +11,7 @@
   "author": "Lance Whatley",
   "license": "MIT",
   "devDependencies": {
+    "@chainlink/contracts": "^0.4.2",
     "@chainlink/contracts-ccip": "^1.2.1",
     "@nomicfoundation/hardhat-foundry": "^1.1.2",
     "@nomiclabs/hardhat-ethers": "^2.2.3",
