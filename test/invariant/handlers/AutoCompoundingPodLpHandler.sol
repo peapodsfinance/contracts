@@ -139,10 +139,6 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         uint256 FACTOR = 10 ** 18;
 
-        fl.log("ASSETS", assets);
-        fl.log("FACTOR", FACTOR);
-        fl.log("CBR", cache.aspTKN._cbr());
-
         // ACTION
         vm.prank(cache.user);
         try cache.aspTKN.withdraw(assets, cache.receiver, address(0)) {} catch Error(string memory reason) {
