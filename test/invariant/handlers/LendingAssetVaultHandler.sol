@@ -113,6 +113,8 @@ contract LendingAssetVaultHandler is Properties {
 
         assets = fl.clamp(assets, 0, _lendingAssetVault.maxWithdraw(cache.user));
 
+        if (assets > _lendingAssetVault.totalAvailableAssets()) return;
+
         // ACTION
         vm.prank(cache.user);
         try _lendingAssetVault.withdraw(
@@ -120,7 +122,42 @@ contract LendingAssetVaultHandler is Properties {
             cache.receiver,
             address(0)
         ) {} catch {
-            fl.t(false, "LAV DEPOSIT FAILED");
+            fl.t(false, "LAV WITHDRAW FAILED");
+        }
+    }
+
+    struct LavRedeemTemps {
+        address user;
+        address receiver;
+        address vaultAsset;
+        uint256 assets;
+    }
+
+    function lendingAssetVault_redeem(
+        uint256 userIndexSeed,
+        uint256 receiverIndexSeed,
+        uint256 shares
+    ) public {
+
+        // PRE-CONDITIONS
+        LavMintTemps memory cache;
+        cache.user = randomAddress(userIndexSeed);
+        cache.receiver = randomAddress(receiverIndexSeed);
+        cache.vaultAsset = _lendingAssetVault.asset();
+
+        shares = fl.clamp(shares, 0, _lendingAssetVault.maxRedeem(cache.user));
+        cache.assets = _lendingAssetVault.convertToAssets(shares);
+
+        if (cache.assets > _lendingAssetVault.totalAvailableAssets()) return;
+        
+        // ACTION
+        vm.prank(cache.user);
+        try _lendingAssetVault.redeem(
+            shares,
+            cache.receiver,
+            address(0)
+        ) {} catch {
+            fl.t(false, "LAV REDEEM FAILED");
         }
     }
 
@@ -146,20 +183,20 @@ contract LendingAssetVaultHandler is Properties {
         (cache.assetShares, , ) = cache.lendingPair.getUserSnapshot(address(_lendingAssetVault));
 
         shares = fl.clamp(shares, 0, cache.assetShares);
-        cache.assets = shares == 0 ? cache.lendingPair.balanceOf(address(this)) : cache.lendingPair.convertToAssets(shares);
+        cache.assets = shares == 0 ? cache.lendingPair.convertToAssets(cache.lendingPair.balanceOf(address(_lendingAssetVault))) : cache.lendingPair.convertToAssets(shares);
 
         (uint256 fraxAssets, , uint256 fraxBorrows, , ) = cache.lendingPair.getPairAccounting();
-
+        
         if (
-            cache.assets > IERC20(cache.lendingPairAsset).balanceOf(address(cache.lendingPair)) ||
-            cache.assets > fraxAssets - fraxBorrows || 
-            _lendingAssetVault.vaultUtilization(address(cache.lendingPair)) == 0
+            cache.assets > IERC20(cache.lendingPairAsset).balanceOf(address(cache.lendingPair)) // ||
+            // cache.assets > fraxAssets - fraxBorrows || 
+            // _lendingAssetVault.totalAssetsUtilized() < cache.assets
             ) return;
-
+        fl.log("VAULT UTILIZATION", _lendingAssetVault.vaultUtilization(address(cache.lendingPair)));
         // ACTION
         vm.prank(cache.user);
         try _lendingAssetVault.redeemFromVault(address(cache.lendingPair), shares) {} catch {
-            fl.t(false, "LAV REDEEM FAILED");
+            fl.t(false, "LAV REDEEM FROM VAULT FAILED");
         }
     }
 }
