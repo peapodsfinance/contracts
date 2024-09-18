@@ -44,6 +44,7 @@ import {FraxlendWhitelist} from "./modules/fraxlend/FraxlendWhitelist.sol";
 import {FraxlendPairRegistry} from "./modules/fraxlend/FraxlendPairRegistry.sol";
 import {FraxlendPair} from "./modules/fraxlend/FraxlendPair.sol";
 import {VariableInterestRate} from "./modules/fraxlend/VariableInterestRate.sol";
+import {IERC4626Extended} from "./modules/fraxlend/interfaces/IERC4626Extended.sol";
 
 // flash
 import {IVault} from "./modules/balancer/interfaces/IVault.sol";
@@ -888,6 +889,10 @@ contract FuzzSetup is Test, FuzzBase {
             )
         );
 
+        // set external access vault
+        vm.prank(timelock);
+        _fraxLPToken1Weth.setExternalAssetVault(IERC4626Extended(address(_lendingAssetVault)));
+
         // deposit some asset
         IERC20(_pod1Weth.PAIRED_LP_TOKEN()).approve(address(_fraxLPToken1Weth), type(uint256).max);
         _fraxLPToken1Weth.deposit(100000 ether, address(this));
@@ -911,6 +916,10 @@ contract FuzzSetup is Test, FuzzBase {
                 )
             )
         );
+
+        // set external access vault
+        vm.prank(timelock);
+        _fraxLPToken2.setExternalAssetVault(IERC4626Extended(address(_lendingAssetVault)));
 
         // deposit some asset
         IERC20(_pod2.PAIRED_LP_TOKEN()).approve(address(_fraxLPToken2), type(uint256).max);
@@ -936,6 +945,10 @@ contract FuzzSetup is Test, FuzzBase {
             )
         );
 
+        // set external access vault
+        vm.prank(timelock);
+        _fraxLPToken4.setExternalAssetVault(IERC4626Extended(address(_lendingAssetVault)));
+
         // deposit some asset
         IERC20(_pod4.PAIRED_LP_TOKEN()).approve(address(_fraxLPToken4), type(uint256).max);
         _fraxLPToken4.deposit(100000 ether, address(this));
@@ -956,20 +969,36 @@ contract FuzzSetup is Test, FuzzBase {
         vaultAsset1Peas.approve(address(_lendingAssetVault), vaultAsset1Peas.totalSupply());
         _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken1Peas), true);
 
+        // set external access vault for fraxLendingPair
+        vm.prank(timelock);
+        _fraxLPToken1Peas.setExternalAssetVault(IERC4626Extended(address(_lendingAssetVault)));
+
         IERC20 vaultAsset1Weth = IERC20(_fraxLPToken1Weth.asset());
         vaultAsset1Weth.approve(address(_fraxLPToken1Weth), vaultAsset1Weth.totalSupply());
         vaultAsset1Weth.approve(address(_lendingAssetVault), vaultAsset1Weth.totalSupply());
         _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken1Weth), true);
+
+        // set external access vault
+        vm.prank(timelock);
+        _fraxLPToken1Weth.setExternalAssetVault(IERC4626Extended(address(_lendingAssetVault)));
 
         IERC20 vaultAsset2 = IERC20(_fraxLPToken2.asset());
         vaultAsset2.approve(address(_fraxLPToken2), vaultAsset2.totalSupply());
         vaultAsset2.approve(address(_lendingAssetVault), vaultAsset2.totalSupply());
         _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken2), true);
 
+        // set external access vault
+        vm.prank(timelock);
+        _fraxLPToken2.setExternalAssetVault(IERC4626Extended(address(_lendingAssetVault)));
+
         IERC20 vaultAsset4 = IERC20(_fraxLPToken4.asset());
         vaultAsset4.approve(address(_fraxLPToken4), vaultAsset4.totalSupply());
         vaultAsset4.approve(address(_lendingAssetVault), vaultAsset4.totalSupply());
         _lendingAssetVault.setVaultWhitelist(address(_fraxLPToken4), true);
+
+        // set external access vault
+        vm.prank(timelock);
+        _fraxLPToken4.setExternalAssetVault(IERC4626Extended(address(_lendingAssetVault)));
 
         address[] memory vaultAddresses = new address[](4);
         vaultAddresses[0] = address(_fraxLPToken1Peas);
