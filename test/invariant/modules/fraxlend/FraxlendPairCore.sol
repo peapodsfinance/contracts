@@ -273,6 +273,9 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
         uint256 newFullUtilizationRate
     );
 
+    event Debug(string a);
+    event DebugUint(string a, uint256);
+
     /// @notice The ```addInterest``` function is a public implementation of _addInterest and allows 3rd parties to trigger interest accrual
     /// @return _interestEarned The amount of interest accrued by all borrowers
     /// @return _feesAmount The amount of fees paid to protocol

@@ -8,6 +8,8 @@ import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './interfaces/ILendingAssetVault.sol';
 
+import '../test/invariant/modules/fraxlend/interfaces/IFraxlendPair.sol';
+
 interface IVaultInterestUpdate {
   function addInterest(bool) external;
 }
@@ -301,13 +303,14 @@ contract LendingAssetVault is
       : ((PRECISION * _vaultWhitelistCbr[_vault]) / _prevVaultCbr) - PRECISION;
 
     uint256 _currentAssetsUtilized = vaultUtilization[_vault];
-    vaultUtilization[_vault] = _prevVaultCbr > _vaultWhitelistCbr[_vault]
-      ? _currentAssetsUtilized -
-        (_currentAssetsUtilized * _vaultAssetRatioChange) /
-        PRECISION
-      : _currentAssetsUtilized +
-        (_currentAssetsUtilized * _vaultAssetRatioChange) /
-        PRECISION;
+    // vaultUtilization[_vault] = _prevVaultCbr > _vaultWhitelistCbr[_vault]
+    //   ? _currentAssetsUtilized -
+    //     (_currentAssetsUtilized * _vaultAssetRatioChange) /
+    //     PRECISION
+    //   : _currentAssetsUtilized +
+    //     (_currentAssetsUtilized * _vaultAssetRatioChange) /
+    //     PRECISION;
+    vaultUtilization[_vault] = IFraxlendPair(_vault).previewMint(IERC20(_vault).balanceOf(address(this)));
     _totalAssetsUtilized =
       _totalAssetsUtilized -
       _currentAssetsUtilized +

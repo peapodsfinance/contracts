@@ -302,6 +302,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
     event MessageUint(string a, uint256 b);
     event MessageUint160(string a, uint160 b);
     event MessageUint128(string a, int128 b);
+    event MessageBool(string a, bool b);
 
     /// @dev Effect some changes to a position
     /// @param params the position details and the change to the position's liquidity to effect
@@ -627,6 +628,8 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
 
         Slot0 memory slot0Start = slot0;
 
+        emit MessageBool("UNLOCKED", slot0Start.unlocked);
+
         require(slot0Start.unlocked, 'LOK');
         require(
             zeroForOne
@@ -815,6 +818,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
         }
 
         emit Swap(msg.sender, recipient, amount0, amount1, state.sqrtPriceX96, state.liquidity, state.tick);
+        emit MessageBool("UNLOCKED", slot0.unlocked);
         slot0.unlocked = true;
     }
 
@@ -825,6 +829,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
         uint256 amount1,
         bytes calldata data
     ) external override lock noDelegateCall {
+        emit Message("LOCKED");
         uint128 _liquidity = liquidity;
         require(_liquidity > 0, 'L');
 

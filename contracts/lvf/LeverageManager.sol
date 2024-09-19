@@ -344,6 +344,10 @@ contract LeverageManager is
     emit AddLeverage(_props.positionId, _props.user);
   }
 
+  event Debug(string a);
+  event DebugUint(string a, uint256 b);
+  event DebugBool(string a, bool b);
+
   function _removeLeverage(
     bytes memory _userData
   ) internal returns (uint256 _podAmtRemaining, uint256 _borrowAmtRemaining) {
@@ -381,6 +385,8 @@ contract LeverageManager is
       _pairedAssetAmtMin
     );
     _podAmtRemaining = _podAmtReceived;
+
+    emit Debug("HERE");
 
     // redeem borrow asset from lending pair for self lending positions
     if (_isSelfLendingAndOrPodded(_props.pod)) {
@@ -448,6 +454,10 @@ contract LeverageManager is
     uint256 _userProvidedDebtAmtMax
   ) internal returns (uint256 _podAmtRemaining) {
     _podAmtRemaining = _podAmtReceived;
+
+    emit DebugUint("_repayAmount", _repayAmount);
+    emit DebugUint("_pairedAmtReceived", _pairedAmtReceived);
+
     uint256 _borrowNeeded = _repayAmount - _pairedAmtReceived;
     uint256 _borrowAmtNeededToSwap = _borrowNeeded;
     if (_userProvidedDebtAmtMax > 0) {
@@ -455,7 +465,13 @@ contract LeverageManager is
         ? _borrowNeeded
         : _userProvidedDebtAmtMax;
       _borrowAmtNeededToSwap -= _borrowAmtFromUser;
-      IERC20(_borrowToken).safeTransferFrom(
+
+      emit DebugUint("_borrowAmtFromUser", _borrowAmtFromUser);
+      emit DebugUint("_borrowNeeded", _borrowNeeded);
+      emit DebugBool("_userProvidedDebtAmtMax >= _borrowNeeded", _userProvidedDebtAmtMax >= _borrowNeeded);
+      emit DebugUint("_userBorrowBalance", IERC20(_borrowToken).balanceOf(_user));
+
+      IERC20(_borrowToken).safeTransferFrom( // @audit this was failing bc user didn't have enough borrow token
         _user,
         address(this),
         _borrowAmtFromUser
@@ -463,13 +479,14 @@ contract LeverageManager is
     }
     if (_borrowAmtNeededToSwap > 0) {
       // sell pod token into LP for enough borrow token to get enough to repay
-      _podAmtRemaining = _swapPodForBorrowToken(
+      _podAmtRemaining = _swapPodForBorrowToken( // @audit failing w/ UniswapV2Router: EXCESSIVE_INPUT_AMOUNT
         IDexAdapter(_dexAdapter),
         _pod,
         _borrowToken,
         _podAmtReceived,
         _borrowAmtNeededToSwap
       );
+      emit Debug("HERE3");
     }
   }
 

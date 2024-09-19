@@ -199,6 +199,8 @@ contract FuzzSetup is Test, FuzzBase {
     // uniswap-v3-core
     UniswapV3Factory internal _uniV3Factory;
     UniswapV3Pool internal _v3peasDaiPool;
+    UniswapV3Pool internal _v3peasDaiFlash;
+    UniswapV3Pool internal _v3wethDaiFlash;
     UniswapV3Pool internal _v3wethDaiPool;
 
     // uniswap-v3-periphery
@@ -253,9 +255,9 @@ contract FuzzSetup is Test, FuzzBase {
         vm.deal(address(this), 1000000 ether);
         _weth.deposit{value: 1000000 ether}();
 
-        vm.deal(address(_uniV3Minter), 1000000 ether);
+        vm.deal(address(_uniV3Minter), 2000000 ether);
         vm.prank(address(_uniV3Minter));
-        _weth.deposit{value: 1000000 ether}();
+        _weth.deposit{value: 2000000 ether}();
     }
 
     event Message(string a);
@@ -317,7 +319,7 @@ contract FuzzSetup is Test, FuzzBase {
     function _deployPeas() internal {
         _peas = new PEAS('Peapods', 'PEAS');
 
-        _peas.transfer(address(_uniV3Minter), 1000000 ether);
+        _peas.transfer(address(_uniV3Minter), 2000000 ether);
     }
 
     function _deployUniV2() internal {
@@ -349,6 +351,31 @@ contract FuzzSetup is Test, FuzzBase {
         _v3wethDaiPool.increaseObservationCardinalityNext(600);
 
         _uniV3Minter.V3addLiquidity(_v3wethDaiPool, 100000e18);
+
+        _v3wethDaiFlash = UniswapV3Pool(
+            _uniV3Factory.createPool(
+                address(_weth),
+                address(_mockDai),
+                500
+            )
+        );
+        _v3wethDaiFlash.initialize(1<<96);
+        _v3wethDaiFlash.increaseObservationCardinalityNext(600);
+
+        _uniV3Minter.V3addLiquidity(_v3wethDaiFlash, 100000e18);
+
+        _v3peasDaiFlash = UniswapV3Pool(
+            _uniV3Factory.createPool(
+                address(_peas),
+                address(_mockDai),
+                500
+            )
+        );
+        _v3peasDaiFlash.initialize(1<<96);
+        _v3peasDaiFlash.increaseObservationCardinalityNext(600);
+
+        _uniV3Minter.V3addLiquidity(_v3peasDaiFlash, 100000e18);
+
         _v3SwapRouter = new SwapRouter02(address(_uniV2Factory), address(_uniV3Factory), address(0), address(_weth));
 
     }
@@ -1049,11 +1076,11 @@ contract FuzzSetup is Test, FuzzBase {
         //     address(_leverageManager)
         //     );
         _uniswapV3FlashSourcePeas = new UniswapV3FlashSource(
-            address(_v3peasDaiPool),
+            address(_v3peasDaiFlash),
             address(_leverageManager)
             );
         _uniswapV3FlashSourceWeth = new UniswapV3FlashSource(
-            address(_v3wethDaiPool),
+            address(_v3wethDaiFlash),
             address(_leverageManager)
             );
 

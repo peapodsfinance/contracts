@@ -227,4 +227,6 @@ interface IFraxlendPair {
     function version() external pure returns (uint256 _major, uint256 _minor, uint256 _patch);
 
     function withdrawFees(uint128 _shares, address _recipient) external returns (uint256 _amountToTransfer);
+
+    function previewMint(uint256 _shares) external view returns (uint256 _amount);
 }

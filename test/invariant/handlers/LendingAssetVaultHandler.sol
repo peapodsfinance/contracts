@@ -161,6 +161,33 @@ contract LendingAssetVaultHandler is Properties {
         }
     }
 
+    struct DonateTemps {
+        address user;
+        address vaultAsset;
+    }
+
+    function lendingAssetVault_donate(
+        uint256 userIndexSeed,
+        uint256 amount
+    ) public {
+
+        // PRE-CONDITIONS
+        DonateTemps memory cache;
+        cache.user = randomAddress(userIndexSeed);
+        cache.vaultAsset = _lendingAssetVault.asset();
+
+        amount = fl.clamp(amount, 0, IERC20(cache.vaultAsset).balanceOf(cache.user));
+
+        vm.prank(cache.user);
+        IERC20(cache.vaultAsset).approve(address(_lendingAssetVault), amount);
+
+        // ACTION
+        vm.prank(cache.user);
+        try _lendingAssetVault.donate(amount) {} catch {
+            fl.t(false, "DONATE FAILED");
+        }
+    }
+
     struct LavRedeemVaultTemps {
         address user;
         address lendingPairAsset;
