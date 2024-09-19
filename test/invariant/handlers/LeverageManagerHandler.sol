@@ -205,7 +205,7 @@ contract LeverageManagerHandler is Properties {
             cache.lendingPair,
             IFraxlendPair(cache.lendingPair).userBorrowShares(cache.custodian),
             cache.repayShares,
-            IFraxlendPair(cache.lendingPair).userCollateralBalance(cache.custodian) - borrowAssets
+            IFraxlendPair(cache.lendingPair).userCollateralBalance(cache.custodian) - collateralAmount
         )) return;
 
         vm.prank(cache.user);
@@ -215,19 +215,19 @@ contract LeverageManagerHandler is Properties {
         try _leverageManager.removeLeverage(
             cache.positionId,
             borrowAssets,
-            borrowAssets,
+            collateralAmount,
             0,
             0,
             address(_dexAdapter),
             // borrowAssets + feeAmount
             0
-        ) {} catch {fl.t(false, "REMOVE LEVERAGE");} // catch Error(string memory reason) {
+        ) {} catch Error(string memory reason) {  // {fl.t(false, "REMOVE LEVERAGE");} 
             
-        //     string[2] memory stringErrors = [
-                // "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
-                // "UniswapV2Router: INSUFFICIENT_B_AMOUNT"
-        //         "UniswapV2Router: EXCESSIVE_INPUT_AMOUNT"
-        //     ];
+            string[3] memory stringErrors = [
+                "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
+                "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
+                "UniswapV2Router: EXCESSIVE_INPUT_AMOUNT"
+            ];
 
             bool expected = false;
             for (uint256 i = 0; i < stringErrors.length; i++) {
