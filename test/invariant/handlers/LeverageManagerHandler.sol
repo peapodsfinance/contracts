@@ -219,13 +219,15 @@ contract LeverageManagerHandler is Properties {
             0,
             0,
             address(_dexAdapter),
-            borrowAssets + feeAmount
-        ) {} catch Error(string memory reason) {
+            // borrowAssets + feeAmount
+            0
+        ) {} catch {fl.t(false, "REMOVE LEVERAGE");} // catch Error(string memory reason) {
             
-            string[2] memory stringErrors = [
-                "UniswapV2: INSUFFICIENT_A_AMOUNT",
-                "UniswapV2: INSUFFICIENT_B_AMOUNT"
-            ];
+        //     string[2] memory stringErrors = [
+                // "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
+                // "UniswapV2Router: INSUFFICIENT_B_AMOUNT"
+        //         "UniswapV2Router: EXCESSIVE_INPUT_AMOUNT"
+        //     ];
 
             bool expected = false;
             for (uint256 i = 0; i < stringErrors.length; i++) {

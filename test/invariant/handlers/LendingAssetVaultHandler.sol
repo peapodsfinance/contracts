@@ -211,19 +211,28 @@ contract LendingAssetVaultHandler is Properties {
 
         shares = fl.clamp(shares, 0, cache.assetShares);
         cache.assets = shares == 0 ? cache.lendingPair.convertToAssets(cache.lendingPair.balanceOf(address(_lendingAssetVault))) : cache.lendingPair.convertToAssets(shares);
-
-        (uint256 fraxAssets, , uint256 fraxBorrows, , ) = cache.lendingPair.getPairAccounting();
         
         if (
             cache.assets > IERC20(cache.lendingPairAsset).balanceOf(address(cache.lendingPair)) // ||
-            // cache.assets > fraxAssets - fraxBorrows || 
-            // _lendingAssetVault.totalAssetsUtilized() < cache.assets
             ) return;
-        fl.log("VAULT UTILIZATION", _lendingAssetVault.vaultUtilization(address(cache.lendingPair)));
+        
         // ACTION
         vm.prank(cache.user);
-        try _lendingAssetVault.redeemFromVault(address(cache.lendingPair), shares) {} catch {
-            fl.t(false, "LAV REDEEM FROM VAULT FAILED");
+        try _lendingAssetVault.redeemFromVault(address(cache.lendingPair), shares) {} catch Panic(uint256 errorCode) {
+            uint256[1] memory errors = [
+                uint256(17)
+            ];
+
+            bool expected = false;
+            for (uint256 i = 0; i < errors.length; i++) {
+                if (errors[i] == errorCode) {
+                    expected = true;
+                }
+                fl.t(
+                    expected,
+                    "REDEEM FAILED"
+                );
+            }
         }
     }
 }

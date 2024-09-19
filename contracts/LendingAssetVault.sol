@@ -303,14 +303,14 @@ contract LendingAssetVault is
       : ((PRECISION * _vaultWhitelistCbr[_vault]) / _prevVaultCbr) - PRECISION;
 
     uint256 _currentAssetsUtilized = vaultUtilization[_vault];
-    // vaultUtilization[_vault] = _prevVaultCbr > _vaultWhitelistCbr[_vault]
-    //   ? _currentAssetsUtilized -
-    //     (_currentAssetsUtilized * _vaultAssetRatioChange) /
-    //     PRECISION
-    //   : _currentAssetsUtilized +
-    //     (_currentAssetsUtilized * _vaultAssetRatioChange) /
-    //     PRECISION;
-    vaultUtilization[_vault] = IFraxlendPair(_vault).previewMint(IERC20(_vault).balanceOf(address(this)));
+    vaultUtilization[_vault] = _prevVaultCbr > _vaultWhitelistCbr[_vault]
+      ? _currentAssetsUtilized -
+        (_currentAssetsUtilized * _vaultAssetRatioChange) /
+        PRECISION
+      : _currentAssetsUtilized +
+        (_currentAssetsUtilized * _vaultAssetRatioChange) /
+        PRECISION;
+    // vaultUtilization[_vault] = IFraxlendPair(_vault).previewMint(IERC20(_vault).balanceOf(address(this)));
     _totalAssetsUtilized =
       _totalAssetsUtilized -
       _currentAssetsUtilized +
