@@ -211,7 +211,6 @@ contract LeverageManagerHandler is Properties {
 
         if (
             borrowAssets <= 1000 || 
-            borrowAssets > reserve0 || 
             collateralAmount <= 1000 ||
             cache.sharesToBurn > IERC20(cache.lendingPair).balanceOf(address(_lendingAssetVault))
             ) return;
