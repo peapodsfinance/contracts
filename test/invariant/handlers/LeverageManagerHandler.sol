@@ -247,7 +247,9 @@ contract LeverageManagerHandler is Properties {
             for (uint256 i = 0; i < stringErrors.length; i++) {
                 if (compareStrings(stringErrors[i], reason)) {
                     expected = true;
-                    break;
+                    
+                } else if (compareStrings(reason, stringErrors[2])) {
+                    // invariant_POD_1();
                 }
             }
             fl.t(expected, reason);

@@ -43,6 +43,8 @@ contract LendingAssetVaultHandler is Properties {
         cache.receiver = randomAddress(receiverIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
 
+        __beforeLav(cache.user, cache.receiver);
+
         amount = fl.clamp(amount, 0, IERC20(cache.vaultAsset).balanceOf(cache.user));
 
         vm.prank(cache.user);
@@ -52,7 +54,14 @@ contract LendingAssetVaultHandler is Properties {
         try _lendingAssetVault.deposit(
             amount,
             cache.receiver
-        ) {} catch {
+        ) returns (uint256 sharesMinted) {
+
+            // POST-CONDITIONS
+            __afterLav(cache.user, cache.receiver);
+
+            invariant_POD_2(sharesMinted);
+
+        } catch {
             fl.t(false, "LAV DEPOSIT FAILED");
         }
     }
@@ -76,6 +85,8 @@ contract LendingAssetVaultHandler is Properties {
         cache.receiver = randomAddress(receiverIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
 
+        __beforeLav(cache.user, cache.receiver);
+
         shares = fl.clamp(shares, 0, _lendingAssetVault.convertToShares(IERC20(cache.vaultAsset).balanceOf(cache.user)));
         cache.assets = _lendingAssetVault.convertToAssets(shares);
 
@@ -87,8 +98,15 @@ contract LendingAssetVaultHandler is Properties {
         try _lendingAssetVault.mint(
             shares,
             cache.receiver
-        ) {} catch {
-            fl.t(false, "LAV DEPOSIT FAILED");
+        ) {
+
+            // POST-CONDITIONS
+            __afterLav(cache.user, cache.receiver);
+
+            invariant_POD_2(shares);
+
+        } catch {
+            fl.t(false, "LAV MINT FAILED");
         }
     }
 
@@ -111,6 +129,8 @@ contract LendingAssetVaultHandler is Properties {
         cache.receiver = randomAddress(receiverIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
 
+        __beforeLav(cache.user, cache.receiver);
+
         assets = fl.clamp(assets, 0, _lendingAssetVault.maxWithdraw(cache.user));
 
         if (assets > _lendingAssetVault.totalAvailableAssets()) return;
@@ -121,7 +141,14 @@ contract LendingAssetVaultHandler is Properties {
             assets,
             cache.receiver,
             address(0)
-        ) {} catch {
+        ) returns (uint256 sharesWithdrawn) {
+
+            // POST-CONDITIONS
+            __afterLav(cache.user, cache.receiver);
+
+            invariant_POD_3(sharesWithdrawn);
+
+        } catch {
             fl.t(false, "LAV WITHDRAW FAILED");
         }
     }
@@ -145,6 +172,8 @@ contract LendingAssetVaultHandler is Properties {
         cache.receiver = randomAddress(receiverIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
 
+        __beforeLav(cache.user, cache.receiver);
+
         shares = fl.clamp(shares, 0, _lendingAssetVault.maxRedeem(cache.user));
         cache.assets = _lendingAssetVault.convertToAssets(shares);
 
@@ -156,7 +185,14 @@ contract LendingAssetVaultHandler is Properties {
             shares,
             cache.receiver,
             address(0)
-        ) {} catch {
+        ) {
+
+            // POST-CONDITIONS
+            __afterLav(cache.user, cache.receiver);
+
+            invariant_POD_3(shares);
+
+        } catch {
             fl.t(false, "LAV REDEEM FAILED");
         }
     }

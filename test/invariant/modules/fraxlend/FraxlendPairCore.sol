@@ -1033,10 +1033,10 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
             externalAssetVault.whitelistUpdate(true);
             uint256 _externalAssetsToWithdraw = externalAssetVault.vaultUtilization(address(this));
             if (_externalAssetsToWithdraw > 0) {
-                // uint256 _extAmount = _externalAssetsToWithdraw > _amountToRepay ? _amountToRepay : _externalAssetsToWithdraw;
-                // _withdrawToVault(_extAmount);
-                uint lavShareBalance = IERC20(address(this)).balanceOf(address(externalAssetVault)) ;
-                _withdrawToVaultWithShares(_shares > lavShareBalance ? lavShareBalance : _shares);
+                uint256 _extAmount = _externalAssetsToWithdraw > _amountToRepay ? _amountToRepay : _externalAssetsToWithdraw;
+                _withdrawToVault(_extAmount);
+                // uint lavShareBalance = IERC20(address(this)).balanceOf(address(externalAssetVault)) ;
+                // _withdrawToVaultWithShares(_shares > lavShareBalance ? lavShareBalance : _shares);
             }
         }
         emit RepayAsset(_payer, _borrower, _amountToRepay, _shares);
