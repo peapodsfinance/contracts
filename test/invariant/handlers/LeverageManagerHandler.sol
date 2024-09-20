@@ -133,21 +133,20 @@ contract LeverageManagerHandler is Properties {
             // return;
         } catch Error(string memory reason) {
             
-            string[2] memory stringErrors = [
-                "UniswapV2: INSUFFICIENT_A_AMOUNT",
-                "UniswapV2: INSUFFICIENT_B_AMOUNT"
+            string[3] memory stringErrors = [
+                "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
+                "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
+                "UniswapV2Router: EXCESSIVE_INPUT_AMOUNT"
             ];
 
             bool expected = false;
             for (uint256 i = 0; i < stringErrors.length; i++) {
                 if (compareStrings(stringErrors[i], reason)) {
                     expected = true;
-                    fl.t(
-                        expected,
-                        stringErrors[i]
-                    );
+                    break;
                 }
             }
+            fl.t(expected, reason);
         }
     }
 

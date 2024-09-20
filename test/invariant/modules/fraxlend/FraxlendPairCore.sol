@@ -646,6 +646,25 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
         _redeem(_totalAsset, _amountToReturn.toUint128(), _shares.toUint128(), address(this), address(externalAssetVault), true);
     }
 
+    function _withdrawToVaultWithShares(uint256 _shares) internal returns (uint256 _amountToReturn) {
+        // Accrue interest if necessary
+        _addInterest();
+
+        // Pull from storage to save gas
+        VaultAccount memory _totalAsset = totalAsset;
+
+        // Calculate the amount to return
+        _amountToReturn = _totalAsset.toAmount(_shares, false);
+
+        // Deposit assets to external vault
+        assetContract.approve(address(externalAssetVault), _amountToReturn);
+        externalAssetVault.whitelistDeposit(_amountToReturn);
+
+        // Execute the withdraw effects for vault
+        // receive assets here in order to call whitelistDeposit and handle accounting in external vault
+        _redeem(_totalAsset, _amountToReturn.toUint128(), _shares.toUint128(), address(this), address(externalAssetVault), true);
+    }
+
     function previewMint(uint256 _shares) external view returns (uint256 _amount) {
         (, , , , VaultAccount memory _totalAsset, ) = previewAddInterest();
         _amount = _totalAsset.toAmount(_shares, false);
@@ -734,6 +753,8 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
 
         // Interactions
         if (_receiver != address(this)) {
+            emit DebugUint("_amountToReturn", _amountToReturn);
+            emit DebugUint("balance", assetContract.balanceOf(address(this)));
             assetContract.safeTransfer(_receiver, _amountToReturn);
         }
         emit Withdraw(msg.sender, _receiver, _owner, _amountToReturn, _shares);
@@ -1012,8 +1033,10 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
             externalAssetVault.whitelistUpdate(true);
             uint256 _externalAssetsToWithdraw = externalAssetVault.vaultUtilization(address(this));
             if (_externalAssetsToWithdraw > 0) {
-                uint256 _extAmount = _externalAssetsToWithdraw > _amountToRepay ? _amountToRepay : _externalAssetsToWithdraw;
-                _withdrawToVault(_extAmount);
+                // uint256 _extAmount = _externalAssetsToWithdraw > _amountToRepay ? _amountToRepay : _externalAssetsToWithdraw;
+                // _withdrawToVault(_extAmount);
+                uint lavShareBalance = IERC20(address(this)).balanceOf(address(externalAssetVault)) ;
+                _withdrawToVaultWithShares(_shares > lavShareBalance ? lavShareBalance : _shares);
             }
         }
         emit RepayAsset(_payer, _borrower, _amountToRepay, _shares);

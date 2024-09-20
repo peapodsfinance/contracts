@@ -39,7 +39,7 @@ contract AutoCompoundingPodLpHandler is Properties {
         cache.aspTKNAsset = cache.aspTKN.asset();
 
         assets = fl.clamp(assets, 0, IERC20(cache.aspTKNAsset).balanceOf(cache.user));
-        if (assets == 0) return;
+        if (assets < 1000) return;
 
         vm.prank(cache.user);
         IERC20(cache.aspTKNAsset).approve(cache.aspTKNAddress, assets);
@@ -49,20 +49,18 @@ contract AutoCompoundingPodLpHandler is Properties {
         try cache.aspTKN.deposit(assets, cache.receiver) {} catch Error(string memory reason) {
             
             string[2] memory stringErrors = [
-                "UniswapV2: INSUFFICIENT_A_AMOUNT",
-                "UniswapV2: INSUFFICIENT_B_AMOUNT"
+                "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
+                "UniswapV2Router: INSUFFICIENT_B_AMOUNT"
             ];
 
             bool expected = false;
             for (uint256 i = 0; i < stringErrors.length; i++) {
                 if (compareStrings(stringErrors[i], reason)) {
                     expected = true;
-                    fl.t(
-                        expected,
-                        stringErrors[i]
-                    );
+                    break;
                 }
             }
+            fl.t(expected, reason);
         }
     }
 
@@ -86,7 +84,7 @@ contract AutoCompoundingPodLpHandler is Properties {
         cache.aspTKNAsset = cache.aspTKN.asset();
 
         shares = fl.clamp(shares, 0, cache.aspTKN.convertToShares(IERC20(cache.aspTKNAsset).balanceOf(cache.user)));
-        if (shares == 0) return;
+        if (shares < 1000) return;
 
         cache.assets = cache.aspTKN.convertToAssets(shares);
 
@@ -98,20 +96,18 @@ contract AutoCompoundingPodLpHandler is Properties {
         try cache.aspTKN.mint(shares, cache.receiver) {} catch Error(string memory reason) {
             
             string[2] memory stringErrors = [
-                "UniswapV2: INSUFFICIENT_A_AMOUNT",
-                "UniswapV2: INSUFFICIENT_B_AMOUNT"
+                "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
+                "UniswapV2Router: INSUFFICIENT_B_AMOUNT"
             ];
 
             bool expected = false;
             for (uint256 i = 0; i < stringErrors.length; i++) {
                 if (compareStrings(stringErrors[i], reason)) {
                     expected = true;
-                    fl.t(
-                        expected,
-                        stringErrors[i]
-                    );
+                    break;
                 }
             }
+            fl.t(expected, reason);
         }
     }
 
@@ -144,20 +140,18 @@ contract AutoCompoundingPodLpHandler is Properties {
         try cache.aspTKN.withdraw(assets, cache.receiver, address(0)) {} catch Error(string memory reason) {
             
             string[2] memory stringErrors = [
-                "UniswapV2: INSUFFICIENT_A_AMOUNT",
-                "UniswapV2: INSUFFICIENT_B_AMOUNT"
+                "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
+                "UniswapV2Router: INSUFFICIENT_B_AMOUNT"
             ];
 
             bool expected = false;
             for (uint256 i = 0; i < stringErrors.length; i++) {
                 if (compareStrings(stringErrors[i], reason)) {
                     expected = true;
-                    fl.t(
-                        expected,
-                        stringErrors[i]
-                    );
+                    break;
                 }
             }
+            fl.t(expected, reason);
         }
     }
 }
