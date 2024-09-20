@@ -634,7 +634,8 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
         VaultAccount memory _totalAsset = totalAsset;
 
         // Calculate the number of shares to burn based on the assets to transfer
-        _shares = _totalAsset.toShares(_amountToReturn, true);
+        // _shares = _totalAsset.toShares(_amountToReturn, true); @audit original 
+        _shares = _totalAsset.toShares(_amountToReturn, false);
 
         // Deposit assets to external vault
         assetContract.approve(address(externalAssetVault), _amountToReturn);

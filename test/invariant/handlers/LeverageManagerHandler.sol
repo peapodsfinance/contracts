@@ -156,6 +156,7 @@ contract LeverageManagerHandler is Properties {
         uint256 positionId;
         uint256 interestEarned;
         uint256 repayShares;
+        uint256 sharesToBurn;
         LeveragePositions positionNFT;
         address podAddress;
         address lendingPair;
@@ -166,7 +167,12 @@ contract LeverageManagerHandler is Properties {
         address flashSource;
     }
 
-    function leverageManager_removeLeverage(uint256 positionIdSeed, uint256 borrowAssets, uint256 collateralAmount) public {
+    function leverageManager_removeLeverage(
+        uint256 positionIdSeed, 
+        uint256 borrowAssets, 
+        uint256 collateralAmount,
+        uint256 userDebtRepay
+        ) public {
 
         // PRE-CONDITIONS
         RemoveLeverageTemps memory cache;
@@ -192,13 +198,23 @@ contract LeverageManagerHandler is Properties {
         // borrowAssets starts as shares, will change to assets here in a sec 
         borrowAssets = fl.clamp(borrowAssets, 0, IFraxlendPair(cache.lendingPair).userBorrowShares(cache.custodian));
         cache.repayShares = borrowAssets;
-        borrowAssets = VaultAccountingLibrary.toAmount(IFraxlendPair(cache.lendingPair).totalBorrow(), borrowAssets + cache.interestEarned, false);
-        fl.log("BORROWASSETS", borrowAssets);
+        borrowAssets = VaultAccountingLibrary.toAmount(IFraxlendPair(cache.lendingPair).totalBorrow(), borrowAssets + cache.interestEarned, true);
+
+        cache.sharesToBurn = _lendingAssetVault.vaultUtilization(cache.lendingPair) > borrowAssets ? 
+        FraxlendPair(cache.lendingPair).convertToShares(borrowAssets) :
+        FraxlendPair(cache.lendingPair).convertToShares(_lendingAssetVault.vaultUtilization(cache.lendingPair));
+        
         uint256 feeAmount = FullMath.mulDivRoundingUp(borrowAssets, 10000, 1e6);
 
         collateralAmount = fl.clamp(collateralAmount, 0, IFraxlendPair(cache.lendingPair).userCollateralBalance(cache.custodian));
+        userDebtRepay = fl.clamp(userDebtRepay, 0, IERC20(cache.borrowToken).balanceOf(cache.user));
 
-        if (borrowAssets <= 1000 || borrowAssets > reserve0 || collateralAmount <= 1000) return;
+        if (
+            borrowAssets <= 1000 || 
+            borrowAssets > reserve0 || 
+            collateralAmount <= 1000 ||
+            cache.sharesToBurn > IERC20(cache.lendingPair).balanceOf(address(_lendingAssetVault))
+            ) return;
 
         if (!_solventCheckAfterRepay(
             cache.custodian,
@@ -210,6 +226,7 @@ contract LeverageManagerHandler is Properties {
 
         vm.prank(cache.user);
         IERC20(cache.borrowToken).approve(address(_leverageManager), borrowAssets+ feeAmount);
+
         // ACTION
         vm.prank(cache.user);
         try _leverageManager.removeLeverage(
@@ -219,8 +236,7 @@ contract LeverageManagerHandler is Properties {
             0,
             0,
             address(_dexAdapter),
-            // borrowAssets + feeAmount
-            0
+            userDebtRepay
         ) {} catch Error(string memory reason) {  // {fl.t(false, "REMOVE LEVERAGE");} 
             
             string[3] memory stringErrors = [
@@ -233,12 +249,10 @@ contract LeverageManagerHandler is Properties {
             for (uint256 i = 0; i < stringErrors.length; i++) {
                 if (compareStrings(stringErrors[i], reason)) {
                     expected = true;
-                    fl.t(
-                        expected,
-                        stringErrors[i]
-                    );
+                    break;
                 }
             }
+            fl.t(expected, reason);
         }
     }
 

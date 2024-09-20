@@ -916,10 +916,6 @@ contract FuzzSetup is Test, FuzzBase {
             )
         );
 
-        // set external access vault
-        vm.prank(timelock);
-        _fraxLPToken1Weth.setExternalAssetVault(IERC4626Extended(address(_lendingAssetVault)));
-
         // deposit some asset
         IERC20(_pod1Weth.PAIRED_LP_TOKEN()).approve(address(_fraxLPToken1Weth), type(uint256).max);
         _fraxLPToken1Weth.deposit(100000 ether, address(this));
@@ -944,10 +940,6 @@ contract FuzzSetup is Test, FuzzBase {
             )
         );
 
-        // set external access vault
-        vm.prank(timelock);
-        _fraxLPToken2.setExternalAssetVault(IERC4626Extended(address(_lendingAssetVault)));
-
         // deposit some asset
         IERC20(_pod2.PAIRED_LP_TOKEN()).approve(address(_fraxLPToken2), type(uint256).max);
         _fraxLPToken2.deposit(100000 ether, address(this));
@@ -971,10 +963,6 @@ contract FuzzSetup is Test, FuzzBase {
                 )
             )
         );
-
-        // set external access vault
-        vm.prank(timelock);
-        _fraxLPToken4.setExternalAssetVault(IERC4626Extended(address(_lendingAssetVault)));
 
         // deposit some asset
         IERC20(_pod4.PAIRED_LP_TOKEN()).approve(address(_fraxLPToken4), type(uint256).max);
