@@ -22,12 +22,14 @@ interface ILeverageManager {
     address pod;
     address lendingPair;
     address custodian;
+    bool isSelfLending;
     address selfLendingPod;
   }
 
   function initializePosition(
     address _pod,
     address _recipient,
+    address _overrideLendingPair,
     address _selfLendingPairPod
   ) external returns (uint256 _positionId);
 

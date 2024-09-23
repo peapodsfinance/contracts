@@ -20,6 +20,7 @@ contract AutoCompoundingPodLpTest is Test {
   MockERC20 public mockAsset;
   MockERC20 public rewardToken1;
   MockERC20 public rewardToken2;
+  MockERC20 public rewardToken3;
   MockERC20 public pairedLpToken;
   address public owner;
   address public user;
@@ -36,6 +37,7 @@ contract AutoCompoundingPodLpTest is Test {
     mockAsset = new MockERC20('Mock LP Token', 'MLT');
     rewardToken1 = new MockERC20('Reward Token 1', 'RT1');
     rewardToken2 = new MockERC20('Reward Token 2', 'RT2');
+    rewardToken3 = new MockERC20('Reward Token 3', 'RT3');
     pairedLpToken = new MockERC20('Paired LP Token', 'PLT');
 
     autoCompoundingPodLp = new AutoCompoundingPodLp(
@@ -50,7 +52,7 @@ contract AutoCompoundingPodLpTest is Test {
 
     mockPod.setLpStakingPool(address(mockAsset));
     mockPod.setPairedLpToken(address(pairedLpToken));
-    mockPod.setLpRewardsToken(address(rewardToken1));
+    mockPod.setLpRewardsToken(address(rewardToken3));
   }
 
   function testConvertToShares() public view {

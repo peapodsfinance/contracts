@@ -9,7 +9,9 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './interfaces/ILendingAssetVault.sol';
 
 interface IVaultInterestUpdate {
-  function addInterest() external;
+  function addInterest(
+    bool
+  ) external returns (uint256, uint256, uint256, uint64);
 }
 
 contract LendingAssetVault is
@@ -27,10 +29,8 @@ contract LendingAssetVault is
   address _asset;
   uint256 _totalAssets;
   uint256 _totalAssetsUtilized;
-  bool _updateInterestOnVaults = true;
 
   uint8 public maxVaults = 12;
-  uint256 public lastAssetChange;
   mapping(address => bool) public vaultWhitelist;
   mapping(address => uint256) public override vaultUtilization;
   mapping(address => uint256) _vaultMaxPerc;
@@ -103,7 +103,7 @@ contract LendingAssetVault is
   function maxDeposit(
     address
   ) external pure override returns (uint256 maxAssets) {
-    maxAssets = type(uint256).max - 1;
+    maxAssets = type(uint256).max;
   }
 
   function previewDeposit(
@@ -128,7 +128,6 @@ contract LendingAssetVault is
     address _receiver
   ) internal returns (uint256 _shares) {
     _updateInterestAndMdInAllVaults(address(0));
-    lastAssetChange = block.timestamp;
     _shares = convertToShares(_assets);
     _totalAssets += _assets;
     _mint(_receiver, _shares);
@@ -137,7 +136,7 @@ contract LendingAssetVault is
   }
 
   function maxMint(address) external pure override returns (uint256 maxShares) {
-    maxShares = type(uint256).max - 1;
+    maxShares = type(uint256).max;
   }
 
   function previewMint(
@@ -212,7 +211,6 @@ contract LendingAssetVault is
     address _receiver
   ) internal returns (uint256 _assets) {
     _updateInterestAndMdInAllVaults(address(0));
-    lastAssetChange = block.timestamp;
     _assets = convertToAssets(_shares);
     require(totalAvailableAssets() >= _assets, 'AV');
     _burn(_msgSender(), _shares);
@@ -234,15 +232,12 @@ contract LendingAssetVault is
   /// @notice Updates interest and metadata for all whitelisted vaults
   /// @param _vaultToExclude Address of the vault to exclude from the update
   function _updateInterestAndMdInAllVaults(address _vaultToExclude) internal {
-    if (!_updateInterestOnVaults) {
-      return;
-    }
     for (uint256 _i; _i < _vaultWhitelistAry.length; _i++) {
       address _vault = _vaultWhitelistAry[_i];
       if (_vault == _vaultToExclude) {
         continue;
       }
-      IVaultInterestUpdate(_vault).addInterest();
+      IVaultInterestUpdate(_vault).addInterest(false);
       _updateAssetMetadataFromVault(_vault);
     }
   }
@@ -341,13 +336,6 @@ contract LendingAssetVault is
   function setMaxVaults(uint8 _newMax) external onlyOwner {
     require(_newMax <= 20, 'M');
     maxVaults = _newMax;
-  }
-
-  /// @notice Set whether to update interest on vaults
-  /// @param _exec True to enable interest updates, false to disable
-  function setUpdateInterestOnVaults(bool _exec) external onlyOwner {
-    require(_updateInterestOnVaults != _exec, 'T');
-    _updateInterestOnVaults = _exec;
   }
 
   /// @notice Add or remove a vault from the whitelist

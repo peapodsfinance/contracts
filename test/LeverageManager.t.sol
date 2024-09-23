@@ -122,7 +122,6 @@ contract LeverageManagerTest is Test {
     bytes memory config = abi.encode(0, 1000, block.timestamp + 1 hours);
 
     deal(address(peas), ALICE, pTknAmt * 100);
-    deal(dai, ALICE, pairedLpDesired * 100);
 
     vm.startPrank(ALICE);
 
@@ -260,9 +259,12 @@ contract LeverageManagerTest is Test {
     bytes memory config = abi.encode(0, 1000, block.timestamp + 1 hours);
 
     deal(address(peas), ALICE, pTknAmt * 100);
-    deal(dai, ALICE, pairedLpDesired * 100);
 
     vm.startPrank(ALICE);
+
+    // wrap into the pod
+    peas.approve(address(pod), peas.totalSupply());
+    pod.bond(address(peas), pTknAmt, 0);
 
     uint256 invalidPositionId = 999; // Assume this position ID doesn't exist
 
@@ -286,10 +288,16 @@ contract LeverageManagerTest is Test {
     uint256 pairedLpAmtMin = 45 * 1e18;
     bytes memory config = abi.encode(0, 1000, block.timestamp + 1 hours);
 
-    deal(address(peas), ALICE, pTknAmt - 1); // LESS THAN WE NEED
-    deal(dai, ALICE, pairedLpDesired * 100);
+    deal(address(peas), ALICE, pTknAmt);
 
     vm.startPrank(ALICE);
+
+    // wrap into the pod
+    peas.approve(address(pod), peas.totalSupply());
+    pod.bond(address(peas), pTknAmt, 0);
+
+    // burn 1 pTKN so we have less than we need
+    pod.burn(1);
 
     uint256 positionId = leverageManager.initializePosition(
       address(pod),
@@ -318,9 +326,13 @@ contract LeverageManagerTest is Test {
     bytes memory config = abi.encode(0, 1000, block.timestamp + 1 hours);
 
     deal(address(peas), ALICE, pTknAmt * 100);
-    deal(dai, ALICE, pairedLpDesired * 100);
 
     vm.startPrank(ALICE);
+
+    // wrap into the pod
+    peas.approve(address(pod), peas.totalSupply());
+    pod.bond(address(peas), pTknAmt, 0);
+
     uint256 positionId = leverageManager.initializePosition(
       address(pod),
       ALICE,
@@ -457,51 +469,57 @@ contract LeverageManagerTest is Test {
   //   vm.stopPrank();
   // }
 
-  // function testAddLeverageWithOpenFee() public {
-  //   uint256 pTknAmt = 100 * 1e18;
-  //   uint256 pairedLpDesired = 50 * 1e18;
-  //   uint256 pairedLpAmtMin = 45 * 1e18;
-  //   bytes memory config = abi.encode(0, 1000, block.timestamp + 1 hours);
-  //   uint16 openFeePerc = 100; // 10% open fee
+  function testAddLeverageWithOpenFee() public {
+    uint256 pTknAmt = 100 * 1e18;
+    uint256 pairedLpDesired = 50 * 1e18;
+    uint256 pairedLpAmtMin = 45 * 1e18;
+    bytes memory config = abi.encode(0, 1000, block.timestamp + 1 hours);
 
-  //   vm.startPrank(ALICE);
-  //   uint256 positionId = leverageManager.initializePosition(
-  //     address(mockDecentralizedIndex),
-  //     ALICE,
-  //     address(0)
-  //   );
+    deal(address(peas), ALICE, pTknAmt * 100);
 
-  //   // Set open fee
-  //   leverageManager.setOpenFeePerc(openFeePerc);
+    uint16 openFeePerc = 100; // 10% open fee
 
-  //   uint256 alicePodTokenBalanceBefore = mockPodToken.balanceOf(ALICE);
-  //   uint256 protocolFeeBefore = mockPodToken.balanceOf(
-  //     address(leverageManager)
-  //   );
+    // Set open fee
+    leverageManager.setOpenFeePerc(openFeePerc);
 
-  //   leverageManager.addLeverage(
-  //     positionId,
-  //     address(mockDecentralizedIndex),
-  //     pTknAmt,
-  //     pairedLpDesired,
-  //     pairedLpAmtMin,
-  //     address(0),
-  //     config
-  //   );
+    uint256 _adminAspBalBefore = aspTkn.balanceOf(address(this));
 
-  //   vm.stopPrank();
+    vm.startPrank(ALICE);
 
-  //   // Verify the open fee was charged
-  //   uint256 expectedFee = (pTknAmt * openFeePerc) / 1000;
-  //   assertEq(
-  //     mockPodToken.balanceOf(ALICE),
-  //     alicePodTokenBalanceBefore - pTknAmt,
-  //     'Incorrect Pod Token balance after adding leverage'
-  //   );
-  //   assertEq(
-  //     mockPodToken.balanceOf(address(leverageManager)),
-  //     protocolFeeBefore + expectedFee,
-  //     'Incorrect protocol fee collected'
-  //   );
-  // }
+    // wrap into the pod
+    peas.approve(address(pod), peas.totalSupply());
+    pod.bond(address(peas), pTknAmt, 0);
+
+    uint256 positionId = leverageManager.initializePosition(
+      address(pod),
+      ALICE,
+      address(0)
+    );
+
+    uint256 alicePodTokenBalanceBefore = pod.balanceOf(ALICE);
+
+    leverageManager.addLeverage(
+      positionId,
+      address(pod),
+      pTknAmt,
+      pairedLpDesired,
+      pairedLpAmtMin,
+      address(0),
+      config
+    );
+
+    vm.stopPrank();
+
+    // Verify the open fee was charged
+    assertEq(
+      pod.balanceOf(ALICE),
+      alicePodTokenBalanceBefore - pTknAmt,
+      'Incorrect Pod Token balance after adding leverage'
+    );
+    assertGt(
+      aspTkn.balanceOf(address(this)),
+      _adminAspBalBefore,
+      'Protocol fee successfully collected'
+    );
+  }
 }

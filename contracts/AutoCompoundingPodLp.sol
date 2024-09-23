@@ -103,18 +103,18 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     uint256 _assets,
     address _receiver
   ) external override returns (uint256 _shares) {
-    return _deposit(_assets, _receiver);
+    _shares = convertToShares(_assets);
+    _deposit(_assets, _shares, _receiver);
   }
 
   function _deposit(
     uint256 _assets,
+    uint256 _shares,
     address _receiver
-  ) internal returns (uint256 _shares) {
+  ) internal {
     require(_assets != 0, 'M');
 
     _processRewardsToPodLp(0, block.timestamp);
-
-    _shares = convertToShares(_assets);
     _totalAssets += _assets;
     IERC20(_asset()).safeTransferFrom(_msgSender(), address(this), _assets);
     _mint(_receiver, _shares);
@@ -136,7 +136,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     address _receiver
   ) external override returns (uint256 _assets) {
     _assets = convertToAssets(_shares);
-    _deposit(_assets, _receiver);
+    _deposit(_assets, _shares, _receiver);
   }
 
   function maxWithdraw(
@@ -157,7 +157,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     address
   ) external override returns (uint256 _shares) {
     _shares = convertToShares(_assets);
-    _withdraw(_shares, _receiver);
+    _withdraw(_assets, _shares, _receiver);
   }
 
   function maxRedeem(
@@ -177,7 +177,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     address _receiver,
     address
   ) external override returns (uint256 _assets) {
-    _assets = _withdraw(_shares, _receiver);
+    _assets = convertToAssets(_shares);
+    _withdraw(_assets, _shares, _receiver);
   }
 
   function processAllRewardsTokensToPodLp(
@@ -188,14 +189,13 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
   }
 
   function _withdraw(
+    uint256 _assets,
     uint256 _shares,
     address _receiver
-  ) internal returns (uint256 _assets) {
+  ) internal {
     require(_shares != 0, 'B');
 
     _processRewardsToPodLp(0, block.timestamp);
-
-    _assets = convertToAssets(_shares);
     _burn(_msgSender(), _shares);
     IERC20(_asset()).safeTransfer(_receiver, _assets);
     _totalAssets -= _assets;
@@ -224,17 +224,20 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
       return _lpAmtOut;
     }
     address[] memory _tokens = rewardsWhitelister.getFullWhitelist();
-    uint256 _len = _tokens.length;
+    uint256 _len = _tokens.length + 1;
     for (uint256 _i; _i < _len; _i++) {
-      address _token = _tokens[_i];
+      address _token = _i == _tokens.length
+        ? pod.lpRewardsToken()
+        : _tokens[_i];
       uint256 _bal = IERC20(_token).balanceOf(address(this));
       if (_bal == 0) {
         continue;
       }
-      uint256 _newLp = _tokenToPodLp(_token, _bal, _amountLpOutMin, _deadline);
+      uint256 _newLp = _tokenToPodLp(_token, _bal, 0, _deadline);
       _lpAmtOut += _newLp;
       _totalAssets += _newLp;
     }
+    require(_lpAmtOut >= _amountLpOutMin, 'M');
   }
 
   function _tokenToPodLp(
@@ -383,16 +386,31 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     uint256 _amountIn,
     uint256 _amountOutMin
   ) internal returns (uint256) {
-    address _out = _path.length == 3 ? _path[2] : _path[1];
+    bool _twoHops = _path.length == 3;
+    address _out = _twoHops ? _path[2] : _path[1];
     uint256 _outBefore = IERC20(_out).balanceOf(address(this));
     IERC20(_path[0]).safeIncreaseAllowance(address(DEX_ADAPTER), _amountIn);
     DEX_ADAPTER.swapV2Single(
       _path[0],
       _path[1],
       _amountIn,
-      _amountOutMin,
+      _twoHops ? 0 : _amountOutMin,
       address(this)
     );
+    if (_twoHops) {
+      uint256 _intermediateBal = IERC20(_path[1]).balanceOf(address(this));
+      IERC20(_path[1]).safeIncreaseAllowance(
+        address(DEX_ADAPTER),
+        _intermediateBal
+      );
+      DEX_ADAPTER.swapV2Single(
+        _path[1],
+        _path[2],
+        _intermediateBal,
+        _amountOutMin,
+        address(this)
+      );
+    }
     return IERC20(_out).balanceOf(address(this)) - _outBefore;
   }
 

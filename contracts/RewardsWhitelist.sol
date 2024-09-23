@@ -5,6 +5,8 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import './interfaces/IRewardsWhitelister.sol';
 
 contract RewardsWhitelist is IRewardsWhitelister, Ownable {
+  uint8 constant MAX = 12;
+
   mapping(address => bool) public override whitelist;
   address[] public _whitelistAry;
   mapping(address => uint256) _whitelistAryIdx;
@@ -27,6 +29,7 @@ contract RewardsWhitelist is IRewardsWhitelister, Ownable {
     require(whitelist[_token] != _isWhitelisted, 'OPP');
     whitelist[_token] = _isWhitelisted;
     if (_isWhitelisted) {
+      require(_whitelistAry.length < MAX, 'MAX');
       _whitelistAryIdx[_token] = _whitelistAry.length;
       _whitelistAry.push(_token);
     } else {
