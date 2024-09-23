@@ -25,6 +25,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract LendingAssetVaultHandler is Properties {
 
+    uint256 donatedAmount;
+
     struct LavDepositTemps {
         address user;
         address receiver;
@@ -71,6 +73,7 @@ contract LendingAssetVaultHandler is Properties {
         address receiver;
         address vaultAsset;
         uint256 assets;
+        uint256 sharesMinted;
     }
 
     function lendingAssetVault_mint(
@@ -98,12 +101,15 @@ contract LendingAssetVaultHandler is Properties {
         try _lendingAssetVault.mint(
             shares,
             cache.receiver
-        ) {
+        ) returns (uint256 assetsMinted) {
 
             // POST-CONDITIONS
             __afterLav(cache.user, cache.receiver);
 
-            invariant_POD_2(shares);
+            cache.sharesMinted = _lendingAssetVault.convertToShares(assetsMinted);
+            fl.log("Doanted amount", donatedAmount);
+            fl.log("Doanted amount shares", _lendingAssetVault.convertToShares(donatedAmount));
+            invariant_POD_2(cache.sharesMinted);
 
         } catch {
             fl.t(false, "LAV MINT FAILED");
@@ -219,7 +225,10 @@ contract LendingAssetVaultHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try _lendingAssetVault.donate(amount) {} catch {
+        try _lendingAssetVault.donate(amount) {
+            donatedAmount += amount;
+            fl.log("Doanted amount shares", _lendingAssetVault.convertToShares(donatedAmount));
+        } catch {
             fl.t(false, "DONATE FAILED");
         }
     }
@@ -249,7 +258,7 @@ contract LendingAssetVaultHandler is Properties {
         cache.assets = shares == 0 ? cache.lendingPair.convertToAssets(cache.lendingPair.balanceOf(address(_lendingAssetVault))) : cache.lendingPair.convertToAssets(shares);
         
         if (
-            cache.assets > IERC20(cache.lendingPairAsset).balanceOf(address(cache.lendingPair)) // ||
+            cache.assets > IERC20(cache.lendingPairAsset).balanceOf(address(cache.lendingPair))
             ) return;
         
         // ACTION

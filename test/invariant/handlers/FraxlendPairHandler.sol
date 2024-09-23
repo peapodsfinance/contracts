@@ -194,52 +194,52 @@ contract FraxlendPairHandler is Properties {
         FraxlendPair fraxPair;
     }
 
-    // function fraxPair_borrowAsset(
-    //     uint256 userIndexSeed,
-    //     uint256 receiverIndexSeed,
-    //     uint256 fraxlendSeed,
-    //     uint256 borrowAmount,
-    //     uint256 collateralAmount
-    // ) public {
+    function fraxPair_borrowAsset(
+        uint256 userIndexSeed,
+        uint256 receiverIndexSeed,
+        uint256 fraxlendSeed,
+        uint256 borrowAmount,
+        uint256 collateralAmount
+    ) public {
 
-    //     // PRE-CONDITIONS
-    //     FraxBorrowTemps memory cache;
-    //     cache.user = randomAddress(userIndexSeed);
-    //     cache.receiver = randomAddress(receiverIndexSeed);
-    //     cache.fraxPair = randomFraxPair(fraxlendSeed);
-    //     cache.fraxAsset = cache.fraxPair.asset();
-    //     cache.fraxCollateral = cache.fraxPair.collateralContract();
-    //     (cache.fraxAssets, , cache.fraxBorrows, , ) = cache.fraxPair.getPairAccounting();
+        // PRE-CONDITIONS
+        FraxBorrowTemps memory cache;
+        cache.user = randomAddress(userIndexSeed);
+        cache.receiver = randomAddress(receiverIndexSeed);
+        cache.fraxPair = randomFraxPair(fraxlendSeed);
+        cache.fraxAsset = cache.fraxPair.asset();
+        cache.fraxCollateral = cache.fraxPair.collateralContract();
+        (cache.fraxAssets, , cache.fraxBorrows, , ) = cache.fraxPair.getPairAccounting();
 
-    //     // cache.borrowCapacity = cache.fraxPair.borrowLimit() - cache.fraxBorrows;
-    //     // borrowAmount = fl.clamp(borrowAmount, 0, cache.borrowCapacity);
+        // cache.borrowCapacity = cache.fraxPair.borrowLimit() - cache.fraxBorrows;
+        // borrowAmount = fl.clamp(borrowAmount, 0, cache.borrowCapacity);
 
-    //     if (borrowAmount > cache.fraxAssets - cache.fraxBorrows) return;
+        if (borrowAmount > cache.fraxAssets - cache.fraxBorrows) return;
 
-    //     // collateralAmount = fl.clamp(collateralAmount, 0, cache.fraxCollateral.balanceOf(cache.user));
+        // collateralAmount = fl.clamp(collateralAmount, 0, cache.fraxCollateral.balanceOf(cache.user));
 
-    //     vm.prank(cache.user);
-    //     cache.fraxCollateral.approve(address(cache.fraxPair), collateralAmount);
+        vm.prank(cache.user);
+        cache.fraxCollateral.approve(address(cache.fraxPair), collateralAmount);
 
-    //     // ACTION
-    //     vm.prank(cache.user);
-    //     try cache.fraxPair.borrowAsset(
-    //         borrowAmount,
-    //         collateralAmount,
-    //         cache.receiver
-    //     ) {} catch (bytes memory err) {
-    //         bytes4[1] memory errors =
-    //             [FraxlendPairConstants.Insolvent.selector];
-    //         bool expected = false;
-    //         for (uint256 i = 0; i < errors.length; i++) {
-    //             if (errors[i] == bytes4(err)) {
-    //                 expected = true;
-    //                 break;
-    //             }
-    //         }
-    //         fl.t(expected, FuzzLibString.getRevertMsg(err));
-    //     }
-    // }
+        // ACTION
+        // vm.prank(cache.user);
+        // try cache.fraxPair.borrowAsset(
+        //     borrowAmount,
+        //     collateralAmount,
+        //     cache.receiver
+        // ) {} catch (bytes memory err) {
+        //     bytes4[1] memory errors =
+        //         [FraxlendPairConstants.Insolvent.selector];
+        //     bool expected = false;
+        //     for (uint256 i = 0; i < errors.length; i++) {
+        //         if (errors[i] == bytes4(err)) {
+        //             expected = true;
+        //             break;
+        //         }
+        //     }
+        //     fl.t(expected, FuzzLibString.getRevertMsg(err));
+        // }
+    }
 
     // addCollateral
 

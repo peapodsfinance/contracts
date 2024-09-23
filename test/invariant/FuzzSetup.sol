@@ -1149,4 +1149,20 @@ contract FuzzSetup is Test, FuzzBase {
     function compareStrings(string memory a, string memory b) internal pure returns (bool) {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
+
+    function assertApproxEq(uint256 a, uint256 b, uint256 maxDelta, string memory reason) internal {
+        if (!(a == b)) {
+            uint256 dt = b > a ? b - a : a - b;
+            if (dt > maxDelta) {
+                emit log("Error: a =~ b not satisfied [uint]");
+                emit log_named_uint("   Value a", a);
+                emit log_named_uint("   Value b", b);
+                emit log_named_uint(" Max Delta", maxDelta);
+                emit log_named_uint("     Delta", dt);
+                fl.t(false, reason);
+            }
+        } else {
+            fl.t(true, "a == b");
+        }
+    }
 }

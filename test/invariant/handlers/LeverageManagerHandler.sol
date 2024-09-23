@@ -110,12 +110,19 @@ contract LeverageManagerHandler is Properties {
             block.timestamp,
             address(0) // TODO: change when self-lending position is setup
         ) {
-            uint256 sharesReturned = IFraxlendPair(cache.lendingPair).userBorrowShares(cache.custodian);
-            uint256 _borrowAssetssToRepay = VaultAccountingLibrary.toAmount(IFraxlendPair(cache.lendingPair).totalBorrow(), sharesReturned, false);
-            fl.log(
-                "USER ASSET BALANCE", 
-                _borrowAssetssToRepay
-            );
+            
+            // POST-CONDITIONS
+            __afterLM(cache.lendingPair);
+            (uint256 fraxAssetsLessVault, ) = FraxlendPair(cache.lendingPair).totalAsset();
+
+            // invariant_POD_4(FraxlendPair(cache.lendingPair));
+
+            if (pairedLpAmount + feeAmount > fraxAssetsLessVault - fraxBorrows) {
+                invariant_POD_9();
+                invariant_POD_10((pairedLpAmount + feeAmount) - (fraxAssetsLessVault - fraxBorrows));
+                invariant_POD_11((pairedLpAmount + feeAmount) - (fraxAssetsLessVault - fraxBorrows));
+            }
+            
         } catch (bytes memory err) {
             bytes4[1] memory errors =
                 [FraxlendPairConstants.Insolvent.selector];
@@ -180,6 +187,8 @@ contract LeverageManagerHandler is Properties {
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
         (cache.podAddress, cache.lendingPair, cache.custodian, cache.selfLendingPod) = _leverageManager.positionProps(cache.positionId);
 
+        __beforeLM(cache.lendingPair);
+
         // I don't think flash is accounting for interest to be added???
         FraxlendPair(cache.lendingPair).addInterest(false);
 
@@ -188,9 +197,6 @@ contract LeverageManagerHandler is Properties {
         cache.borrowToken = cache.selfLendingPod != address(0) ? 
             IFraxlendPair(cache.lendingPair).asset()
             : IDecentralizedIndex(cache.podAddress).PAIRED_LP_TOKEN();
-
-        address lpPair = _uniV2Factory.getPair(cache.podAddress, cache.pod.PAIRED_LP_TOKEN());
-        (uint112 reserve0, uint112 reserve1, ) = IUniswapV2Pair(lpPair).getReserves();
 
         (cache.interestEarned, , , , , ) = FraxlendPair(cache.lendingPair).previewAddInterest();
 
@@ -235,7 +241,22 @@ contract LeverageManagerHandler is Properties {
             0,
             address(_dexAdapter),
             userDebtRepay
-        ) {} catch Error(string memory reason) {  // {fl.t(false, "REMOVE LEVERAGE");} 
+        ) {
+
+            // POST-CONDITIONS
+            __afterLM(cache.lendingPair);
+
+            invariant_POD_4(FraxlendPair(cache.lendingPair));
+
+            if (_beforeLM.vaultUtilization > 0) {
+                invariant_POD_6();
+                fl.log("_beforeLM.vaultUtilization", _beforeLM.vaultUtilization);
+                fl.log("borrowAssets", borrowAssets);
+                // invariant_POD_7(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization);
+                // invariant_POD_8(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization);
+            }
+
+        } catch Error(string memory reason) {  // {fl.t(false, "REMOVE LEVERAGE");} 
             
             string[3] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
@@ -272,15 +293,5 @@ contract LeverageManagerHandler is Properties {
         isSolvent = true;
         uint256 _ltv = (((sharesAfterRepay * highExchangeRate) / FraxlendPair(lendingPair).EXCHANGE_PRECISION()) * FraxlendPair(lendingPair).LTV_PRECISION()) / _collateralAmount;
         isSolvent = _ltv <= FraxlendPair(lendingPair).maxLTV();
-    }
-
-    function _calculateLiquidity(
-        uint112 _reserve0,
-        uint112 _reserve1,
-        uint256 amount0,
-        uint256 amount1,
-        uint256 _totalSupply
-        ) internal returns (uint256) {
-        return Math.min((amount0 * _totalSupply) / _reserve0, (amount1 * _totalSupply) / _reserve1);
     }
 }
