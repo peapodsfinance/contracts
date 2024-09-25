@@ -101,6 +101,10 @@ contract FuzzSetup is Test, FuzzBase {
     address internal timelock = vm.addr(uint256(keccak256("comptroller")));
 
     uint16 internal fee = 100;
+    uint256 internal PRECISION = 10 ** 27;
+
+    uint256 donatedAmount;
+    uint256 lavDeposits;
 
     /*///////////////////////////////////////////////////////////////
                             TEST CONTRACTS
@@ -1152,6 +1156,22 @@ contract FuzzSetup is Test, FuzzBase {
 
     function assertApproxEq(uint256 a, uint256 b, uint256 maxDelta, string memory reason) internal {
         if (!(a == b)) {
+            uint256 dt = b > a ? b - a : a - b;
+            if (dt > maxDelta) {
+                emit log("Error: a =~ b not satisfied [uint]");
+                emit log_named_uint("   Value a", a);
+                emit log_named_uint("   Value b", b);
+                emit log_named_uint(" Max Delta", maxDelta);
+                emit log_named_uint("     Delta", dt);
+                fl.t(false, reason);
+            }
+        } else {
+            fl.t(true, "a == b");
+        }
+    }
+
+    function assertApproxLte(uint256 a, uint256 b, uint256 maxDelta, string memory reason) internal {
+        if (!(a <= b)) {
             uint256 dt = b > a ? b - a : a - b;
             if (dt > maxDelta) {
                 emit log("Error: a =~ b not satisfied [uint]");

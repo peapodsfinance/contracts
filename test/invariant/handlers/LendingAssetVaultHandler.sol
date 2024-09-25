@@ -25,8 +25,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract LendingAssetVaultHandler is Properties {
 
-    uint256 donatedAmount;
-
     struct LavDepositTemps {
         address user;
         address receiver;
@@ -62,6 +60,9 @@ contract LendingAssetVaultHandler is Properties {
             __afterLav(cache.user, cache.receiver);
 
             invariant_POD_2(sharesMinted);
+
+            lavDeposits += amount;
+            fl.log("LAV DEPOSITS", lavDeposits);
 
         } catch {
             fl.t(false, "LAV DEPOSIT FAILED");
@@ -111,6 +112,9 @@ contract LendingAssetVaultHandler is Properties {
             fl.log("Doanted amount shares", _lendingAssetVault.convertToShares(donatedAmount));
             invariant_POD_2(cache.sharesMinted);
 
+            lavDeposits += assetsMinted;
+            fl.log("LAV DEPOSITS", lavDeposits);
+
         } catch {
             fl.t(false, "LAV MINT FAILED");
         }
@@ -154,6 +158,9 @@ contract LendingAssetVaultHandler is Properties {
 
             invariant_POD_3(sharesWithdrawn);
 
+            lavDeposits -= assets;
+            fl.log("LAV DEPOSITS", lavDeposits);
+
         } catch {
             fl.t(false, "LAV WITHDRAW FAILED");
         }
@@ -191,12 +198,15 @@ contract LendingAssetVaultHandler is Properties {
             shares,
             cache.receiver,
             address(0)
-        ) {
+        ) returns (uint256 assetsWithdrawn) {
 
             // POST-CONDITIONS
             __afterLav(cache.user, cache.receiver);
 
             invariant_POD_3(shares);
+
+            lavDeposits -= assetsWithdrawn;
+            fl.log("LAV DEPOSITS", lavDeposits);
 
         } catch {
             fl.t(false, "LAV REDEEM FAILED");
@@ -206,6 +216,7 @@ contract LendingAssetVaultHandler is Properties {
     struct DonateTemps {
         address user;
         address vaultAsset;
+        uint256 interestEarned;
     }
 
     function lendingAssetVault_donate(
@@ -218,6 +229,8 @@ contract LendingAssetVaultHandler is Properties {
         cache.user = randomAddress(userIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
 
+        __beforeLav(cache.user, address(0));
+
         amount = fl.clamp(amount, 0, IERC20(cache.vaultAsset).balanceOf(cache.user));
 
         vm.prank(cache.user);
@@ -227,7 +240,13 @@ contract LendingAssetVaultHandler is Properties {
         vm.prank(cache.user);
         try _lendingAssetVault.donate(amount) {
             donatedAmount += amount;
-            fl.log("Doanted amount shares", _lendingAssetVault.convertToShares(donatedAmount));
+            lavDeposits += amount;
+            
+            // POST-CONDITIONS
+            __afterLav(cache.user, address(0));
+
+            if (amount != 0) invariant_POD_14(amount);
+            
         } catch {
             fl.t(false, "DONATE FAILED");
         }

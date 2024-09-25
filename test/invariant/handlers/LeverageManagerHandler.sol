@@ -75,6 +75,8 @@ contract LeverageManagerHandler is Properties {
         cache.flashSource = _leverageManager.flashSource(cache.podAddress);
         cache.aspTKN = AutoCompoundingPodLp(IFraxlendPair(cache.lendingPair).collateralContract());
 
+        __beforeLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
+
         podAmount = fl.clamp(podAmount, 0, cache.pod.balanceOf(cache.user));
         if (podAmount < 1e14) return;
 
@@ -88,7 +90,6 @@ contract LeverageManagerHandler is Properties {
         if (pairedLpAmount > IERC20(cache.pod.PAIRED_LP_TOKEN()).balanceOf(IFlashLoanSource(cache.flashSource).source())) return;
 
         uint256 feeAmount = FullMath.mulDivRoundingUp(pairedLpAmount, 10000, 1e6);
-        // IERC20(cache.pod.PAIRED_LP_TOKEN()).transfer(address(_leverageManager), feeAmount);
 
         (uint256 fraxAssets, , uint256 fraxBorrows, , ) = IFraxlendPair(cache.lendingPair).getPairAccounting();
         if (pairedLpAmount + feeAmount > fraxAssets - fraxBorrows) return;
@@ -112,10 +113,16 @@ contract LeverageManagerHandler is Properties {
         ) {
             
             // POST-CONDITIONS
-            __afterLM(cache.lendingPair);
+            __afterLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
             (uint256 fraxAssetsLessVault, ) = FraxlendPair(cache.lendingPair).totalAsset();
 
             // invariant_POD_4(FraxlendPair(cache.lendingPair));
+            // invariant_POD_16();
+            // invariant_POD_18();
+            invariant_POD_19();
+            invariant_POD_21();
+            invariant_POD_22();
+            invariant_POD_23();
 
             if (pairedLpAmount + feeAmount > fraxAssetsLessVault - fraxBorrows) {
                 invariant_POD_9();
@@ -187,10 +194,10 @@ contract LeverageManagerHandler is Properties {
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
         (cache.podAddress, cache.lendingPair, cache.custodian, cache.selfLendingPod) = _leverageManager.positionProps(cache.positionId);
 
-        __beforeLM(cache.lendingPair);
-
         // I don't think flash is accounting for interest to be added???
         FraxlendPair(cache.lendingPair).addInterest(false);
+
+        __beforeLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
 
         cache.pod = WeightedIndex(payable(cache.podAddress));
         cache.flashSource = _leverageManager.flashSource(cache.podAddress);
@@ -217,7 +224,8 @@ contract LeverageManagerHandler is Properties {
         if (
             borrowAssets <= 1000 || 
             collateralAmount <= 1000 ||
-            cache.sharesToBurn > IERC20(cache.lendingPair).balanceOf(address(_lendingAssetVault))
+            cache.sharesToBurn > IERC20(cache.lendingPair).balanceOf(address(_lendingAssetVault)) ||
+            borrowAssets > IERC20(IFraxlendPair(cache.lendingPair).asset()).balanceOf(cache.lendingPair)
             ) return;
 
         if (!_solventCheckAfterRepay(
@@ -244,9 +252,15 @@ contract LeverageManagerHandler is Properties {
         ) {
 
             // POST-CONDITIONS
-            __afterLM(cache.lendingPair);
+            __afterLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
 
-            invariant_POD_4(FraxlendPair(cache.lendingPair));
+            // invariant_POD_4(FraxlendPair(cache.lendingPair));
+            // invariant_POD_16();
+            invariant_POD_17();
+            invariant_POD_20();
+            // invariant_POD_24();
+            invariant_POD_25();
+            invariant_POD_26();
 
             if (_beforeLM.vaultUtilization > 0) {
                 invariant_POD_6();
