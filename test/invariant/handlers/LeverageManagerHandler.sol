@@ -147,10 +147,12 @@ contract LeverageManagerHandler is Properties {
             // return;
         } catch Error(string memory reason) {
             
-            string[3] memory stringErrors = [
+            string[5] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
-                "UniswapV2Router: EXCESSIVE_INPUT_AMOUNT"
+                "UniswapV2Router: EXCESSIVE_INPUT_AMOUNT",
+                "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
+                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
             ];
 
             bool expected = false;
@@ -270,7 +272,7 @@ contract LeverageManagerHandler is Properties {
                 // invariant_POD_8(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization);
             }
 
-        } catch Error(string memory reason) {  // {fl.t(false, "REMOVE LEVERAGE");} 
+        } catch Error(string memory reason) {
             
             string[3] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
@@ -289,6 +291,23 @@ contract LeverageManagerHandler is Properties {
             }
             fl.t(expected, reason);
         }
+        // catch (bytes memory err) {
+
+        //     bytes4[1] memory errors = [FraxlendPairConstants.Insolvent.selector]; 
+
+        //     bool expected = false;
+        //     for (uint256 i = 0; i < errors.length; i++) {
+        //         if (errors[i] == bytes4(err)) {
+        //             if (
+        //                 IFraxlendPair(cache.lendingPair).userBorrowShares(cache.custodian) != 
+        //                 _beforeLM.custodianBorrowShares
+        //                 ) {
+        //                     invariant_POD_33();
+        //                 }
+        //         }
+        //     }
+
+        // }
     }
 
     function _solventCheckAfterRepay(

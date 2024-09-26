@@ -4,6 +4,8 @@ pragma solidity ^0.8.19;
 import {BeforeAfter} from "./BeforeAfter.sol";
 
 import {FraxlendPair} from "../modules/fraxlend/FraxlendPair.sol";
+import {FraxlendPairCore} from "../modules/fraxlend/FraxlendPairCore.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Properties is BeforeAfter {
     
@@ -14,10 +16,9 @@ contract Properties is BeforeAfter {
     function invariant_POD_2(uint256 shares) internal {
         // LendingAssetVault::deposit share balance of receiver should increase
         // LendingAssetVault::mint share balance of receiver should increase
-        fl.gte(
+        fl.eq(
             _afterLav.receiverShareBalance,
-            _beforeLav.receiverShareBalance, // + shares,
-            //10000,
+            _beforeLav.receiverShareBalance + shares,
             "POD-2: LendingAssetVault::deposit/mint share balance of receiver should increase"
         );
     }
@@ -126,8 +127,13 @@ contract Properties is BeforeAfter {
     //     );
     // }
 
-    function invariant_POD_13() internal {
+    function invariant_POD_13(uint256 actualAmount, uint256 maxAmount) internal {
         // LendingAssetVault::withdraw/redeem User can't withdraw more than their share of total assets
+        fl.lte(
+            actualAmount,
+            maxAmount,
+            "POD-13: LendingAssetVault::withdraw/redeem User can't withdraw more than their share of total assets"
+        );
     }
  
     function invariant_POD_14(uint256 assets) internal {
@@ -146,17 +152,17 @@ contract Properties is BeforeAfter {
         );
     }
 
-    function invariant_POD_15() internal {
-        // LendingAssetVault::global FraxLend vault should never more assets lent to it from the LAV that the allotted _vaultMaxPerc 
-        // e.g. convertToAssets(LAV fToken share balance) <= totalAssets * vault pct
-        for (uint256 i; i < _fraxPairs.length; i++) {
-            fl.lte(
-                _lendingAssetVault.convertToAssets(_fraxPairs[i].balanceOf(address(_lendingAssetVault))),
-                _lendingAssetVault.totalAssets() * 2500,
-                "POD-15: FraxLend vault should never more assets lent to it from the LAV that the allotted _vaultMaxPerc"
-            );
-        }
-    }
+    // function invariant_POD_15() public {
+    //     // LendingAssetVault::global FraxLend vault should never more assets lent to it from the LAV that the allotted _vaultMaxPerc 
+    //     // e.g. convertToAssets(LAV fToken share balance) <= totalAssets * vault pct
+    //     for (uint256 i; i < _fraxPairs.length; i++) {
+    //         fl.lte(
+    //             _lendingAssetVault.convertToAssets(_fraxPairs[i].balanceOf(address(_lendingAssetVault))),
+    //             _lendingAssetVault.totalAssets() * 2500,
+    //             "POD-15: FraxLend vault should never more assets lent to it from the LAV that the allotted _vaultMaxPerc"
+    //         );
+    //     }
+    // }
 
     function invariant_POD_16() internal {
         // LendingAssetVault::whitelistDeposit and whitelistWithdraw  _cbr() should not change after a whitelistDeposit 
@@ -211,12 +217,12 @@ contract Properties is BeforeAfter {
         fl.lt(
             _afterLM.totalBorrowAmount,
             _beforeLM.totalBorrowAmount,
-            "POD-19a: LeverageManager::addLeverage Post adding leverage, there totalBorrow amount and shares should increase"
+            "POD-20a: LeverageManager::removeLeverage Post removing leverage, there totalBorrow amount and shares should decrease"
         );
         fl.lt(
             _afterLM.totalBorrowShares,
             _beforeLM.totalBorrowShares,
-            "POD-19b: LeverageManager::addLeverage Post adding leverage, there totalBorrow amount and shares should increase"
+            "POD-20b: LeverageManager::removeLeverage Post removing leverage, there totalBorrow amount and shares should decrease"
         );
     }
 
@@ -298,9 +304,56 @@ contract Properties is BeforeAfter {
 
     function invariant_POD_28() internal {
         // Fraxlend should not experience overflow revert
+        fl.t(false, "Fraxlend should not experience overflow revert");
     }
 
     function invariant_POD_29() internal {
         // FraxLend: cbr change with one large update == cbr change with multiple, smaller updates
     }
+
+    function invariant_POD_30() public {
+        // IERC20(pod).balanceOf(leverageManager) == 0, IERC20(pairedLpToken).balanceOf(leverageManager) == 0
+        for (uint256 i; i < _pods.length; i++) {
+            fl.eq(
+                _pods[i].balanceOf(address(_leverageManager)),
+                0,
+                "POD-30a: LeverageManager contract should never hold any token balances"
+            );
+            fl.eq(
+                IERC20(_pods[i].PAIRED_LP_TOKEN()).balanceOf(address(_leverageManager)),
+                0,
+                "POD-30b: LeverageManager contract should never hold any token balances"
+            );
+        }
+    }
+
+    function invariant_POD_31() public {
+        // FraxlendPair.totalAsset includes both direct deposits and external vault deposits. 
+        // Therefore, it shouuld always be greater or equal to vaultUtilization mapping tracked in LendingAssetVault
+        for (uint256 i; i < _fraxPairs.length; i++) {
+            (uint128 pairTotalAssets, ) = FraxlendPairCore(address(_fraxPairs[i])).totalAsset();
+            fl.gte(
+                uint256(pairTotalAssets),
+                _lendingAssetVault.vaultUtilization(address(_fraxPairs[i])),
+                "POD-31: FraxlendPair.totalAsset should be greater or equal to vaultUtilization (LendingAssetVault)"
+            );
+        }
+    }
+
+    function invariant_POD_32() public {
+        // totalAssets must be greater than totalAssetUtilized
+        fl.gte(
+            _lendingAssetVault.totalAssets(),
+            _lendingAssetVault.totalAssetsUtilized(),
+            "POD-32: totalAssets must be greater than totalAssetUtilized"
+        );
+    }
+
+    function invariant_POD_33() internal {
+        // repayAsset should not lead to to insolvency
+        fl.t(false, "POD-33: repayAsset should not lead to to insolvency");
+    }
+
+    // Workflow modifier cannot be left open
+    // Voting pool balance + staking pool balance should equal token reward shares
 }

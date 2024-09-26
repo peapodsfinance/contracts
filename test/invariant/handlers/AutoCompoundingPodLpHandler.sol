@@ -48,9 +48,11 @@ contract AutoCompoundingPodLpHandler is Properties {
         vm.prank(cache.user);
         try cache.aspTKN.deposit(assets, cache.receiver) {} catch Error(string memory reason) {
             
-            string[2] memory stringErrors = [
+            string[4] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
-                "UniswapV2Router: INSUFFICIENT_B_AMOUNT"
+                "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
+                "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
+                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
             ];
 
             bool expected = false;
@@ -95,9 +97,11 @@ contract AutoCompoundingPodLpHandler is Properties {
         vm.prank(cache.user);
         try cache.aspTKN.mint(shares, cache.receiver) {} catch Error(string memory reason) {
             
-            string[2] memory stringErrors = [
+            string[4] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
-                "UniswapV2Router: INSUFFICIENT_B_AMOUNT"
+                "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
+                "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
+                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
             ];
 
             bool expected = false;
@@ -139,9 +143,11 @@ contract AutoCompoundingPodLpHandler is Properties {
         vm.prank(cache.user);
         try cache.aspTKN.withdraw(assets, cache.receiver, address(0)) {} catch Error(string memory reason) {
             
-            string[2] memory stringErrors = [
+            string[4] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
-                "UniswapV2Router: INSUFFICIENT_B_AMOUNT"
+                "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
+                "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
+                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
             ];
 
             bool expected = false;

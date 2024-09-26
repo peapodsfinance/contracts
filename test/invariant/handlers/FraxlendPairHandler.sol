@@ -211,25 +211,26 @@ contract FraxlendPairHandler is Properties {
         cache.fraxCollateral = cache.fraxPair.collateralContract();
         (cache.fraxAssets, , cache.fraxBorrows, , ) = cache.fraxPair.getPairAccounting();
 
-        // cache.borrowCapacity = cache.fraxPair.borrowLimit() - cache.fraxBorrows;
-        // borrowAmount = fl.clamp(borrowAmount, 0, cache.borrowCapacity);
+        cache.borrowCapacity = cache.fraxPair.borrowLimit() - cache.fraxBorrows;
+        borrowAmount = fl.clamp(borrowAmount, 0, cache.borrowCapacity);
 
         if (borrowAmount > cache.fraxAssets - cache.fraxBorrows) return;
 
-        // collateralAmount = fl.clamp(collateralAmount, 0, cache.fraxCollateral.balanceOf(cache.user));
+        collateralAmount = fl.clamp(collateralAmount, 0, cache.fraxCollateral.balanceOf(cache.user));
 
         vm.prank(cache.user);
         cache.fraxCollateral.approve(address(cache.fraxPair), collateralAmount);
 
         // ACTION
-        // vm.prank(cache.user);
-        // try cache.fraxPair.borrowAsset(
-        //     borrowAmount,
-        //     collateralAmount,
-        //     cache.receiver
-        // ) {} catch (bytes memory err) {
-        //     bytes4[1] memory errors =
-        //         [FraxlendPairConstants.Insolvent.selector];
+        vm.prank(cache.user);
+        // try 
+        cache.fraxPair.borrowAsset(
+            borrowAmount,
+            collateralAmount,
+            cache.receiver
+        ); 
+        // {} catch (bytes memory err) {
+        //     bytes4[1] memory errors = [FraxlendPairConstants.Insolvent.selector];
         //     bool expected = false;
         //     for (uint256 i = 0; i < errors.length; i++) {
         //         if (errors[i] == bytes4(err)) {
@@ -299,6 +300,16 @@ contract FraxlendPairHandler is Properties {
             fl.t(expected, FuzzLibString.getRevertMsg(err));
         }
     }
-    // leveragedPosition???
+    // leveragedPosition
+    // struct LeveragedPositionTemps {
+
+    // }
+
+    // function fraxPair_leveragedPosition() public {
+
+    //     // PRE-CONDITIONS
+
+    //     // ACTION
+    // }
     // repayAssetWithCollateral
 }

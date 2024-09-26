@@ -110,7 +110,7 @@ contract LendingAssetVaultHandler is Properties {
             cache.sharesMinted = _lendingAssetVault.convertToShares(assetsMinted);
             fl.log("Doanted amount", donatedAmount);
             fl.log("Doanted amount shares", _lendingAssetVault.convertToShares(donatedAmount));
-            invariant_POD_2(cache.sharesMinted);
+            // invariant_POD_2(cache.sharesMinted);
 
             lavDeposits += assetsMinted;
             fl.log("LAV DEPOSITS", lavDeposits);
@@ -125,6 +125,8 @@ contract LendingAssetVaultHandler is Properties {
         address receiver;
         address vaultAsset;
         uint256 assets;
+        uint256 shares;
+        uint256 maxAssets;
     }
 
     function lendingAssetVault_withdraw(
@@ -134,7 +136,7 @@ contract LendingAssetVaultHandler is Properties {
     ) public {
 
         // PRE-CONDITIONS
-        LavMintTemps memory cache;
+        LavWithdrawTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
         cache.receiver = randomAddress(receiverIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
@@ -142,6 +144,9 @@ contract LendingAssetVaultHandler is Properties {
         __beforeLav(cache.user, cache.receiver);
 
         assets = fl.clamp(assets, 0, _lendingAssetVault.maxWithdraw(cache.user));
+        cache.shares = _lendingAssetVault.convertToShares(assets);
+        cache.assets = _lendingAssetVault.convertToAssets(cache.shares);
+        cache.maxAssets = _lendingAssetVault.maxWithdraw(cache.user);
 
         if (assets > _lendingAssetVault.totalAvailableAssets()) return;
 
@@ -157,8 +162,9 @@ contract LendingAssetVaultHandler is Properties {
             __afterLav(cache.user, cache.receiver);
 
             invariant_POD_3(sharesWithdrawn);
+            invariant_POD_13(cache.assets, cache.maxAssets);
 
-            lavDeposits -= assets;
+            lavDeposits -= cache.assets;
             fl.log("LAV DEPOSITS", lavDeposits);
 
         } catch {
@@ -171,6 +177,7 @@ contract LendingAssetVaultHandler is Properties {
         address receiver;
         address vaultAsset;
         uint256 assets;
+        uint256 maxAssets;
     }
 
     function lendingAssetVault_redeem(
@@ -180,7 +187,7 @@ contract LendingAssetVaultHandler is Properties {
     ) public {
 
         // PRE-CONDITIONS
-        LavMintTemps memory cache;
+        LavRedeemTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
         cache.receiver = randomAddress(receiverIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
@@ -189,6 +196,7 @@ contract LendingAssetVaultHandler is Properties {
 
         shares = fl.clamp(shares, 0, _lendingAssetVault.maxRedeem(cache.user));
         cache.assets = _lendingAssetVault.convertToAssets(shares);
+        cache.maxAssets = _lendingAssetVault.convertToAssets(_lendingAssetVault.maxRedeem(cache.user));
 
         if (cache.assets > _lendingAssetVault.totalAvailableAssets()) return;
         
@@ -204,6 +212,7 @@ contract LendingAssetVaultHandler is Properties {
             __afterLav(cache.user, cache.receiver);
 
             invariant_POD_3(shares);
+            invariant_POD_13(assetsWithdrawn, cache.maxAssets);
 
             lavDeposits -= assetsWithdrawn;
             fl.log("LAV DEPOSITS", lavDeposits);

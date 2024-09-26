@@ -46,6 +46,7 @@ contract BeforeAfter is FuzzSetup {
         uint256 spTotalSupply;
         uint256 aspTotalSupply;
         uint256 custodianCollateralBalance;
+        uint256 custodianBorrowShares;
     }
 
     LeverageManagerVars internal _beforeLM;
@@ -61,6 +62,7 @@ contract BeforeAfter is FuzzSetup {
         _beforeLM.spTotalSupply = StakingPoolToken(WeightedIndex(payable(pod)).lpStakingPool()).totalSupply();
         _beforeLM.aspTotalSupply = AutoCompoundingPodLp(aspTKN).totalSupply();
         _beforeLM.custodianCollateralBalance = FraxlendPair(vault).userCollateralBalance(custodian);
+        _beforeLM.custodianBorrowShares = FraxlendPair(vault).userBorrowShares(custodian);
     }
 
     function __afterLM(address vault, address pod, address aspTKN, address custodian) internal {
@@ -73,6 +75,7 @@ contract BeforeAfter is FuzzSetup {
         _afterLM.spTotalSupply = StakingPoolToken(WeightedIndex(payable(pod)).lpStakingPool()).totalSupply();
         _afterLM.aspTotalSupply = AutoCompoundingPodLp(aspTKN).totalSupply();
         _afterLM.custodianCollateralBalance = FraxlendPair(vault).userCollateralBalance(custodian);
+        _afterLM.custodianBorrowShares = FraxlendPair(vault).userBorrowShares(custodian);
     }
 
     function _cbrGhost() internal returns (uint256) {
