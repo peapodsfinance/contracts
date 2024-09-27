@@ -21,6 +21,4 @@ interface IStakingPoolToken {
   function stake(address user, uint256 amount) external;
 
   function unstake(uint256 amount) external;
-
-  function externalRewardHook(address token0, address token1) external;
 }

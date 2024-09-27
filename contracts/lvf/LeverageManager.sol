@@ -165,6 +165,7 @@ contract LeverageManager is
     uint256 _userProvidedDebtAmtMax
   ) external override onlyPositionOwner(_positionId) workflow(true) {
     address _lendingPair = positionProps[_positionId].lendingPair;
+    IFraxlendPair(_lendingPair).addInterest(false);
 
     // if additional fees required for flash source, handle that here
     _processExtraFlashLoanPayment(_positionId, _msgSender());

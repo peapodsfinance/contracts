@@ -203,6 +203,11 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
     uint256 amount,
     bytes calldata data
   ) external pure override {}
+  function flashMint(
+    address recipient,
+    uint256 amount,
+    bytes calldata data
+  ) external pure override {}
   function getAllAssets()
     external
     pure
@@ -341,10 +346,6 @@ contract MockDexAdapter is IDexAdapter, Test {
   function createV2Pool(address, address) external pure returns (address) {
     return address(0);
   }
-  function extraRewardsHook(
-    address _token0,
-    address _token1
-  ) external returns (address[] memory tokens, uint256[] memory amounts) {}
   function getV2Pool(address, address) external pure returns (address pool) {
     return address(0);
   }

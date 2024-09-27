@@ -63,6 +63,12 @@ abstract contract DecentralizedIndex is
     uint256 amount
   );
 
+  event FlashMint(
+    address indexed executor,
+    address indexed recipient,
+    uint256 amount
+  );
+
   modifier lock() {
     require(unlocked == 1, 'L');
     unlocked = 0;
@@ -453,7 +459,7 @@ abstract contract DecentralizedIndex is
   /// @param _recipient User to receive underlying TKN for the flash loan
   /// @param _token TKN to borrow
   /// @param _amount Number of underying TKN to borrow
-  /// @param _data Any data the recipient wants to be passed on the flash loan callback callback
+  /// @param _data Any data the recipient wants to be passed on the flash loan callback
   function flash(
     address _recipient,
     address _token,
@@ -481,6 +487,22 @@ abstract contract DecentralizedIndex is
     IFlashLoanRecipient(_recipient).callback(_data);
     require(IERC20(_token).balanceOf(address(this)) >= _balance, 'FA');
     emit FlashLoan(_msgSender(), _recipient, _token, _amount);
+  }
+
+  /// @notice The ```flashMint``` function allows to flash mint pTKN and burn it + 0.1% at the end of the transaction
+  /// @param _recipient User to receive ptkn for the flash mint
+  /// @param _amount Number of pTKN to receive/mint
+  /// @param _data Any data the recipient wants to be passed on the flash mint callback
+  function flashMint(
+    address _recipient,
+    uint256 _amount,
+    bytes calldata _data
+  ) external override lock {
+    _mint(_recipient, _amount);
+    IFlashLoanRecipient(_recipient).callback(_data);
+    // Make sure the user has and we burn 0.1% more than they flash minted
+    _burn(_recipient, (_amount * 1001) / 1000);
+    emit FlashMint(_msgSender(), _recipient, _amount);
   }
 
   function setPartner(address _partner) external onlyPartner {

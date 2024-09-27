@@ -44,7 +44,7 @@ contract ChainlinkSinglePriceOracle is IMinimalSinglePriceOracle, Ownable {
     (, int256 _price, , uint256 _lastUpdated, ) = AggregatorV3Interface(
       _priceFeed
     ).latestRoundData();
-    _price18 = uint256(_price) * (10 ** 18 / 10 ** _decimals);
+    _price18 = (uint256(_price) * 10 ** 18) / 10 ** _decimals;
     _updatedAt = _lastUpdated;
   }
 

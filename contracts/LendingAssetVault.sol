@@ -168,10 +168,11 @@ contract LendingAssetVault is
   function withdraw(
     uint256 _assets,
     address _receiver,
-    address
+    address _owner
   ) external override returns (uint256 _shares) {
+    _updateInterestAndMdInAllVaults(address(0));
     _shares = convertToShares(_assets);
-    _withdraw(_shares, _receiver);
+    _withdraw(_shares, _assets, _owner, _msgSender(), _receiver);
   }
 
   function maxRedeem(
@@ -189,9 +190,11 @@ contract LendingAssetVault is
   function redeem(
     uint256 _shares,
     address _receiver,
-    address
+    address _owner
   ) external override returns (uint256 _assets) {
-    _assets = _withdraw(_shares, _receiver);
+    _updateInterestAndMdInAllVaults(address(0));
+    _assets = convertToAssets(_shares);
+    _withdraw(_shares, _assets, _owner, _msgSender(), _receiver);
   }
 
   /// @notice Donate assets to the vault without receiving shares
@@ -204,29 +207,31 @@ contract LendingAssetVault is
 
   /// @notice Internal function to handle share withdrawals
   /// @param _shares The amount of shares to withdraw
+  /// @param _assets The amount of assets to withdraw
+  /// @param _owner The owner of the shares being withdrawn
+  /// @param _caller The address who initiated withdrawing
   /// @param _receiver The address that will receive the assets
-  /// @return _assets The amount of assets withdrawn
   function _withdraw(
     uint256 _shares,
+    uint256 _assets,
+    address _owner,
+    address _caller,
     address _receiver
-  ) internal returns (uint256 _assets) {
-    _updateInterestAndMdInAllVaults(address(0));
-    _assets = convertToAssets(_shares);
+  ) internal {
+    if (_caller != _owner) {
+      _spendAllowance(_owner, _caller, _shares);
+    }
     require(totalAvailableAssets() >= _assets, 'AV');
-    _burn(_msgSender(), _shares);
+    _burn(_owner, _shares);
     IERC20(_asset).safeTransfer(_receiver, _assets);
     _totalAssets -= _assets;
-    emit Withdraw(_msgSender(), _receiver, _receiver, _assets, _shares);
+    emit Withdraw(_owner, _receiver, _receiver, _assets, _shares);
   }
 
   /// @notice Assumes underlying vault asset has decimals == 18
   function _cbr() internal view returns (uint256) {
     uint256 _supply = totalSupply();
     return _supply == 0 ? PRECISION : (PRECISION * _totalAssets) / _supply;
-  }
-
-  function _assetDecimals() internal view returns (uint8) {
-    return IERC20Metadata(_asset).decimals();
   }
 
   /// @notice Updates interest and metadata for all whitelisted vaults
@@ -316,7 +321,10 @@ contract LendingAssetVault is
   /// @notice The ```redeemFromVault``` function redeems shares from a specific vault
   /// @param _vault The address of the vault to redeem from
   /// @param _amountShares The amount of shares to redeem (0 for all)
-  function redeemFromVault(address _vault, uint256 _amountShares) external {
+  function redeemFromVault(
+    address _vault,
+    uint256 _amountShares
+  ) external onlyOwner {
     _updateAssetMetadataFromVault(_vault);
     _amountShares = _amountShares == 0
       ? IERC20(_vault).balanceOf(address(this))
@@ -345,7 +353,7 @@ contract LendingAssetVault is
     require(vaultWhitelist[_vault] != _allowed, 'T');
     vaultWhitelist[_vault] = _allowed;
     if (_allowed) {
-      require(_vaultWhitelistAry.length <= maxVaults, 'M');
+      require(_vaultWhitelistAry.length < maxVaults, 'M');
       _vaultWhitelistAryIdx[_vault] = _vaultWhitelistAry.length;
       _vaultWhitelistAry.push(_vault);
     } else {
@@ -353,7 +361,11 @@ contract LendingAssetVault is
       address _movingVault = _vaultWhitelistAry[_vaultWhitelistAry.length - 1];
       _vaultWhitelistAry[_idx] = _movingVault;
       _vaultWhitelistAryIdx[_movingVault] = _idx;
+
+      // clean up state
       _vaultWhitelistAry.pop();
+      delete _vaultMaxPerc[_vault];
+      delete _vaultWhitelistAryIdx[_vault];
     }
     emit SetVaultWhitelist(_vault, _allowed);
   }

@@ -101,7 +101,7 @@ contract LeverageManagerTest is Test {
 
     // Setup LeverageManager
     leverageManager.setLendingPair(address(pod), address(mockFraxlendPair));
-    leverageManager.setFlashSource(address(pod), address(flashSource));
+    leverageManager.setFlashSource(dai, address(flashSource));
 
     // Approve LeverageManager to spend tokens
     vm.startPrank(ALICE);
@@ -132,6 +132,7 @@ contract LeverageManagerTest is Test {
     uint256 positionId = leverageManager.initializePosition(
       address(pod),
       ALICE,
+      address(0),
       address(0)
     );
 
@@ -174,6 +175,7 @@ contract LeverageManagerTest is Test {
       address returnedPod,
       address lendingPair,
       address custodian,
+      bool isSelfLending,
       address selfLendingPod
     ) = leverageManager.positionProps(positionId);
     assertEq(returnedPod, address(pod), 'Incorrect pod address');
@@ -183,6 +185,7 @@ contract LeverageManagerTest is Test {
       'Incorrect lending pair address'
     );
     assertNotEq(custodian, address(0), 'Custodian address should not be zero');
+    assertEq(isSelfLending, false, 'Not self lending');
     assertEq(selfLendingPod, address(0), 'Self lending pod should be zero');
   }
 
@@ -196,7 +199,7 @@ contract LeverageManagerTest is Test {
 
   //   uint256 positionId = leverageManager.initializePosition(
   //     address(mockDecentralizedIndex),
-  //     ALICE,
+  //     ALICE,address(0),
   //     address(0)
   //   );
 
@@ -229,7 +232,7 @@ contract LeverageManagerTest is Test {
 
   //   uint256 positionId = leverageManager.initializePosition(
   //     address(mockDecentralizedIndex),
-  //     ALICE,
+  //     ALICE,address(0),
   //     address(0)
   //   );
 
@@ -302,6 +305,7 @@ contract LeverageManagerTest is Test {
     uint256 positionId = leverageManager.initializePosition(
       address(pod),
       ALICE,
+      address(0),
       address(0)
     );
 
@@ -336,6 +340,7 @@ contract LeverageManagerTest is Test {
     uint256 positionId = leverageManager.initializePosition(
       address(pod),
       ALICE,
+      address(0),
       address(0)
     );
     vm.stopPrank();
@@ -363,7 +368,7 @@ contract LeverageManagerTest is Test {
   //   vm.startPrank(ALICE);
   //   uint256 positionId = leverageManager.initializePosition(
   //     address(mockDecentralizedIndex),
-  //     ALICE,
+  //     ALICE,address(0),
   //     address(0)
   //   );
 
@@ -414,7 +419,7 @@ contract LeverageManagerTest is Test {
   //   vm.startPrank(ALICE);
   //   uint256 positionId = leverageManager.initializePosition(
   //     address(mockDecentralizedIndex),
-  //     ALICE,
+  //     ALICE,address(0),
   //     mockSelfLendingPod
   //   );
 
@@ -451,7 +456,7 @@ contract LeverageManagerTest is Test {
   //   vm.startPrank(ALICE);
   //   uint256 positionId = leverageManager.initializePosition(
   //     address(mockDecentralizedIndex),
-  //     ALICE,
+  //     ALICE,address(0),
   //     address(0)
   //   );
 
@@ -493,6 +498,7 @@ contract LeverageManagerTest is Test {
     uint256 positionId = leverageManager.initializePosition(
       address(pod),
       ALICE,
+      address(0),
       address(0)
     );
 

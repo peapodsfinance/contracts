@@ -171,8 +171,4 @@ contract TestERC4626Vault is IERC4626, ERC20, ERC20Permit {
     uint256 _supply = totalSupply();
     return _supply == 0 ? PRECISION : (PRECISION * totalAssets()) / _supply;
   }
-
-  function _assetDecimals() internal view returns (uint8) {
-    return IERC20Metadata(_asset).decimals();
-  }
 }

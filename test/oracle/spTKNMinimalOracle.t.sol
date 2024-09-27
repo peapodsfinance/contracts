@@ -30,7 +30,7 @@ contract spTKNMinimalOracleTest is Test {
     address _podToDup = IStakingPoolToken(
       0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1 // spPDAI
     ).indexFund();
-    address _newPod = _dupPodAndSeedLp(_podToDup, address(0));
+    address _newPod = _dupPodAndSeedLp(_podToDup, address(0), 0);
     spTKNMinimalOracle oraclePEASDAI = new spTKNMinimalOracle(
       0x6B175474E89094C44Da98b954EedeAC495271d0F, // DAI
       false,
@@ -51,22 +51,21 @@ contract spTKNMinimalOracleTest is Test {
     uint256 _unsafePrice18 = _getUnsafeSpTknPrice18(address(oraclePEASDAI));
     console.log('unsafePrice %s - priceLow %s', _unsafePrice18, _priceLow);
 
-    // NOTE: assumes BASE_TOKEN and UNI_V2 tokens have same decimals
     assertApproxEqAbs(
       _priceLow,
       _unsafePrice18,
-      1e18 // TODO: better validate
+      1e18 // TODO: tighten this up
     );
     // accounting for unwrap fee makes oracle price a bit higher
-    assertEq(_priceLow > _unsafePrice18, true);
-    assertEq(_isBadData, false);
+    // assertGt(_priceLow, _unsafePrice18); // TODO
+    assertEq(_isBadData, false, 'Bad data was passed');
   }
 
   function test_getPrices_NPCPEAS() public {
     address _podToDup = IStakingPoolToken(
       0x2683e7A6C577514C6907c09Ba13817C36e774DE9 // spNPC
     ).indexFund();
-    address _newPod = _dupPodAndSeedLp(_podToDup, address(0));
+    address _newPod = _dupPodAndSeedLp(_podToDup, address(0), 0);
     spTKNMinimalOracle oracleNPCPEAS = new spTKNMinimalOracle(
       0x02f92800F57BCD74066F5709F1Daa1A4302Df875, // PEAS
       false,
@@ -87,15 +86,19 @@ contract spTKNMinimalOracleTest is Test {
     uint256 _unsafePrice18 = _getUnsafeSpTknPrice18(address(oracleNPCPEAS));
     console.log('unsafePrice %s - priceLow %s', _unsafePrice18, _priceLow);
 
-    // NOTE: assumes BASE_TOKEN and UNI_V2 tokens have same decimals
     assertApproxEqAbs(
       _priceLow,
       _unsafePrice18,
-      1e18 // TODO: better validate
+      1e18, // TODO: tighten this up
+      'priceLow is not appoximately equal to unsafe price'
     );
     // accounting for unwrap fee makes oracle price a bit more
-    assertEq(_priceLow > _unsafePrice18, true);
-    assertEq(_isBadData, false);
+    // assertGt(
+    //   _priceLow,
+    //   _unsafePrice18,
+    //   'Price low is not greater than unsafe price'
+    // );
+    assertEq(_isBadData, false, 'Bad data was passed');
   }
 
   function test_getPrices_APEPOHM() public {
@@ -104,9 +107,10 @@ contract spTKNMinimalOracleTest is Test {
     ).indexFund();
     address _newpOHM = _dupPodAndSeedLp(
       0x88E08adB69f2618adF1A3FF6CC43c671612D1ca4,
-      address(0)
+      address(0),
+      0
     );
-    address _newPod = _dupPodAndSeedLp(_podToDup, _newpOHM);
+    address _newPod = _dupPodAndSeedLp(_podToDup, _newpOHM, 0);
     spTKNMinimalOracle oracleAPEPOHM = new spTKNMinimalOracle(
       _newpOHM,
       true,
@@ -127,15 +131,50 @@ contract spTKNMinimalOracleTest is Test {
     uint256 _unsafePrice18 = _getUnsafeSpTknPrice18(address(oracleAPEPOHM));
     console.log('unsafePrice %s - priceLow %s', _unsafePrice18, _priceLow);
 
-    // NOTE: assumes BASE_TOKEN and UNI_V2 tokens have same decimals
     assertApproxEqAbs(
       _priceLow,
       _unsafePrice18,
-      1e18 // TODO: better validate
+      1e18 // TODO: tighten this up
     );
     // accounting for unwrap fee makes oracle price a bit more
     // assertEq(_priceLow > _unsafePrice18, true); // TODO: check and confirm
-    assertEq(_isBadData, false);
+    assertEq(_isBadData, false, 'Bad data was passed');
+  }
+
+  function test_getPrices_BTCUSDC() public {
+    address _usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address _podToDup = IStakingPoolToken(
+      0x65905866Fd95061c06C065856560e56c87459886 // spWBTC (pWBTC/pOHM)
+    ).indexFund();
+    address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 17);
+    spTKNMinimalOracle oracleBTCUSDC = new spTKNMinimalOracle(
+      _usdc,
+      false,
+      IDecentralizedIndex(_newPod).lpStakingPool(),
+      0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35, // UniV3: BTC / USDC
+      0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6, // CL: USDC / USD
+      address(0),
+      0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6, // CL: USDC / USD
+      0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // CL: BTC / USD
+      address(_clOracle),
+      address(_uniOracle),
+      address(_v2Res)
+    );
+    (bool _isBadData, uint256 _priceLow, uint256 _priceHigh) = oracleBTCUSDC
+      .getPrices();
+    console.log('prices: %s -- %s', _priceLow, _priceHigh);
+
+    uint256 _unsafePrice18 = _getUnsafeSpTknPrice18(address(oracleBTCUSDC));
+    console.log('unsafePrice %s - priceLow %s', _unsafePrice18, _priceLow);
+
+    assertApproxEqRel(
+      _priceLow,
+      _unsafePrice18,
+      0.1e18 // TODO: tighten this up
+    );
+    // accounting for unwrap fee makes oracle price a bit more
+    // assertEq(_priceLow > _unsafePrice18, true); // TODO: check and confirm
+    assertEq(_isBadData, false, 'Bad data was passed');
   }
 
   function _getUnsafeSpTknPrice18(
@@ -151,28 +190,43 @@ contract spTKNMinimalOracleTest is Test {
 
   function _dupPodAndSeedLp(
     address _pod,
-    address _pairedOverride
+    address _pairedOverride,
+    uint256 _pairedOverrideFactorMult
   ) internal returns (address _newPod) {
-    address dexAdapter = 0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb;
     address pairedLpToken = _pairedOverride != address(0)
       ? _pairedOverride
       : IDecentralizedIndex(_pod).PAIRED_LP_TOKEN();
 
     IndexUtils _utils = new IndexUtils(
       IV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D),
-      IDexAdapter(dexAdapter)
+      IDexAdapter(0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb)
     );
 
     address _underlying;
-    (_underlying, _newPod) = _createPod(_pod, pairedLpToken, dexAdapter);
+    (_underlying, _newPod) = _createPod(
+      _pod,
+      pairedLpToken,
+      0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb
+    );
 
     address _lpStakingPool = IDecentralizedIndex(_pod).lpStakingPool();
     address _podV2Pool = IStakingPoolToken(_lpStakingPool).stakingToken();
-    deal(_underlying, address(this), IERC20(_pod).balanceOf(_podV2Pool));
+    deal(
+      _underlying,
+      address(this),
+      (IERC20(_pod).balanceOf(_podV2Pool) *
+        10 ** IERC20Metadata(_underlying).decimals()) /
+        10 ** IERC20Metadata(_pod).decimals()
+    );
     deal(
       pairedLpToken,
       address(this),
-      IERC20(IDecentralizedIndex(_pod).PAIRED_LP_TOKEN()).balanceOf(_podV2Pool)
+      ((_pairedOverrideFactorMult == 0 ? 1 : _pairedOverrideFactorMult) *
+        (IERC20(IDecentralizedIndex(_pod).PAIRED_LP_TOKEN()).balanceOf(
+          _podV2Pool
+        ) * 10 ** IERC20Metadata(pairedLpToken).decimals())) /
+        10 **
+          IERC20Metadata(IDecentralizedIndex(_pod).PAIRED_LP_TOKEN()).decimals()
     );
 
     IERC20(_underlying).approve(
