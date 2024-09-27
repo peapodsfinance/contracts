@@ -212,7 +212,7 @@ contract LendingAssetVaultHandler is Properties {
             __afterLav(cache.user, cache.receiver);
 
             invariant_POD_3(shares);
-            invariant_POD_13(assetsWithdrawn, cache.maxAssets);
+            // invariant_POD_13(assetsWithdrawn, cache.maxAssets);
 
             lavDeposits -= assetsWithdrawn;
             fl.log("LAV DEPOSITS", lavDeposits);

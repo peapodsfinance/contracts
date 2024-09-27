@@ -94,9 +94,7 @@ contract LeverageManagerHandler is Properties {
         (uint256 fraxAssets, , uint256 fraxBorrows, , ) = IFraxlendPair(cache.lendingPair).getPairAccounting();
         if (pairedLpAmount + feeAmount > fraxAssets - fraxBorrows) return;
 
-        _peasPriceFeed.updateAnswer(3e18);
-        _daiPriceFeed.updateAnswer(1e18);
-        _wethPriceFeed.updateAnswer(3000e18);
+        _updatePrices(positionIdSeed);
 
         // ACTION
         vm.prank(cache.user);

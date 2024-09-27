@@ -221,31 +221,151 @@ contract FraxlendPairHandler is Properties {
         vm.prank(cache.user);
         cache.fraxCollateral.approve(address(cache.fraxPair), collateralAmount);
 
+        _updatePrices(userIndexSeed);
+
         // ACTION
         vm.prank(cache.user);
-        // try 
         cache.fraxPair.borrowAsset(
             borrowAmount,
             collateralAmount,
             cache.receiver
         ); 
-        // {} catch (bytes memory err) {
-        //     bytes4[1] memory errors = [FraxlendPairConstants.Insolvent.selector];
-        //     bool expected = false;
-        //     for (uint256 i = 0; i < errors.length; i++) {
-        //         if (errors[i] == bytes4(err)) {
-        //             expected = true;
-        //             break;
-        //         }
-        //     }
-        //     fl.t(expected, FuzzLibString.getRevertMsg(err));
-        // }
+
     }
 
     // addCollateral
+    struct AddCollateralTemps {
+        address user;
+        address borrower;
+        IERC20 fraxCollateral;
+        FraxlendPair fraxPair;
+    }
+
+    function fraxPair_addCollateral(
+        uint256 userIndexSeed,
+        uint256 borrowerIndexSeed,
+        uint256 fraxlendSeed,
+        uint256 collateralAmount
+    ) public {
+
+        // PRE-CONDITIONS
+        AddCollateralTemps memory cache;
+        cache.user = randomAddress(userIndexSeed);
+        cache.borrower = randomAddress(borrowerIndexSeed);
+        cache.fraxPair = randomFraxPair(fraxlendSeed);
+        cache.fraxCollateral = cache.fraxPair.collateralContract();
+
+        collateralAmount = fl.clamp(collateralAmount, 0, cache.fraxCollateral.balanceOf(cache.user));
+
+        vm.prank(cache.user);
+        cache.fraxCollateral.approve(address(cache.fraxPair), collateralAmount);
+
+        // ACTION
+        vm.prank(cache.user);
+        try cache.fraxPair.addCollateral(
+            collateralAmount,
+            cache.borrower
+        ) {} catch {
+            fl.t(false, "ADD COLLATERAL FAILED");
+        }
+    }
 
     // removeCollateral
+    struct RemoveCollateralTemps {
+        address user;
+        address receiver;
+        IERC20 fraxCollateral;
+        FraxlendPair fraxPair;
+    }
+
+    function fraxPair_removeCollateral(
+        uint256 userIndexSeed,
+        uint256 receiverIndexSeed,
+        uint256 fraxlendSeed,
+        uint256 collateralAmount
+    ) public {
+
+        // PRE-CONDITIONS
+        RemoveCollateralTemps memory cache;
+        cache.user = randomAddress(userIndexSeed);
+        cache.receiver = randomAddress(receiverIndexSeed);
+        cache.fraxPair = randomFraxPair(fraxlendSeed);
+        cache.fraxCollateral = cache.fraxPair.collateralContract();
+
+        collateralAmount = fl.clamp(collateralAmount, 0, cache.fraxPair.userCollateralBalance(cache.user));
+
+        _updatePrices(userIndexSeed);
+
+        // ACTION
+        vm.prank(cache.user);
+        try cache.fraxPair.removeCollateral(
+            collateralAmount,
+            cache.receiver
+        ) {} catch (bytes memory err) {
+            bytes4[1] memory errors =
+                [FraxlendPairConstants.Insolvent.selector];
+            bool expected = false;
+            for (uint256 i = 0; i < errors.length; i++) {
+                if (errors[i] == bytes4(err)) {
+                    expected = true;
+                    break;
+                }
+            }
+            fl.t(expected, FuzzLibString.getRevertMsg(err));
+        }
+    }
+
     // repayAsset
+    struct RepayAssetTemps {
+        address user;
+        address borrower;
+        uint256 amountToRepay;
+        uint256 sharesToBurn;
+        IERC20 fraxCollateral;
+        IERC20 fraxAsset;
+        FraxlendPair fraxPair;
+    }
+
+    function fraxPair_repayAsset(
+        uint256 userIndexSeed,
+        uint256 borrowerIndexSeed,
+        uint256 fraxlendSeed,
+        uint256 shares
+    ) public {
+
+        // PRE-CONDITIONS
+        RepayAssetTemps memory cache;
+        cache.user = randomAddress(userIndexSeed);
+        cache.borrower = randomAddress(borrowerIndexSeed);
+        cache.fraxPair = randomFraxPair(fraxlendSeed);
+        cache.fraxCollateral = cache.fraxPair.collateralContract();
+        cache.fraxAsset = IERC20(cache.fraxPair.asset());
+
+        shares = fl.clamp(shares, 0, cache.fraxPair.userBorrowShares(cache.borrower));
+        cache.amountToRepay = cache.fraxPair.toBorrowAmount(shares, false, true);
+
+        cache.sharesToBurn = _lendingAssetVault.vaultUtilization(address(cache.fraxPair)) > cache.amountToRepay ? 
+        cache.fraxPair.convertToShares(cache.amountToRepay) :
+        cache.fraxPair.convertToShares(_lendingAssetVault.vaultUtilization(address(cache.fraxPair)));
+
+        if (
+            cache.amountToRepay > cache.fraxAsset.balanceOf(cache.user) ||
+            cache.sharesToBurn > cache.fraxPair.balanceOf(address(_lendingAssetVault)) 
+            ) return;
+
+        vm.prank(cache.user);
+        cache.fraxAsset.approve(address(cache.fraxPair), cache.amountToRepay);
+
+        // ACTION
+        vm.prank(cache.user);
+        try cache.fraxPair.repayAsset(
+            shares,
+            cache.borrower
+        ) {} catch {
+            fl.t(false, "REPAY ASSET FAILED");
+        }
+    }
+
     // liquidate
     struct LiquidateTemps {
         address user;
@@ -276,9 +396,7 @@ contract FraxlendPairHandler is Properties {
 
         shares = uint128(fl.clamp(uint256(shares), 0, cache.fraxPair.userBorrowShares(cache.custodian)));
 
-        _peasPriceFeed.updateAnswer(3e18);
-        _daiPriceFeed.updateAnswer(1e18);
-        _wethPriceFeed.updateAnswer(3000e18);
+        _updatePrices(positionIdSeed);
 
         // ACTION
         try cache.fraxPair.liquidate(

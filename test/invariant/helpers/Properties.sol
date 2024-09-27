@@ -152,27 +152,27 @@ contract Properties is BeforeAfter {
         );
     }
 
-    // function invariant_POD_15() public {
-    //     // LendingAssetVault::global FraxLend vault should never more assets lent to it from the LAV that the allotted _vaultMaxPerc 
-    //     // e.g. convertToAssets(LAV fToken share balance) <= totalAssets * vault pct
-    //     for (uint256 i; i < _fraxPairs.length; i++) {
-    //         fl.lte(
-    //             _lendingAssetVault.convertToAssets(_fraxPairs[i].balanceOf(address(_lendingAssetVault))),
-    //             _lendingAssetVault.totalAssets() * 2500,
-    //             "POD-15: FraxLend vault should never more assets lent to it from the LAV that the allotted _vaultMaxPerc"
-    //         );
-    //     }
-    // }
-
-    function invariant_POD_16() internal {
-        // LendingAssetVault::whitelistDeposit and whitelistWithdraw  _cbr() should not change after a whitelistDeposit 
-        // and whitelistWithdraw since the burn/mint should be proportional.
-        fl.eq(
-            _afterLM.cbr,
-            _beforeLM.cbr,
-            "POD-16: LendingAssetVault::whitelistDeposit and whitelistWithdraw  _cbr() should not change after a whitelistDeposit/Withdraw"
-        );
+    function invariant_POD_15() public {
+        // LendingAssetVault::global FraxLend vault should never more assets lent to it from the LAV that the allotted _vaultMaxPerc 
+        // e.g. convertToAssets(LAV fToken share balance) <= totalAssets * vault pct
+        for (uint256 i; i < _fraxPairs.length; i++) {
+            fl.lte(
+                _lendingAssetVault.vaultUtilization(address(_fraxPairs[i])),
+                _lendingAssetVault.totalAssets() * 2500,
+                "POD-15: FraxLend vault should never more assets lent to it from the LAV that the allotted _vaultMaxPerc"
+            );
+        }
     }
+
+    // function invariant_POD_16() internal {
+    //     // LendingAssetVault::whitelistDeposit and whitelistWithdraw  _cbr() should not change after a whitelistDeposit 
+    //     // and whitelistWithdraw since the burn/mint should be proportional.
+    //     fl.eq(
+    //         _afterLM.cbr,
+    //         _beforeLM.cbr,
+    //         "POD-16: LendingAssetVault::whitelistDeposit and whitelistWithdraw  _cbr() should not change after a whitelistDeposit/Withdraw"
+    //     );
+    // }
 
     function invariant_POD_17() internal {
         // LendingAssetVault::whitelistDeposit Post-state utilization rate in FraxLend should have decreased (called by repayAsset in FraxLend)

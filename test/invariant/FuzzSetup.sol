@@ -106,6 +106,13 @@ contract FuzzSetup is Test, FuzzBase {
     uint256 donatedAmount;
     uint256 lavDeposits;
 
+    uint256 internal _peasPrice;
+    uint256 internal _daiPrice;
+    uint256 internal _wethPrice;
+    uint256 internal _tokenAPrice;
+    uint256 internal _tokenBPrice;
+    uint256 internal _tokenCPrice;
+
     /*///////////////////////////////////////////////////////////////
                             TEST CONTRACTS
     ///////////////////////////////////////////////////////////////*/
@@ -468,11 +475,17 @@ contract FuzzSetup is Test, FuzzBase {
 
     function _deployPriceFeeds() internal {
         _peasPriceFeed = new MockV3Aggregator(_peas.decimals(), 3e18);
+        _peasPrice = 3e18;
         _daiPriceFeed = new MockV3Aggregator(_mockDai.decimals(), 1e18);
+        _daiPrice = 1e18;
         _wethPriceFeed = new MockV3Aggregator(_weth.decimals(), 3000e18);
+        _wethPrice = 3000e18;
         _tokenAPriceFeed = new MockV3Aggregator(_tokenA.decimals(), 1e18);
+        _tokenAPrice = 1e18;
         _tokenBPriceFeed = new MockV3Aggregator(_tokenB.decimals(), 100e6);
+        _tokenBPrice = 100e6;
         _tokenCPriceFeed = new MockV3Aggregator(_tokenC.decimals(), 50e18);
+        _tokenCPrice = 50e18;
     }
 
     function _deployWeightedIndexes() internal {
@@ -1148,6 +1161,37 @@ contract FuzzSetup is Test, FuzzBase {
                 break;
             }
         }
+    }
+
+    function _updatePrices(uint256 seed) internal {
+    
+        _peasPrice = randomPrice(seed, _peasPrice);
+        _peasPriceFeed.updateAnswer(int256(_peasPrice));
+
+        _daiPrice = randomPrice(seed, _daiPrice);
+        _daiPriceFeed.updateAnswer(int256(_daiPrice));
+
+        _wethPrice = randomPrice(seed, _wethPrice);
+        _wethPriceFeed.updateAnswer(int256(_wethPrice));
+
+        _tokenAPrice = randomPrice(seed, _tokenAPrice);
+        _tokenAPriceFeed.updateAnswer(int256(_tokenAPrice));
+
+        _tokenBPrice = randomPrice(seed, _tokenBPrice);
+        _tokenBPriceFeed.updateAnswer(int256(_tokenBPrice));
+
+        _tokenCPrice = randomPrice(seed, _tokenCPrice);
+        _tokenCPriceFeed.updateAnswer(int256(_tokenCPrice));
+    }
+
+    function randomPrice(uint256 seed, uint256 price) internal returns (uint256) {
+        uint256 newPrice;
+        newPrice = bound(
+            seed,
+            (price * 9e18) / 10e18,
+            (price * 11e18) / 10e18
+        );
+        return newPrice;
     }
 
     function compareStrings(string memory a, string memory b) internal pure returns (bool) {
