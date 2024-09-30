@@ -9,6 +9,7 @@ import {LeveragePositions} from "../../../contracts/lvf/LeveragePositions.sol";
 import {ILeverageManager} from "../../../contracts/interfaces/ILeverageManager.sol";
 import {IFlashLoanSource} from "../../../contracts/interfaces/IFlashLoanSource.sol";
 import {AutoCompoundingPodLp} from "../../../contracts/AutoCompoundingPodLp.sol";
+import {StakingPoolToken} from "../../../contracts/StakingPoolToken.sol";
 
 import {IUniswapV2Pair} from "uniswap-v2/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import {FullMath} from "v3-core/libraries/FullMath.sol";
@@ -25,6 +26,7 @@ contract AutoCompoundingPodLpHandler is Properties {
         address receiver;
         address aspTKNAsset;
         address aspTKNAddress;
+        StakingPoolToken spTKN;
         AutoCompoundingPodLp aspTKN;
     }
 
@@ -37,16 +39,27 @@ contract AutoCompoundingPodLpHandler is Properties {
         cache.aspTKN = randomAspTKN(aspTKNSeed);
         cache.aspTKNAddress = address(cache.aspTKN);
         cache.aspTKNAsset = cache.aspTKN.asset();
+        cache.spTKN = StakingPoolToken(IDecentralizedIndex(cache.aspTKN.pod()).lpStakingPool());
 
         assets = fl.clamp(assets, 0, IERC20(cache.aspTKNAsset).balanceOf(cache.user));
         if (assets < 1000) return;
+
+        __beforeAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
         vm.prank(cache.user);
         IERC20(cache.aspTKNAsset).approve(cache.aspTKNAddress, assets);
 
         // ACTION
         vm.prank(cache.user);
-        try cache.aspTKN.deposit(assets, cache.receiver) {} catch Error(string memory reason) {
+        try cache.aspTKN.deposit(assets, cache.receiver) {
+
+            // POST-CONDITIONS
+            __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
+
+            invariant_POD_40(assets);
+            invariant_POD_43();
+
+        } catch Error(string memory reason) {
             
             string[4] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
@@ -72,6 +85,7 @@ contract AutoCompoundingPodLpHandler is Properties {
         address aspTKNAsset;
         address aspTKNAddress;
         uint256 assets;
+        StakingPoolToken spTKN;
         AutoCompoundingPodLp aspTKN;
     }
 
@@ -84,18 +98,29 @@ contract AutoCompoundingPodLpHandler is Properties {
         cache.aspTKN = randomAspTKN(aspTKNSeed);
         cache.aspTKNAddress = address(cache.aspTKN);
         cache.aspTKNAsset = cache.aspTKN.asset();
+        cache.spTKN = StakingPoolToken(IDecentralizedIndex(cache.aspTKN.pod()).lpStakingPool());
 
         shares = fl.clamp(shares, 0, cache.aspTKN.convertToShares(IERC20(cache.aspTKNAsset).balanceOf(cache.user)));
         if (shares < 1000) return;
 
         cache.assets = cache.aspTKN.convertToAssets(shares);
 
+        __beforeAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
+
         vm.prank(cache.user);
         IERC20(cache.aspTKNAsset).approve(cache.aspTKNAddress, cache.assets);
 
         // ACTION
         vm.prank(cache.user);
-        try cache.aspTKN.mint(shares, cache.receiver) {} catch Error(string memory reason) {
+        try cache.aspTKN.mint(shares, cache.receiver) {
+
+            // POST-CONDITIONS
+            __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
+
+            // invariant_POD_39(shares);
+            invariant_POD_43();
+
+        } catch Error(string memory reason) {
             
             string[4] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
@@ -121,6 +146,7 @@ contract AutoCompoundingPodLpHandler is Properties {
         address aspTKNAsset;
         address aspTKNAddress;
         uint256 assets;
+        StakingPoolToken spTKN;
         AutoCompoundingPodLp aspTKN;
     }
 
@@ -133,15 +159,80 @@ contract AutoCompoundingPodLpHandler is Properties {
         cache.aspTKN = randomAspTKN(aspTKNSeed);
         cache.aspTKNAddress = address(cache.aspTKN);
         cache.aspTKNAsset = cache.aspTKN.asset();
+        cache.spTKN = StakingPoolToken(IDecentralizedIndex(cache.aspTKN.pod()).lpStakingPool());
 
         assets = fl.clamp(assets, 0, cache.aspTKN.maxWithdraw(cache.user));
         if (assets == 0 || cache.aspTKN.convertToShares(assets) == 0) return;
 
-        uint256 FACTOR = 10 ** 18;
+        __beforeAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
         // ACTION
         vm.prank(cache.user);
-        try cache.aspTKN.withdraw(assets, cache.receiver, address(0)) {} catch Error(string memory reason) {
+        try cache.aspTKN.withdraw(assets, cache.receiver, address(0)) {
+
+            // POST-CONDITIONS
+            __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
+
+            // invariant_POD_42(assets);
+            invariant_POD_43();
+
+        } catch Error(string memory reason) {
+            
+            string[4] memory stringErrors = [
+                "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
+                "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
+                "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
+                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
+            ];
+
+            bool expected = false;
+            for (uint256 i = 0; i < stringErrors.length; i++) {
+                if (compareStrings(stringErrors[i], reason)) {
+                    expected = true;
+                    break;
+                }
+            }
+            fl.t(expected, reason);
+        }
+    }
+
+    struct RedeemTemps {
+        address user;
+        address receiver;
+        address aspTKNAsset;
+        address aspTKNAddress;
+        uint256 assets;
+        StakingPoolToken spTKN;
+        AutoCompoundingPodLp aspTKN;
+    }
+
+    function aspTKN_redeem(uint256 userIndexSeed, uint256 receiverIndexSeed, uint256 aspTKNSeed, uint256 shares) public {
+
+        // PRE-CONDITIONS
+        RedeemTemps memory cache;
+        cache.user = randomAddress(userIndexSeed);
+        cache.receiver = randomAddress(receiverIndexSeed);
+        cache.aspTKN = randomAspTKN(aspTKNSeed);
+        cache.aspTKNAddress = address(cache.aspTKN);
+        cache.aspTKNAsset = cache.aspTKN.asset();
+        cache.spTKN = StakingPoolToken(IDecentralizedIndex(cache.aspTKN.pod()).lpStakingPool());
+
+        shares = fl.clamp(shares, 0, cache.aspTKN.maxRedeem(cache.user));
+        if (shares == 0) return;
+
+        __beforeAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
+
+        // ACTION
+        vm.prank(cache.user);
+        try cache.aspTKN.redeem(shares, cache.receiver, address(0)) {
+
+            // POST-CONDITIONS
+            __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
+
+            invariant_POD_41(shares);
+            invariant_POD_43();
+
+        } catch Error(string memory reason) {
             
             string[4] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",

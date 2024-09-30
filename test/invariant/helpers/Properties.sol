@@ -3,8 +3,12 @@ pragma solidity ^0.8.19;
 
 import {BeforeAfter} from "./BeforeAfter.sol";
 
+import {StakingPoolToken} from "../../../contracts/StakingPoolToken.sol";
+import {TokenRewards} from "../../../contracts/TokenRewards.sol";
+
 import {FraxlendPair} from "../modules/fraxlend/FraxlendPair.sol";
 import {FraxlendPairCore} from "../modules/fraxlend/FraxlendPairCore.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Properties is BeforeAfter {
@@ -113,6 +117,7 @@ contract Properties is BeforeAfter {
         );
     }
 
+    // @TODO total assets == sum(deposits + donations + interest accrued - withdrawals)
     // function invariant_POD_12() public {
     //     // LendingAssetVault::global totalAssets == sum(deposits,  functiondonate calls, total utilization)
     //     fl.log("DONAtiONS", donatedAmount);
@@ -164,6 +169,7 @@ contract Properties is BeforeAfter {
         }
     }
 
+    // @TODO invalid
     // function invariant_POD_16() internal {
     //     // LendingAssetVault::whitelistDeposit and whitelistWithdraw  _cbr() should not change after a whitelistDeposit 
     //     // and whitelistWithdraw since the burn/mint should be proportional.
@@ -174,6 +180,7 @@ contract Properties is BeforeAfter {
     //     );
     // }
 
+    // @TODO check POD-breaks for the fix
     function invariant_POD_17() internal {
         // LendingAssetVault::whitelistDeposit Post-state utilization rate in FraxLend should have decreased (called by repayAsset in FraxLend)
         // (utilization rate retrieved from currentRateInfo public var)
@@ -185,6 +192,7 @@ contract Properties is BeforeAfter {
         // @TODO will addInterest affect this???
     }
 
+    // @TODO check POD-breaks for the fix
     function invariant_POD_18() internal {
         // LendingAssetVault::whitelistWithdraw Post-state utilization rate in FraxLend should have increased or not changed 
         // (if called within from a redeem no change, increase if called from borrowAsset)
@@ -224,11 +232,7 @@ contract Properties is BeforeAfter {
             _beforeLM.totalBorrowShares,
             "POD-20b: LeverageManager::removeLeverage Post removing leverage, there totalBorrow amount and shares should decrease"
         );
-    }
-
-    // I believe custodian doesn't hold balance of aspTKNs. All of it should be deposited into Fraxlend.
-
-    // thanks for the catch userCollateralBalance should increase/decrease respectively. 
+    } 
 
     function invariant_POD_21() internal {
         // LeverageManager::addLeverage Post adding leverage, there should be a higher supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and 
@@ -289,7 +293,8 @@ contract Properties is BeforeAfter {
             "POD-26: Post removing leverage, the custodian for the position should have a lower userCollateralBalance"
         );
     }
- 
+    
+    // @TODO this is invalid
     // function invariant_POD_27() public {
     //     // LendingAssetVault::global. _totalAssetsAvailable() should never be more than the 
     //     // sum of user deposits into the LAV
@@ -302,11 +307,13 @@ contract Properties is BeforeAfter {
     //     );
     // }
 
+    // @TODO this needs to be placed in handlers
     function invariant_POD_28() internal {
         // Fraxlend should not experience overflow revert
         fl.t(false, "Fraxlend should not experience overflow revert");
     }
 
+    // @TODO    
     function invariant_POD_29() internal {
         // FraxLend: cbr change with one large update == cbr change with multiple, smaller updates
     }
@@ -349,11 +356,109 @@ contract Properties is BeforeAfter {
         );
     }
 
+    // @TODO
     function invariant_POD_33() internal {
         // repayAsset should not lead to to insolvency
         fl.t(false, "POD-33: repayAsset should not lead to to insolvency");
     }
 
-    // Workflow modifier cannot be left open
-    // Voting pool balance + staking pool balance should equal token reward shares
+    // @TODO // POD-34 // Workflow modifier cannot be left open
+    // @TODO // POD-35 // Voting pool balance + staking pool balance should equal token reward shares
+
+    function invariant_POD_36() public {
+        // FraxLend: (totalBorrow.amount) / totalAsset.totalAmount(address(externalAssetVault)) 
+        // should never be more than 100%
+        for (uint256 i; i < _fraxPairs.length; i++) {
+            (uint256 totalAssetAmount, , uint256 totalBorrowAmount, , ) = _fraxPairs[i].getPairAccounting();
+            fl.lte(
+                totalBorrowAmount,
+                totalAssetAmount,
+                "POD-36: FraxLend: (totalBorrow.amount) / totalAsset.totalAmount(address(externalAssetVault)) should never be more than 100%"
+            );
+        }
+    }
+
+    function invariant_POD_37() public {
+        // FraxLend: totalAsset.totalAmount(address(0)) == 0 -> totalBorrow.amount == 0
+        for (uint256 i; i < _fraxPairs.length; i++) {
+            (uint128 totalAssetAmount, ) = FraxlendPairCore(address(_fraxPairs[i])).totalAsset();
+            (uint128 totalBorrowAmount, ) = FraxlendPairCore(address(_fraxPairs[i])).totalBorrow();
+            if (totalAssetAmount == 0) {
+                fl.eq(
+                totalBorrowAmount,
+                0,
+                "POD-37: FraxLend: totalAsset.totalAmount(address(0)) == 0 -> totalBorrow.amount == 0"
+            );
+            }
+        }
+    }
+
+    // @TODO // POD-38 // FraxLend: LTV should never decrease after a borrowAsset, LTV should never decrease after leveragedPosition
+
+    function invariant_POD_39(uint256 shares) internal {
+        // AutoCompoundingPodLP: mint() should increase asp supply by exactly that amount of shares
+        fl.eq(
+            _afterASP.aspTotalSupply,
+            _beforeASP.aspTotalSupply + shares,
+            "POD-39: AutoCompoundingPodLP: mint() should increase asp supply by exactly that amount of shares"
+        );
+    }
+
+    function invariant_POD_40(uint256 assets) internal {
+        // AutoCompoundingPodLP: deposit() should decrease user balance of sp tokens 
+        // by exact amount of assets passed
+        fl.eq(
+            _afterASP.spUserBalance,
+            _beforeASP.spUserBalance - assets,
+            "POD-40: AutoCompoundingPodLP: deposit() should decrease user balance of sp tokens by exact amount of assets passed"
+        );
+    }
+
+    function invariant_POD_41(uint256 shares) internal {
+        // AutoCompoundingPodLP: redeem() should decrease asp supply by exactly that amount of shares
+        fl.eq(
+            _afterASP.aspTotalSupply,
+            _beforeASP.aspTotalSupply - shares,
+            "POD-41: AutoCompoundingPodLP: redeem() should decrease asp supply by exactly that amount of shares"
+        );
+    }
+
+    function invariant_POD_42(uint256 assets) internal {
+        // AutoCompoundingPodLP: withdraw() should increase user balance of sp tokens 
+        // by exact amount of assets passed
+        fl.eq(
+            _afterASP.spUserBalance,
+            _beforeASP.spUserBalance + assets,
+            "POD-42: AutoCompoundingPodLP: withdraw() should increase user balance of sp tokens by exact amount of assets passed"
+        );
+    }
+
+    function invariant_POD_43() internal {
+        // AutoCompoundingPodLP: mint/deposit/redeem/withdraw()  spToken total supply should never decrease
+        fl.gte(
+            _afterASP.spTotalSupply,
+            _beforeASP.spTotalSupply,
+            "POD-43: spToken totalSupply should never decrease"
+        );
+    }
+
+    // @TODO // POD-44 // AutoCompoundingPodLP: redeem/withdraw()   should never get an InsufficientBalance or underflow/overflow revert
+    // @TODO // POD-45 // LeverageManager: custodian position is solvent after adding leverage and removing leverage
+    
+    function invariant_POD_46() public {
+        // TokenReward: global:  getUnpaid() <= balanceOf reward token
+        for (uint256 i; i < _pods.length; i++) {
+            address tokenRewards = StakingPoolToken(_pods[i].lpStakingPool()).POOL_REWARDS();
+            for (uint256 user; user < users.length; user++) {
+                fl.lte(
+                    TokenRewards(tokenRewards).getUnpaid(address(_peas), users[user]),
+                    _peas.balanceOf(tokenRewards),
+                    "POD-46: TokenReward: global:  getUnpaid() <= balanceOf reward token"
+                );
+            }
+        }
+    } 
+    
+    // @TODO // POD-47 // LVF: global there should not be any remaining allowances after each function call
+
 }

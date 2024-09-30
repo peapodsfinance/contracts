@@ -78,6 +78,30 @@ contract BeforeAfter is FuzzSetup {
         _afterLM.custodianBorrowShares = FraxlendPair(vault).userBorrowShares(custodian);
     }
 
+    struct AspTknVars {
+        uint256 spTotalSupply;
+        uint256 aspTotalSupply;
+        uint256 spUserBalance;
+        uint256 spReceiverBalance;
+    }
+
+    AspTknVars internal _beforeASP;
+    AspTknVars internal _afterASP;
+
+    function __beforeAsp(AutoCompoundingPodLp aspTKN, StakingPoolToken spTKN, address user, address receiver) internal {
+        _beforeASP.spTotalSupply = spTKN.totalSupply(); 
+        _beforeASP.aspTotalSupply = aspTKN.totalSupply();
+        _beforeASP.spUserBalance = spTKN.balanceOf(user);
+        _beforeASP.spReceiverBalance = spTKN.balanceOf(receiver);
+    }
+
+    function __afterAsp(AutoCompoundingPodLp aspTKN, StakingPoolToken spTKN, address user, address receiver) internal {
+        _afterASP.spTotalSupply = spTKN.totalSupply(); 
+        _afterASP.aspTotalSupply = aspTKN.totalSupply();
+        _afterASP.spUserBalance = spTKN.balanceOf(user);
+        _afterASP.spReceiverBalance = spTKN.balanceOf(receiver);
+    }
+
     function _cbrGhost() internal returns (uint256) {
         uint256 totalSupply = _lendingAssetVault.totalSupply();
         return totalSupply == 0 ? PRECISION : (PRECISION * _lendingAssetVault.totalAssets()) / totalSupply;
