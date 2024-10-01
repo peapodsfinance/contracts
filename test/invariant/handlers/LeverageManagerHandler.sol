@@ -121,6 +121,8 @@ contract LeverageManagerHandler is Properties {
             invariant_POD_21();
             invariant_POD_22();
             invariant_POD_23();
+            // invariant_POD_37a();
+            invariant_POD_44(cache.lendingPair);
 
             if (pairedLpAmount + feeAmount > fraxAssetsLessVault - fraxBorrows) {
                 invariant_POD_9();
@@ -261,6 +263,7 @@ contract LeverageManagerHandler is Properties {
             // invariant_POD_24();
             invariant_POD_25();
             invariant_POD_26();
+            invariant_POD_44(cache.lendingPair);
 
             if (_beforeLM.vaultUtilization > 0) {
                 invariant_POD_6();

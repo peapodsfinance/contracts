@@ -356,16 +356,27 @@ contract Properties is BeforeAfter {
         );
     }
 
-    // @TODO
     function invariant_POD_33() internal {
         // repayAsset should not lead to to insolvency
         fl.t(false, "POD-33: repayAsset should not lead to to insolvency");
     }
 
-    // @TODO // POD-34 // Workflow modifier cannot be left open
-    // @TODO // POD-35 // Voting pool balance + staking pool balance should equal token reward shares
+    function invariant_POD_34() public {
+        // staking pool balance should equal token reward shares
+        for (uint256 i; i < _pods.length; i++) {
+            address stakingToken = _pods[i].lpStakingPool();
+            address tokenRewards = StakingPoolToken(stakingToken).POOL_REWARDS();
+            for (uint256 user; user < users.length; user++) {
+                fl.eq(
+                    StakingPoolToken(stakingToken).balanceOf(users[user]),
+                    TokenRewards(tokenRewards).shares(users[user]),
+                    "POD-34: staking pool balance should equal token reward shares"
+                );
+            }
+        }
+    }
 
-    function invariant_POD_36() public {
+    function invariant_POD_35() public {
         // FraxLend: (totalBorrow.amount) / totalAsset.totalAmount(address(externalAssetVault)) 
         // should never be more than 100%
         for (uint256 i; i < _fraxPairs.length; i++) {
@@ -373,12 +384,12 @@ contract Properties is BeforeAfter {
             fl.lte(
                 totalBorrowAmount,
                 totalAssetAmount,
-                "POD-36: FraxLend: (totalBorrow.amount) / totalAsset.totalAmount(address(externalAssetVault)) should never be more than 100%"
+                "POD-35: FraxLend: (totalBorrow.amount) / totalAsset.totalAmount(address(externalAssetVault)) should never be more than 100%"
             );
         }
     }
 
-    function invariant_POD_37() public {
+    function invariant_POD_36() public {
         // FraxLend: totalAsset.totalAmount(address(0)) == 0 -> totalBorrow.amount == 0
         for (uint256 i; i < _fraxPairs.length; i++) {
             (uint128 totalAssetAmount, ) = FraxlendPairCore(address(_fraxPairs[i])).totalAsset();
@@ -387,65 +398,90 @@ contract Properties is BeforeAfter {
                 fl.eq(
                 totalBorrowAmount,
                 0,
-                "POD-37: FraxLend: totalAsset.totalAmount(address(0)) == 0 -> totalBorrow.amount == 0"
+                "POD-36: FraxLend: totalAsset.totalAmount(address(0)) == 0 -> totalBorrow.amount == 0"
             );
             }
         }
     }
 
-    // @TODO // POD-38 // FraxLend: LTV should never decrease after a borrowAsset, LTV should never decrease after leveragedPosition
+    // @TODO // POD-37 // FraxLend: LTV should never decrease after a borrowAsset
+    function invariant_POD_37a() internal {
+        // FraxLend: LTV should never decrease after a borrowAsset
+        fl.gte(
+            _afterLM.custodianLTV,
+            _beforeLM.custodianLTV,
+            "POD-37a: FraxLend: LTV should never decrease after a borrowAsset (custodian)"
+        );
+    }
 
-    function invariant_POD_39(uint256 shares) internal {
+    function invariant_POD_37b() internal {
+        // FraxLend: LTV should never decrease after a borrowAsset
+        fl.gte(
+            _afterFrax.userLTV,
+            _beforeFrax.userLTV,
+            "POD-37b: FraxLend: LTV should never decrease after a borrowAsset (user)"
+        );
+    }
+
+    function invariant_POD_38(uint256 shares) internal {
         // AutoCompoundingPodLP: mint() should increase asp supply by exactly that amount of shares
         fl.eq(
             _afterASP.aspTotalSupply,
             _beforeASP.aspTotalSupply + shares,
-            "POD-39: AutoCompoundingPodLP: mint() should increase asp supply by exactly that amount of shares"
+            "POD-38: AutoCompoundingPodLP: mint() should increase asp supply by exactly that amount of shares"
         );
     }
 
-    function invariant_POD_40(uint256 assets) internal {
+    function invariant_POD_39(uint256 assets) internal {
         // AutoCompoundingPodLP: deposit() should decrease user balance of sp tokens 
         // by exact amount of assets passed
         fl.eq(
             _afterASP.spUserBalance,
             _beforeASP.spUserBalance - assets,
-            "POD-40: AutoCompoundingPodLP: deposit() should decrease user balance of sp tokens by exact amount of assets passed"
+            "POD-39: AutoCompoundingPodLP: deposit() should decrease user balance of sp tokens by exact amount of assets passed"
         );
     }
 
-    function invariant_POD_41(uint256 shares) internal {
+    function invariant_POD_40(uint256 shares) internal {
         // AutoCompoundingPodLP: redeem() should decrease asp supply by exactly that amount of shares
         fl.eq(
             _afterASP.aspTotalSupply,
             _beforeASP.aspTotalSupply - shares,
-            "POD-41: AutoCompoundingPodLP: redeem() should decrease asp supply by exactly that amount of shares"
+            "POD-40: AutoCompoundingPodLP: redeem() should decrease asp supply by exactly that amount of shares"
         );
     }
 
-    function invariant_POD_42(uint256 assets) internal {
+    function invariant_POD_41(uint256 assets) internal {
         // AutoCompoundingPodLP: withdraw() should increase user balance of sp tokens 
         // by exact amount of assets passed
         fl.eq(
             _afterASP.spUserBalance,
             _beforeASP.spUserBalance + assets,
-            "POD-42: AutoCompoundingPodLP: withdraw() should increase user balance of sp tokens by exact amount of assets passed"
+            "POD-41: AutoCompoundingPodLP: withdraw() should increase user balance of sp tokens by exact amount of assets passed"
         );
     }
 
-    function invariant_POD_43() internal {
+    function invariant_POD_42() internal {
         // AutoCompoundingPodLP: mint/deposit/redeem/withdraw()  spToken total supply should never decrease
         fl.gte(
             _afterASP.spTotalSupply,
             _beforeASP.spTotalSupply,
-            "POD-43: spToken totalSupply should never decrease"
+            "POD-42: spToken totalSupply should never decrease"
         );
     }
 
-    // @TODO // POD-44 // AutoCompoundingPodLP: redeem/withdraw()   should never get an InsufficientBalance or underflow/overflow revert
-    // @TODO // POD-45 // LeverageManager: custodian position is solvent after adding leverage and removing leverage
+    // @TODO // POD-43 // AutoCompoundingPodLP: redeem/withdraw()   should never get an InsufficientBalance or underflow/overflow revert
+
+    function invariant_POD_44(address lendingPair) internal {
+        // LeverageManager: custodian position is solvent after adding leverage and removing leverage
+        fl.lte(
+            _afterLM.custodianLTV,
+            FraxlendPair(lendingPair).maxLTV(),
+            "POD-44: custodian position is solvent after adding leverage and removing leverage"
+        );
+    }
     
-    function invariant_POD_46() public {
+    function invariant_POD_45() public {
         // TokenReward: global:  getUnpaid() <= balanceOf reward token
         for (uint256 i; i < _pods.length; i++) {
             address tokenRewards = StakingPoolToken(_pods[i].lpStakingPool()).POOL_REWARDS();
@@ -453,12 +489,12 @@ contract Properties is BeforeAfter {
                 fl.lte(
                     TokenRewards(tokenRewards).getUnpaid(address(_peas), users[user]),
                     _peas.balanceOf(tokenRewards),
-                    "POD-46: TokenReward: global:  getUnpaid() <= balanceOf reward token"
+                    "POD-45: TokenReward: global:  getUnpaid() <= balanceOf reward token"
                 );
             }
         }
     } 
     
-    // @TODO // POD-47 // LVF: global there should not be any remaining allowances after each function call
+    // @TODO // POD-46 // LVF: global there should not be any remaining allowances after each function call
 
 }

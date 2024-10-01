@@ -5,9 +5,11 @@ import {FuzzSetup} from "../FuzzSetup.sol";
 
 import {FraxlendPairCore} from "../modules/fraxlend/FraxlendPairCore.sol";
 import {FraxlendPair} from "../modules/fraxlend/FraxlendPair.sol";
+import {IFraxlendPair} from "../modules/fraxlend/interfaces/IFraxlendPair.sol";
 import {StakingPoolToken} from "../../../contracts/StakingPoolToken.sol";
 import {WeightedIndex} from "../../../contracts/WeightedIndex.sol";
 import {AutoCompoundingPodLp} from "../../../contracts/AutoCompoundingPodLp.sol";
+import {VaultAccount, VaultAccountingLibrary} from "../modules/fraxlend/libraries/VaultAccount.sol";
 
 contract BeforeAfter is FuzzSetup {
 
@@ -47,6 +49,7 @@ contract BeforeAfter is FuzzSetup {
         uint256 aspTotalSupply;
         uint256 custodianCollateralBalance;
         uint256 custodianBorrowShares;
+        uint256 custodianLTV;
     }
 
     LeverageManagerVars internal _beforeLM;
@@ -63,6 +66,7 @@ contract BeforeAfter is FuzzSetup {
         _beforeLM.aspTotalSupply = AutoCompoundingPodLp(aspTKN).totalSupply();
         _beforeLM.custodianCollateralBalance = FraxlendPair(vault).userCollateralBalance(custodian);
         _beforeLM.custodianBorrowShares = FraxlendPair(vault).userBorrowShares(custodian);
+        _beforeLM.custodianLTV = _ltvGhost(vault, custodian);
     }
 
     function __afterLM(address vault, address pod, address aspTKN, address custodian) internal {
@@ -76,6 +80,7 @@ contract BeforeAfter is FuzzSetup {
         _afterLM.aspTotalSupply = AutoCompoundingPodLp(aspTKN).totalSupply();
         _afterLM.custodianCollateralBalance = FraxlendPair(vault).userCollateralBalance(custodian);
         _afterLM.custodianBorrowShares = FraxlendPair(vault).userBorrowShares(custodian);
+        _afterLM.custodianLTV = _ltvGhost(vault, custodian);
     }
 
     struct AspTknVars {
@@ -102,8 +107,33 @@ contract BeforeAfter is FuzzSetup {
         _afterASP.spReceiverBalance = spTKN.balanceOf(receiver);
     }
 
+    struct FraxVars {
+        uint256 userLTV;
+    }
+
+    FraxVars internal _beforeFrax;
+    FraxVars internal _afterFrax;
+
+    function __beforeFrax(address lendingPair, address user) internal {
+        _beforeFrax.userLTV = _ltvGhost(lendingPair, user);
+    }
+
+    function __afterFrax(address lendingPair, address user) internal {
+        _afterFrax.userLTV = _ltvGhost(lendingPair, user);
+    }
+
     function _cbrGhost() internal returns (uint256) {
         uint256 totalSupply = _lendingAssetVault.totalSupply();
         return totalSupply == 0 ? PRECISION : (PRECISION * _lendingAssetVault.totalAssets()) / totalSupply;
+    }
+
+    function _ltvGhost(address lendingPair, address borrower) internal returns (uint256) {
+        ( , , , , uint256 highExchangeRate) = FraxlendPair(lendingPair).exchangeRateInfo();
+
+        uint256 _borrowerAmount = VaultAccountingLibrary.toAmount(IFraxlendPair(lendingPair).totalBorrow(), IFraxlendPair(lendingPair).userBorrowShares(borrower), true);
+        if (_borrowerAmount == 0) return 0;
+        uint256 _collateralAmount = IFraxlendPair(lendingPair).userCollateralBalance(borrower);
+        if (_collateralAmount == 0) return 0;
+        return (((_borrowerAmount * highExchangeRate) / FraxlendPair(lendingPair).EXCHANGE_PRECISION()) * FraxlendPair(lendingPair).LTV_PRECISION()) / _collateralAmount;
     }
 }

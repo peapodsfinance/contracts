@@ -211,6 +211,8 @@ contract FraxlendPairHandler is Properties {
         cache.fraxCollateral = cache.fraxPair.collateralContract();
         (cache.fraxAssets, , cache.fraxBorrows, , ) = cache.fraxPair.getPairAccounting();
 
+        __beforeFrax(address(cache.fraxPair), cache.user);
+
         cache.borrowCapacity = cache.fraxPair.borrowLimit() - cache.fraxBorrows;
         borrowAmount = fl.clamp(borrowAmount, 0, cache.borrowCapacity);
 
@@ -231,6 +233,10 @@ contract FraxlendPairHandler is Properties {
             cache.receiver
         ); 
 
+        // POST-CONDITIONS
+        __afterFrax(address(cache.fraxPair), cache.user);
+
+        invariant_POD_37b();
     }
 
     // addCollateral
@@ -363,13 +369,20 @@ contract FraxlendPairHandler is Properties {
         // ACTION
         vm.prank(cache.user);
         // try 
-        cache.fraxPair.repayAsset(
+        try cache.fraxPair.repayAsset(
             shares,
             cache.borrower
-        );
-        //  {} catch {
-        //     fl.t(false, "REPAY ASSET FAILED");
-        // }
+        ) {} catch (bytes memory err) {
+            bytes4[1] memory errors =
+                [FraxlendPairConstants.Insolvent.selector];
+            bool expected = false;
+            for (uint256 i = 0; i < errors.length; i++) {
+                if (errors[i] == bytes4(err)) {
+                    invariant_POD_33();
+                }
+            }
+            fl.t(expected, FuzzLibString.getRevertMsg(err));
+        }
     }
 
     // liquidate

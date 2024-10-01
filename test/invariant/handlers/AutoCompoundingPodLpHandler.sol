@@ -56,8 +56,8 @@ contract AutoCompoundingPodLpHandler is Properties {
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
-            invariant_POD_40(assets);
-            invariant_POD_43();
+            invariant_POD_39(assets);
+            invariant_POD_42();
 
         } catch Error(string memory reason) {
             
@@ -118,8 +118,8 @@ contract AutoCompoundingPodLpHandler is Properties {
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
-            // invariant_POD_39(shares);
-            invariant_POD_43();
+            // invariant_POD_38(shares);
+            invariant_POD_42();
 
         } catch Error(string memory reason) {
             
@@ -175,8 +175,8 @@ contract AutoCompoundingPodLpHandler is Properties {
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
-            // invariant_POD_42(assets);
-            invariant_POD_43();
+            // invariant_POD_41(assets);
+            invariant_POD_42();
 
         } catch Error(string memory reason) {
             
@@ -232,8 +232,8 @@ contract AutoCompoundingPodLpHandler is Properties {
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
-            invariant_POD_41(shares);
-            invariant_POD_43();
+            invariant_POD_40(shares);
+            invariant_POD_42();
 
         } catch Error(string memory reason) {
             
