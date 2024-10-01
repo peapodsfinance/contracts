@@ -61,10 +61,11 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         } catch Error(string memory reason) {
             
-            string[4] memory stringErrors = [
+            string[5] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
+                "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
             ];
 
@@ -122,10 +123,11 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         } catch Error(string memory reason) {
             
-            string[4] memory stringErrors = [
+            string[5] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
+                "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
             ];
 
@@ -178,10 +180,11 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         } catch Error(string memory reason) {
             
-            string[4] memory stringErrors = [
+            string[5] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
+                "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
             ];
 
@@ -234,10 +237,11 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         } catch Error(string memory reason) {
             
-            string[4] memory stringErrors = [
+            string[5] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
+                "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
             ];
 

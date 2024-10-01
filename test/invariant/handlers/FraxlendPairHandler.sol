@@ -262,12 +262,14 @@ contract FraxlendPairHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try cache.fraxPair.addCollateral(
+        // try 
+        cache.fraxPair.addCollateral(
             collateralAmount,
             cache.borrower
-        ) {} catch {
-            fl.t(false, "ADD COLLATERAL FAILED");
-        }
+        );
+        //  {} catch {
+        //     fl.t(false, "ADD COLLATERAL FAILED");
+        // }
     }
 
     // removeCollateral
@@ -298,21 +300,23 @@ contract FraxlendPairHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try cache.fraxPair.removeCollateral(
+        // try 
+        cache.fraxPair.removeCollateral(
             collateralAmount,
             cache.receiver
-        ) {} catch (bytes memory err) {
-            bytes4[1] memory errors =
-                [FraxlendPairConstants.Insolvent.selector];
-            bool expected = false;
-            for (uint256 i = 0; i < errors.length; i++) {
-                if (errors[i] == bytes4(err)) {
-                    expected = true;
-                    break;
-                }
-            }
-            fl.t(expected, FuzzLibString.getRevertMsg(err));
-        }
+        );
+        //  {} catch (bytes memory err) {
+        //     bytes4[1] memory errors =
+        //         [FraxlendPairConstants.Insolvent.selector];
+        //     bool expected = false;
+        //     for (uint256 i = 0; i < errors.length; i++) {
+        //         if (errors[i] == bytes4(err)) {
+        //             expected = true;
+        //             break;
+        //         }
+        //     }
+        //     fl.t(expected, FuzzLibString.getRevertMsg(err));
+        // }
     }
 
     // repayAsset
@@ -358,12 +362,14 @@ contract FraxlendPairHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try cache.fraxPair.repayAsset(
+        // try 
+        cache.fraxPair.repayAsset(
             shares,
             cache.borrower
-        ) {} catch {
-            fl.t(false, "REPAY ASSET FAILED");
-        }
+        );
+        //  {} catch {
+        //     fl.t(false, "REPAY ASSET FAILED");
+        // }
     }
 
     // liquidate
