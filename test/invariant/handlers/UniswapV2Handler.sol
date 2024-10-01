@@ -53,7 +53,7 @@ contract UniswapV2Handler is Properties {
         path[1] = address(cache.pod);
 
         if (IERC20(pairedToken).balanceOf(cache.from) < 1e14) return;
-        amountIn = fl.clamp(amountIn, 1e14, IERC20(pairedToken).balanceOf(cache.from));
+        // amountIn = fl.clamp(amountIn, 1e14, IERC20(pairedToken).balanceOf(cache.from));
 
         // ACTION
         vm.prank(cache.from);
