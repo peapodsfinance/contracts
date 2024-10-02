@@ -236,7 +236,7 @@ contract FraxlendPairHandler is Properties {
         // POST-CONDITIONS
         __afterFrax(address(cache.fraxPair), cache.user);
 
-        invariant_POD_37b();
+        invariant_POD_37();
     }
 
     // addCollateral

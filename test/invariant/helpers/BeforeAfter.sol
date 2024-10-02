@@ -11,6 +11,8 @@ import {WeightedIndex} from "../../../contracts/WeightedIndex.sol";
 import {AutoCompoundingPodLp} from "../../../contracts/AutoCompoundingPodLp.sol";
 import {VaultAccount, VaultAccountingLibrary} from "../modules/fraxlend/libraries/VaultAccount.sol";
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 contract BeforeAfter is FuzzSetup {
 
     struct LavVars {
@@ -50,6 +52,14 @@ contract BeforeAfter is FuzzSetup {
         uint256 custodianCollateralBalance;
         uint256 custodianBorrowShares;
         uint256 custodianLTV;
+        uint256 pairAssetApproval;
+        uint256 podLpApproval;
+        uint256 podLpIndexApproval;
+        uint256 podDexApproval;
+        uint256 podIndexApproval;
+        uint256 spTKNApproval;
+        uint256 spTKNIndexApproval;
+        uint256 custodianPairApproval;
     }
 
     LeverageManagerVars internal _beforeLM;
@@ -81,6 +91,14 @@ contract BeforeAfter is FuzzSetup {
         _afterLM.custodianCollateralBalance = FraxlendPair(vault).userCollateralBalance(custodian);
         _afterLM.custodianBorrowShares = FraxlendPair(vault).userBorrowShares(custodian);
         _afterLM.custodianLTV = _ltvGhost(vault, custodian);
+        _afterLM.pairAssetApproval = IERC20(IFraxlendPair(vault).asset()).allowance(vault, address(_lendingAssetVault));
+        _afterLM.podLpApproval = IERC20(WeightedIndex(payable(pod)).PAIRED_LP_TOKEN()).allowance(address(_leverageManager), vault);
+        _afterLM.podLpIndexApproval = IERC20(WeightedIndex(payable(pod)).PAIRED_LP_TOKEN()).allowance(address(_leverageManager), address(_indexUtils));
+        _afterLM.podDexApproval = IERC20(pod).allowance(address(_leverageManager), address(_dexAdapter));
+        _afterLM.podIndexApproval = IERC20(pod).allowance(address(_leverageManager), address(_indexUtils));
+        _afterLM.spTKNApproval = StakingPoolToken(WeightedIndex(payable(pod)).lpStakingPool()).allowance(address(_leverageManager), aspTKN);
+        _afterLM.spTKNIndexApproval = StakingPoolToken(WeightedIndex(payable(pod)).lpStakingPool()).allowance(address(_leverageManager), address(_indexUtils));
+        _afterLM.custodianPairApproval = IERC20(IFraxlendPair(vault).collateralContract()).allowance(custodian, vault);
     }
 
     struct AspTknVars {
@@ -88,6 +106,11 @@ contract BeforeAfter is FuzzSetup {
         uint256 aspTotalSupply;
         uint256 spUserBalance;
         uint256 spReceiverBalance;
+        uint256 userAssetApproval;
+        uint256 aspRewardApproval;
+        uint256 pairedLpApproval;
+        uint256 podIndexUtilsApproval;
+        uint256 pairedLpIndexApproval;
     }
 
     AspTknVars internal _beforeASP;
@@ -105,6 +128,11 @@ contract BeforeAfter is FuzzSetup {
         _afterASP.aspTotalSupply = aspTKN.totalSupply();
         _afterASP.spUserBalance = spTKN.balanceOf(user);
         _afterASP.spReceiverBalance = spTKN.balanceOf(receiver);
+        _afterASP.userAssetApproval = IERC20(aspTKN.asset()).allowance(user, address(aspTKN));
+        _afterASP.aspRewardApproval = _peas.allowance(address(aspTKN), address(_dexAdapter));
+        _afterASP.pairedLpApproval = IERC20(aspTKN.pod().PAIRED_LP_TOKEN()).allowance(address(aspTKN), address(_dexAdapter));
+        _afterASP.podIndexUtilsApproval = IERC20(address(aspTKN.pod())).allowance(address(aspTKN), address(_indexUtils));
+        _afterASP.pairedLpIndexApproval = IERC20(aspTKN.pod().PAIRED_LP_TOKEN()).allowance(address(aspTKN), address(_indexUtils));
     }
 
     struct FraxVars {

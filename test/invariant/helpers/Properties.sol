@@ -119,13 +119,13 @@ contract Properties is BeforeAfter {
 
     // @TODO total assets == sum(deposits + donations + interest accrued - withdrawals)
     // function invariant_POD_12() public {
-    //     // LendingAssetVault::global totalAssets == sum(deposits,  functiondonate calls, total utilization)
+    //     // LendingAssetVault::global total assets == sum(deposits + donations + interest accrued - withdrawals)
     //     fl.log("DONAtiONS", donatedAmount);
     //     fl.log("lavDeposits", lavDeposits);
     //     fl.log("totalAssetsUtilized", _lendingAssetVault.totalAssetsUtilized());
     //     fl.log("totalAssets", _lendingAssetVault.totalAssets());
     //     assertApproxEq(
-    //         donatedAmount + lavDeposits + _lendingAssetVault.totalAssetsUtilized(),
+    //         lavDeposits,
     //         _lendingAssetVault.totalAssets(),
     //         10000,
     //         "POD-12: LendingAssetVault::global totalAssets == sum(deposits,  functiondonate calls, total utilization)"
@@ -168,17 +168,6 @@ contract Properties is BeforeAfter {
             );
         }
     }
-
-    // @TODO invalid
-    // function invariant_POD_16() internal {
-    //     // LendingAssetVault::whitelistDeposit and whitelistWithdraw  _cbr() should not change after a whitelistDeposit 
-    //     // and whitelistWithdraw since the burn/mint should be proportional.
-    //     fl.eq(
-    //         _afterLM.cbr,
-    //         _beforeLM.cbr,
-    //         "POD-16: LendingAssetVault::whitelistDeposit and whitelistWithdraw  _cbr() should not change after a whitelistDeposit/Withdraw"
-    //     );
-    // }
 
     // @TODO check POD-breaks for the fix
     function invariant_POD_17() internal {
@@ -293,19 +282,6 @@ contract Properties is BeforeAfter {
             "POD-26: Post removing leverage, the custodian for the position should have a lower userCollateralBalance"
         );
     }
-    
-    // @TODO this is invalid
-    // function invariant_POD_27() public {
-    //     // LendingAssetVault::global. _totalAssetsAvailable() should never be more than the 
-    //     // sum of user deposits into the LAV
-    //     // @note lavDeposits contains deposited amount
-    //     assertApproxLte(
-    //         _lendingAssetVault.totalAvailableAssets(),
-    //         lavDeposits,
-    //         1,
-    //         "POD-27: LendingAssetVault::global. _totalAssetsAvailable() should never be more than the sum of user deposits into the LAV"
-    //     );
-    // }
 
     // @TODO this needs to be placed in handlers
     function invariant_POD_28() internal {
@@ -404,22 +380,12 @@ contract Properties is BeforeAfter {
         }
     }
 
-    // @TODO // POD-37 // FraxLend: LTV should never decrease after a borrowAsset
-    function invariant_POD_37a() internal {
-        // FraxLend: LTV should never decrease after a borrowAsset
-        fl.gte(
-            _afterLM.custodianLTV,
-            _beforeLM.custodianLTV,
-            "POD-37a: FraxLend: LTV should never decrease after a borrowAsset (custodian)"
-        );
-    }
-
-    function invariant_POD_37b() internal {
+    function invariant_POD_37() internal {
         // FraxLend: LTV should never decrease after a borrowAsset
         fl.gte(
             _afterFrax.userLTV,
             _beforeFrax.userLTV,
-            "POD-37b: FraxLend: LTV should never decrease after a borrowAsset (user)"
+            "POD-37: FraxLend: LTV should never decrease after a borrowAsset (user)"
         );
     }
 
@@ -496,5 +462,84 @@ contract Properties is BeforeAfter {
     } 
     
     // @TODO // POD-46 // LVF: global there should not be any remaining allowances after each function call
-
+    function invariant_POD_46() public {
+        // user aspTKN Asset -> aspTKN
+        fl.eq(
+            _afterASP.userAssetApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // asp Rewards Token -> dexAdapter
+        fl.eq(
+            _afterASP.aspRewardApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // asp pod pairedLpToken -> dexAdapter
+        fl.eq(
+            _afterASP.pairedLpApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // asp pod -> indexUtils
+        fl.eq(
+            _afterASP.podIndexUtilsApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // asp pod pairedLpToken -> indexUtils
+        fl.eq(
+            _afterASP.pairedLpIndexApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // leverage manager -> pod LP token -> fraxlend pair
+        fl.eq(
+            _afterLM.podLpApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // leverage manager -> pod -> dex adapter
+        fl.eq(
+            _afterLM.podDexApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // leverage manager -> pod -> index utils
+        fl.eq(
+            _afterLM.podIndexApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // leverage manager -> pod Lp token -> index utils
+        fl.eq(
+            _afterLM.podLpIndexApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // fraxlend pair asset -> _lendingAssetVault
+        fl.eq(
+            _afterLM.pairAssetApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // leverage manager -> staking pool token -> aspTKN
+        fl.eq(
+            _afterLM.spTKNApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // leverage manager -> staking pool token -> index utils
+        fl.eq(
+            _afterLM.spTKNIndexApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+        // custodian -> fraxlend collateral -> fraxlend pair
+        fl.eq(
+            _afterLM.custodianPairApproval,
+            0,
+            "POD-46: LVF: global there should not be any remaining allowances after each function call"
+        );
+    }
 }
