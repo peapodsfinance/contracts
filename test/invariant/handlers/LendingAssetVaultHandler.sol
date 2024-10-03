@@ -43,7 +43,12 @@ contract LendingAssetVaultHandler is Properties {
         cache.receiver = randomAddress(receiverIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
 
-        __beforeLav(cache.user, cache.receiver);
+        // _updateInterest();
+
+        __beforeLav(cache.user, cache.receiver, address(0));
+
+        _updateInterest();
+        lavDeposits += (_lendingAssetVault.totalAssets() - _beforeLav.totalAssets);
 
         amount = fl.clamp(amount, 0, IERC20(cache.vaultAsset).balanceOf(cache.user));
 
@@ -57,7 +62,7 @@ contract LendingAssetVaultHandler is Properties {
         ) returns (uint256 sharesMinted) {
 
             // POST-CONDITIONS
-            __afterLav(cache.user, cache.receiver);
+            __afterLav(cache.user, cache.receiver, address(0));
 
             invariant_POD_2(sharesMinted);
 
@@ -89,7 +94,12 @@ contract LendingAssetVaultHandler is Properties {
         cache.receiver = randomAddress(receiverIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
 
-        __beforeLav(cache.user, cache.receiver);
+        // _updateInterest();
+
+        __beforeLav(cache.user, cache.receiver, address(0));
+
+        _updateInterest();
+        lavDeposits += (_lendingAssetVault.totalAssets() - _beforeLav.totalAssets);
 
         shares = fl.clamp(shares, 0, _lendingAssetVault.convertToShares(IERC20(cache.vaultAsset).balanceOf(cache.user)));
         cache.assets = _lendingAssetVault.convertToAssets(shares);
@@ -105,7 +115,7 @@ contract LendingAssetVaultHandler is Properties {
         ) returns (uint256 assetsMinted) {
 
             // POST-CONDITIONS
-            __afterLav(cache.user, cache.receiver);
+            __afterLav(cache.user, cache.receiver, address(0));
 
             cache.sharesMinted = _lendingAssetVault.convertToShares(assetsMinted);
             fl.log("Doanted amount", donatedAmount);
@@ -141,7 +151,12 @@ contract LendingAssetVaultHandler is Properties {
         cache.receiver = randomAddress(receiverIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
 
-        __beforeLav(cache.user, cache.receiver);
+        // _updateInterest();
+
+        __beforeLav(cache.user, cache.receiver, address(0));
+
+        _updateInterest();
+        lavDeposits += (_lendingAssetVault.totalAssets() - _beforeLav.totalAssets);
 
         assets = fl.clamp(assets, 0, _lendingAssetVault.maxWithdraw(cache.user));
         cache.shares = _lendingAssetVault.convertToShares(assets);
@@ -159,7 +174,7 @@ contract LendingAssetVaultHandler is Properties {
         ) returns (uint256 sharesWithdrawn) {
 
             // POST-CONDITIONS
-            __afterLav(cache.user, cache.receiver);
+            __afterLav(cache.user, cache.receiver, address(0));
 
             invariant_POD_3(sharesWithdrawn);
             invariant_POD_13(cache.assets, cache.maxAssets);
@@ -192,7 +207,12 @@ contract LendingAssetVaultHandler is Properties {
         cache.receiver = randomAddress(receiverIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
 
-        __beforeLav(cache.user, cache.receiver);
+        // _updateInterest();
+
+        __beforeLav(cache.user, cache.receiver, address(0));
+
+        _updateInterest();
+        lavDeposits += (_lendingAssetVault.totalAssets() - _beforeLav.totalAssets);
 
         shares = fl.clamp(shares, 0, _lendingAssetVault.maxRedeem(cache.user));
         cache.assets = _lendingAssetVault.convertToAssets(shares);
@@ -209,7 +229,7 @@ contract LendingAssetVaultHandler is Properties {
         ) returns (uint256 assetsWithdrawn) {
 
             // POST-CONDITIONS
-            __afterLav(cache.user, cache.receiver);
+            __afterLav(cache.user, cache.receiver, address(0));
 
             invariant_POD_3(shares);
             // invariant_POD_13(assetsWithdrawn, cache.maxAssets);
@@ -238,7 +258,12 @@ contract LendingAssetVaultHandler is Properties {
         cache.user = randomAddress(userIndexSeed);
         cache.vaultAsset = _lendingAssetVault.asset();
 
-        __beforeLav(cache.user, address(0));
+        // _updateInterest();
+
+        __beforeLav(cache.user, address(0), address(0));
+
+        _updateInterest();
+        lavDeposits += (_lendingAssetVault.totalAssets() - _beforeLav.totalAssets);
 
         amount = fl.clamp(amount, 0, IERC20(cache.vaultAsset).balanceOf(cache.user));
 
@@ -252,7 +277,7 @@ contract LendingAssetVaultHandler is Properties {
             lavDeposits += amount;
             
             // POST-CONDITIONS
-            __afterLav(cache.user, address(0));
+            __afterLav(cache.user, address(0), address(0));
 
             if (amount != 0) invariant_POD_14(amount);
             
@@ -282,6 +307,13 @@ contract LendingAssetVaultHandler is Properties {
         cache.lendingPairAsset = cache.lendingPair.asset();
         (cache.assetShares, , ) = cache.lendingPair.getUserSnapshot(address(_lendingAssetVault));
 
+        // _updateInterest();
+
+        __beforeLav(cache.user, address(0), address(cache.lendingPair));
+
+        _updateInterest();
+        lavDeposits += (_lendingAssetVault.totalAssets() - _beforeLav.totalAssets);
+
         shares = fl.clamp(shares, 0, cache.assetShares);
         cache.assets = shares == 0 ? cache.lendingPair.convertToAssets(cache.lendingPair.balanceOf(address(_lendingAssetVault))) : cache.lendingPair.convertToAssets(shares);
         
@@ -291,7 +323,14 @@ contract LendingAssetVaultHandler is Properties {
         
         // ACTION
         vm.prank(cache.user);
-        try _lendingAssetVault.redeemFromVault(address(cache.lendingPair), shares) {} catch Panic(uint256 errorCode) {
+        try _lendingAssetVault.redeemFromVault(address(cache.lendingPair), shares) {
+
+            // POST-CONDITIONS
+            __afterLav(cache.user, address(0), address(cache.lendingPair));
+
+            invariant_POD_4(cache.lendingPair);
+
+        } catch Panic(uint256 errorCode) {
             uint256[1] memory errors = [
                 uint256(17)
             ];
@@ -307,5 +346,21 @@ contract LendingAssetVaultHandler is Properties {
                 );
             }
         }
+    }
+
+    function _updateInterest() internal {
+        address[] memory vaultAddresses = new address[](4);
+        vaultAddresses[0] = address(_fraxLPToken1Peas);
+        vaultAddresses[1] = address(_fraxLPToken1Weth);
+        vaultAddresses[2] = address(_fraxLPToken2);
+        vaultAddresses[3] = address(_fraxLPToken4);
+
+        uint256[] memory percentages = new uint256[](4);
+        percentages[0] = 2500;
+        percentages[1] = 2500;
+        percentages[2] = 2500;
+        percentages[3] = 2500;
+
+        _lendingAssetVault.setVaultMaxPerc(vaultAddresses, percentages);
     }
 }

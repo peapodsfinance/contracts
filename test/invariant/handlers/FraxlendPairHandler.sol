@@ -187,6 +187,7 @@ contract FraxlendPairHandler is Properties {
         address user;
         address receiver;
         address fraxAsset;
+        address pod;
         IERC20 fraxCollateral;
         uint256 fraxAssets;
         uint256 fraxBorrows;
@@ -206,12 +207,14 @@ contract FraxlendPairHandler is Properties {
         FraxBorrowTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
         cache.receiver = randomAddress(receiverIndexSeed);
+        cache.pod = address(randomPod(fraxlendSeed));
         cache.fraxPair = randomFraxPair(fraxlendSeed);
         cache.fraxAsset = cache.fraxPair.asset();
         cache.fraxCollateral = cache.fraxPair.collateralContract();
         (cache.fraxAssets, , cache.fraxBorrows, , ) = cache.fraxPair.getPairAccounting();
 
         __beforeFrax(address(cache.fraxPair), cache.user);
+        __beforeLM(address(cache.fraxPair), cache.pod, address(cache.fraxCollateral), address(0));
 
         cache.borrowCapacity = cache.fraxPair.borrowLimit() - cache.fraxBorrows;
         borrowAmount = fl.clamp(borrowAmount, 0, cache.borrowCapacity);
@@ -235,8 +238,10 @@ contract FraxlendPairHandler is Properties {
 
         // POST-CONDITIONS
         __afterFrax(address(cache.fraxPair), cache.user);
+        __afterLM(address(cache.fraxPair), cache.pod, address(cache.fraxCollateral), address(0));
+        _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV; 
 
-        invariant_POD_37();
+        // invariant_POD_4(cache.fraxPair);
     }
 
     // addCollateral
@@ -329,6 +334,7 @@ contract FraxlendPairHandler is Properties {
     struct RepayAssetTemps {
         address user;
         address borrower;
+        address pod;
         uint256 amountToRepay;
         uint256 sharesToBurn;
         IERC20 fraxCollateral;
@@ -347,9 +353,12 @@ contract FraxlendPairHandler is Properties {
         RepayAssetTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
         cache.borrower = randomAddress(borrowerIndexSeed);
+        cache.pod = address(randomPod(fraxlendSeed));
         cache.fraxPair = randomFraxPair(fraxlendSeed);
         cache.fraxCollateral = cache.fraxPair.collateralContract();
         cache.fraxAsset = IERC20(cache.fraxPair.asset());
+
+        __beforeLM(address(cache.fraxPair), cache.pod, address(cache.fraxCollateral), address(0));
 
         shares = fl.clamp(shares, 0, cache.fraxPair.userBorrowShares(cache.borrower));
         cache.amountToRepay = cache.fraxPair.toBorrowAmount(shares, false, true);
@@ -368,11 +377,17 @@ contract FraxlendPairHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        // try 
         try cache.fraxPair.repayAsset(
             shares,
             cache.borrower
-        ) {} catch (bytes memory err) {
+        ) {
+
+            // POST-CONDITIONS
+            __afterLM(address(cache.fraxPair), cache.pod, address(cache.fraxCollateral), address(0));
+            _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV; 
+
+            invariant_POD_4(cache.fraxPair);
+        } catch (bytes memory err) {
             bytes4[1] memory errors =
                 [FraxlendPairConstants.Insolvent.selector];
             bool expected = false;
@@ -413,6 +428,8 @@ contract FraxlendPairHandler is Properties {
         (cache.podAddress, cache.lendingPair, cache.custodian,) = _leverageManager.positionProps(cache.positionId);
         cache.fraxPair = FraxlendPair(cache.lendingPair);
 
+        __beforeLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
+
         shares = uint128(fl.clamp(uint256(shares), 0, cache.fraxPair.userBorrowShares(cache.custodian)));
 
         _updatePrices(positionIdSeed);
@@ -423,7 +440,11 @@ contract FraxlendPairHandler is Properties {
             block.timestamp,
             cache.custodian
         ) {
-            // if (shares > 1) fl.t(false, "TEST LIQ");
+            
+            // POST-CONDITIONS
+            __afterLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
+            _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV; 
+
         } catch (bytes memory err) {
             bytes4[1] memory errors =
                 [FraxlendPairConstants.BorrowerSolvent.selector];

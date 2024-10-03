@@ -113,10 +113,11 @@ contract LeverageManagerHandler is Properties {
             // POST-CONDITIONS
             __afterLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
             (uint256 fraxAssetsLessVault, ) = FraxlendPair(cache.lendingPair).totalAsset();
+            _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV;
 
             // invariant_POD_4(FraxlendPair(cache.lendingPair));
             // invariant_POD_16();
-            // invariant_POD_18();
+            invariant_POD_18();
             invariant_POD_19();
             invariant_POD_21();
             invariant_POD_22();
@@ -254,6 +255,8 @@ contract LeverageManagerHandler is Properties {
 
             // POST-CONDITIONS
             __afterLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
+            
+            _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV; 
 
             // invariant_POD_4(FraxlendPair(cache.lendingPair));
             // invariant_POD_16();

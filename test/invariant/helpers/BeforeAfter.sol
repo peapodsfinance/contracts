@@ -20,31 +20,35 @@ contract BeforeAfter is FuzzSetup {
         uint256 receiverShareBalance;
         uint256 totalSupply;
         uint256 totalAssets;
+        uint256 vaultUtilization;
     }
 
     LavVars internal _beforeLav;
     LavVars internal _afterLav;
 
-    function __beforeLav(address user, address receiver) internal {
+    function __beforeLav(address user, address receiver, address vault) internal {
         _beforeLav.userShareBalance = _lendingAssetVault.balanceOf(user);
         _beforeLav.receiverShareBalance = _lendingAssetVault.balanceOf(receiver);
         _beforeLav.totalSupply = _lendingAssetVault.totalSupply();
         _beforeLav.totalAssets = _lendingAssetVault.totalAssets();
+        _beforeLav.vaultUtilization = _lendingAssetVault.vaultUtilization(vault);
     }
 
-    function __afterLav(address user, address receiver) internal {
+    function __afterLav(address user, address receiver, address vault) internal {
         _afterLav.userShareBalance = _lendingAssetVault.balanceOf(user);
         _afterLav.receiverShareBalance = _lendingAssetVault.balanceOf(receiver);
         _afterLav.totalSupply = _lendingAssetVault.totalSupply();
         _afterLav.totalAssets = _lendingAssetVault.totalAssets();
+        _afterLav.vaultUtilization = _lendingAssetVault.vaultUtilization(vault);
     }
 
     struct LeverageManagerVars {
         uint256 vaultUtilization;
         uint256 totalAvailableAssets;
         uint256 totalAssetsUtilized;
+        uint256 totalAssetsLAV;
         uint256 cbr;
-        uint64 utilizationRate;
+        uint256 utilizationRate;
         uint256 totalBorrowAmount;
         uint256 totalBorrowShares;
         uint256 spTotalSupply;
@@ -69,8 +73,13 @@ contract BeforeAfter is FuzzSetup {
         _beforeLM.vaultUtilization = _lendingAssetVault.vaultUtilization(vault);
         _beforeLM.totalAvailableAssets = _lendingAssetVault.totalAvailableAssets();
         _beforeLM.totalAssetsUtilized = _lendingAssetVault.totalAssetsUtilized();
+        _beforeLM.totalAssetsLAV = _lendingAssetVault.totalAssets();
         _beforeLM.cbr = _cbrGhost();
-        ( , , , , _beforeLM.utilizationRate) = FraxlendPairCore(vault).currentRateInfo();
+        (uint128 borrowAmount, ) = FraxlendPairCore(vault).totalBorrow();
+        (uint128 assetAmount, uint128 assetShares )= FraxlendPairCore(vault).totalAsset();
+        VaultAccount memory vaultAccount = VaultAccount(assetAmount, assetShares);
+        uint256 totalAmount = VaultAccountingLibrary.totalAmount(vaultAccount, address(_lendingAssetVault));
+        _beforeLM.utilizationRate = (1e5 * borrowAmount) / totalAmount;
         ( , , _beforeLM.totalBorrowAmount, _beforeLM.totalBorrowShares, ) = FraxlendPair(vault).getPairAccounting();
         _beforeLM.spTotalSupply = StakingPoolToken(WeightedIndex(payable(pod)).lpStakingPool()).totalSupply();
         _beforeLM.aspTotalSupply = AutoCompoundingPodLp(aspTKN).totalSupply();
@@ -83,8 +92,13 @@ contract BeforeAfter is FuzzSetup {
         _afterLM.vaultUtilization = _lendingAssetVault.vaultUtilization(vault);
         _afterLM.totalAvailableAssets = _lendingAssetVault.totalAvailableAssets();
         _afterLM.totalAssetsUtilized = _lendingAssetVault.totalAssetsUtilized();
+        _afterLM.totalAssetsLAV = _lendingAssetVault.totalAssets();
         _afterLM.cbr = _cbrGhost();
-        ( , , , , _afterLM.utilizationRate) = FraxlendPairCore(vault).currentRateInfo();
+        (uint128 borrowAmount, ) = FraxlendPairCore(vault).totalBorrow();
+        (uint128 assetAmount, uint128 assetShares )= FraxlendPairCore(vault).totalAsset();
+        VaultAccount memory vaultAccount = VaultAccount(assetAmount, assetShares);
+        uint256 totalAmount = VaultAccountingLibrary.totalAmount(vaultAccount, address(_lendingAssetVault));
+        _afterLM.utilizationRate = (1e5 * borrowAmount) / totalAmount;
         ( , , _afterLM.totalBorrowAmount, _afterLM.totalBorrowShares, ) = FraxlendPair(vault).getPairAccounting();
         _afterLM.spTotalSupply = StakingPoolToken(WeightedIndex(payable(pod)).lpStakingPool()).totalSupply();
         _afterLM.aspTotalSupply = AutoCompoundingPodLp(aspTKN).totalSupply();
