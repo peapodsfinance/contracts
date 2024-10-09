@@ -100,8 +100,6 @@ interface IDecentralizedIndex is IERC20 {
 
   function partner() external view returns (address);
 
-  function getIdxPriceUSDX96() external view returns (uint256, uint256);
-
   function isAsset(address token) external view returns (bool);
 
   function getAllAssets() external view returns (IndexAssetInfo[] memory);
@@ -117,6 +115,10 @@ interface IDecentralizedIndex is IERC20 {
   function processPreSwapFeesAndSwap() external;
 
   function totalAssets() external view returns (uint256 totalManagedAssets);
+
+  function totalAssets(
+    address asset
+  ) external view returns (uint256 totalManagedAssets);
 
   function convertToShares(
     uint256 assets

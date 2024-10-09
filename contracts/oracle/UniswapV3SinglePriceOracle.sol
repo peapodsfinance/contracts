@@ -10,6 +10,8 @@ import '../interfaces/IUniswapV3Pool.sol';
 import './ChainlinkSinglePriceOracle.sol';
 
 contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
+  constructor(address _sequencer) ChainlinkSinglePriceOracle(_sequencer) {}
+
   function getPriceUSD18(
     address _clBaseConversionPoolPriceFeed,
     address _quoteToken,
@@ -25,12 +27,15 @@ contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
     uint256 _basePrice18 = 10 ** 18;
     uint256 _updatedAt = block.timestamp;
     if (_clBaseConversionPoolPriceFeed != address(0)) {
-      (_basePrice18, _updatedAt) = _getChainlinkPriceFeedPrice18(
+      (_basePrice18, _updatedAt, _isBadData) = _getChainlinkPriceFeedPrice18(
         _clBaseConversionPoolPriceFeed
       );
     }
     _price18 = (_quotePriceX96 * _basePrice18) / FixedPoint96.Q96;
-    _isBadData = _updatedAt < block.timestamp - maxOracleDelay;
+    uint256 _maxDelay = feedMaxOracleDelay[_clBaseConversionPoolPriceFeed] > 0
+      ? feedMaxOracleDelay[_clBaseConversionPoolPriceFeed]
+      : defaultMaxOracleDelay;
+    _isBadData = _isBadData || _updatedAt < block.timestamp - _maxDelay;
   }
 
   function _getPoolPriceTokenDenomenator(
@@ -58,9 +63,14 @@ contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
       secondsAgo[0] = _interval;
       secondsAgo[1] = 0; // to (now)
       (int56[] memory tickCumulatives, ) = _pool.observe(secondsAgo);
-      _sqrtPriceX96 = TickMath.getSqrtRatioAtTick(
-        int24((tickCumulatives[1] - tickCumulatives[0]) / int32(_interval))
-      );
+      int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
+      int24 arithmeticMeanTick = int24(tickCumulativesDelta / int32(_interval));
+      // Always round to negative infinity
+      if (
+        tickCumulativesDelta < 0 &&
+        (tickCumulativesDelta % int32(_interval) != 0)
+      ) arithmeticMeanTick--;
+      _sqrtPriceX96 = TickMath.getSqrtRatioAtTick(arithmeticMeanTick);
     }
   }
 

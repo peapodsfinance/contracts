@@ -4,103 +4,59 @@ pragma solidity ^0.8.19;
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
-import './AutoCompoundingPodLp.sol';
+import './LendingAssetVault.sol';
 
-contract AutoCompoundingPodLpFactory is Ownable {
+contract LendingAssetVaultFactory is Ownable {
   using SafeERC20 for IERC20;
 
   uint256 minimumDepositAtCreation = 10 ** 3;
 
-  event Create(address newAspTkn);
+  event Create(address newVault);
 
   function create(
     string memory _name,
     string memory _symbol,
-    IDecentralizedIndex _pod,
-    IDexAdapter _dexAdapter,
-    IIndexUtils _utils,
-    IRewardsWhitelister _whitelist,
-    IV3TwapUtilities _v3TwapUtilities,
+    address _asset,
     uint96 _salt
   ) external onlyOwner {
-    address _aspAddy = _deploy(
-      getBytecode(
-        _name,
-        _symbol,
-        _pod,
-        _dexAdapter,
-        _utils,
-        _whitelist,
-        _v3TwapUtilities
-      ),
+    address _vault = _deploy(
+      getBytecode(_name, _symbol, _asset),
       _getFullSalt(_salt)
     );
-    if (address(_pod) != address(0) && minimumDepositAtCreation > 0) {
-      _depositMin(_aspAddy, _pod);
+    if (minimumDepositAtCreation > 0) {
+      _depositMin(_vault, _asset);
     }
-    AutoCompoundingPodLp(_aspAddy).transferOwnership(_msgSender());
-    emit Create(_aspAddy);
+    LendingAssetVault(_vault).transferOwnership(_msgSender());
+    emit Create(_vault);
   }
 
-  function _depositMin(address _aspAddy, IDecentralizedIndex _pod) internal {
-    address _lpToken = _pod.lpStakingPool();
-    IERC20(_lpToken).safeTransferFrom(
+  function _depositMin(address _vault, address _asset) internal {
+    IERC20(_asset).safeTransferFrom(
       _msgSender(),
       address(this),
       minimumDepositAtCreation
     );
-    IERC20(_lpToken).safeApprove(_aspAddy, minimumDepositAtCreation);
-    AutoCompoundingPodLp(_aspAddy).deposit(
-      minimumDepositAtCreation,
-      _msgSender()
-    );
+    IERC20(_asset).safeApprove(_vault, minimumDepositAtCreation);
+    LendingAssetVault(_vault).deposit(minimumDepositAtCreation, _msgSender());
   }
 
   function getNewCaFromParams(
     string memory _name,
     string memory _symbol,
-    IDecentralizedIndex _pod,
-    IDexAdapter _dexAdapter,
-    IIndexUtils _utils,
-    IRewardsWhitelister _whitelist,
-    IV3TwapUtilities _v3TwapUtilities,
+    address _asset,
     uint96 _salt
   ) external view returns (address) {
-    bytes memory _bytecode = getBytecode(
-      _name,
-      _symbol,
-      _pod,
-      _dexAdapter,
-      _utils,
-      _whitelist,
-      _v3TwapUtilities
-    );
+    bytes memory _bytecode = getBytecode(_name, _symbol, _asset);
     return getNewCaAddress(_bytecode, _salt);
   }
 
   function getBytecode(
     string memory _name,
     string memory _symbol,
-    IDecentralizedIndex _pod,
-    IDexAdapter _dexAdapter,
-    IIndexUtils _utils,
-    IRewardsWhitelister _whitelist,
-    IV3TwapUtilities _v3TwapUtilities
+    address _asset
   ) public pure returns (bytes memory) {
-    bytes memory _bytecode = type(AutoCompoundingPodLp).creationCode;
-    return
-      abi.encodePacked(
-        _bytecode,
-        abi.encode(
-          _name,
-          _symbol,
-          _pod,
-          _dexAdapter,
-          _utils,
-          _whitelist,
-          _v3TwapUtilities
-        )
-      );
+    bytes memory _bytecode = type(LendingAssetVault).creationCode;
+    return abi.encodePacked(_bytecode, abi.encode(_name, _symbol, _asset));
   }
 
   function getNewCaAddress(

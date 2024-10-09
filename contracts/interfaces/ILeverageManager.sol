@@ -14,7 +14,6 @@ interface ILeverageManager {
     uint256 pTknAmt;
     uint256 pairedLpDesired;
     uint256 pairedLpAmtMin;
-    address selfLendingPairPod;
     bytes config;
   }
 

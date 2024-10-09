@@ -80,11 +80,11 @@ contract AutoCompoundingPodLpTest is Test {
   function testSetProtocolFee() public {
     assertEq(autoCompoundingPodLp.protocolFee(), 50);
 
-    autoCompoundingPodLp.setProtocolFee(100);
+    autoCompoundingPodLp.setProtocolFee(100, 0, block.timestamp);
     assertEq(autoCompoundingPodLp.protocolFee(), 100);
 
     vm.expectRevert(bytes('MAX'));
-    autoCompoundingPodLp.setProtocolFee(1001);
+    autoCompoundingPodLp.setProtocolFee(1001, 0, block.timestamp);
   }
 
   function testProcessAllRewardsTokensToPodLp() public {
@@ -178,6 +178,9 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
     return 0;
   }
   function totalAssets() external view returns (uint256 totalManagedAssets) {}
+  function totalAssets(
+    address
+  ) external view returns (uint256 totalManagedAssets) {}
   function convertToShares(
     uint256 assets
   ) external view returns (uint256 shares) {}
@@ -215,14 +218,6 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
     returns (IndexAssetInfo[] memory)
   {
     return new IndexAssetInfo[](0);
-  }
-  function getIdxPriceUSDX96()
-    external
-    pure
-    override
-    returns (uint256, uint256)
-  {
-    return (0, 0);
   }
   function getInitialAmount(
     address,
@@ -412,6 +407,10 @@ contract MockRewardsWhitelister is IRewardsWhitelister {
     returns (address[] memory)
   {
     return _fullWhitelist;
+  }
+
+  function paused(address) external pure returns (bool) {
+    return false;
   }
 
   function whitelist(address) external pure returns (bool) {

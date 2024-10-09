@@ -2,7 +2,6 @@
 pragma solidity ^0.8.19;
 
 import '@openzeppelin/contracts/access/Ownable.sol';
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Context.sol';
@@ -244,6 +243,11 @@ contract TokenRewards is ITokenRewards, Context {
     }
     for (uint256 _i; _i < _allRewardsTokens.length; _i++) {
       address _token = _allRewardsTokens[_i];
+
+      if (REWARDS_WHITELISTER.paused(_token)) {
+        continue;
+      }
+
       uint256 _amount = getUnpaid(_token, _wallet);
       rewards[_token][_wallet].realized += _amount;
       rewards[_token][_wallet].excluded = _cumulativeRewards(
@@ -309,6 +313,7 @@ contract TokenRewards is ITokenRewards, Context {
     uint256 _adminAmt
   ) internal {
     if (_rewardsSwapAmountInOverride > 0) {
+      _adminAmt = (_adminAmt * _rewardsSwapAmountInOverride) / _amountIn;
       _amountOut = (_amountOut * _rewardsSwapAmountInOverride) / _amountIn;
       _amountIn = _rewardsSwapAmountInOverride;
     }

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 interface ILendingAssetVault {
-  event DonateAssets(address indexed user, uint256 amount);
+  event DonateAssets(address indexed user, uint256 amount, uint256 newShares);
 
   event PayBackUsedAssets(address indexed user, uint256 amount);
 

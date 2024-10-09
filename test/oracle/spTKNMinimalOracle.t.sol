@@ -22,8 +22,8 @@ contract spTKNMinimalOracleTest is Test {
 
   function setUp() public {
     _v2Res = new V2ReservesUniswap();
-    _clOracle = new ChainlinkSinglePriceOracle();
-    _uniOracle = new UniswapV3SinglePriceOracle();
+    _clOracle = new ChainlinkSinglePriceOracle(address(0));
+    _uniOracle = new UniswapV3SinglePriceOracle(address(0));
   }
 
   function test_getPrices_PEASDAI() public {

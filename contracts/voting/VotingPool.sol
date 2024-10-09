@@ -48,6 +48,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     require(_amount > 0, 'A');
     IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _amount);
     stakes[_msgSender()][_asset].lastStaked = block.timestamp;
+    stakes[_msgSender()][_asset].lockupPeriod = lockupPeriod;
     _update(_msgSender(), _asset, _amount);
     emit AddStake(_msgSender(), _asset, _amount);
   }
@@ -55,7 +56,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
   function unstake(address _asset, uint256 _amount) external override {
     require(_amount > 0, 'R');
     Stake storage _stake = stakes[_msgSender()][_asset];
-    require(block.timestamp > _stake.lastStaked + lockupPeriod, 'LU');
+    require(block.timestamp > _stake.lastStaked + _stake.lockupPeriod, 'LU');
     uint256 _amtStakeToRemove = (_amount * _stake.stakedToOutputDenomenator) /
       _stake.stakedToOutputFactor;
     _stake.amtStaked -= _amtStakeToRemove;
@@ -79,10 +80,11 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     require(assets[_asset].enabled, 'E');
     (_convFctr, _convDenom) = _getConversionFactorAndDenom(_asset);
     Stake storage _stake = stakes[_user][_asset];
-    uint256 _mintedAmtBefore = _stake.amtStaked == 0
-      ? 0
-      : (_stake.amtStaked * _stake.stakedToOutputFactor) /
-        _stake.stakedToOutputDenomenator;
+    uint256 _den = _stake.stakedToOutputDenomenator > 0
+      ? _stake.stakedToOutputDenomenator
+      : 1;
+    uint256 _mintedAmtBefore = (_stake.amtStaked *
+      _stake.stakedToOutputFactor) / _den;
     _stake.amtStaked += _addAmt;
     _stake.stakedToOutputFactor = _convFctr;
     _stake.stakedToOutputDenomenator = _convDenom;
@@ -138,7 +140,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     uint256 _amount
   ) internal virtual override {
     require(_from == address(0) || _to == address(0), 'NT');
-    if (_from != address(0) && _from != address(0xdead)) {
+    if (_from != address(0)) {
       TokenRewards(REWARDS).setShares(_from, _amount, true);
     }
     if (_to != address(0) && _to != address(0xdead)) {

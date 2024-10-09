@@ -100,7 +100,7 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
     address _to,
     uint256 _amount
   ) internal override {
-    if (_from != address(0) && _from != address(0xdead)) {
+    if (_from != address(0)) {
       TokenRewards(POOL_REWARDS).setShares(_from, _amount, true);
     }
     if (_to != address(0) && _to != address(0xdead)) {

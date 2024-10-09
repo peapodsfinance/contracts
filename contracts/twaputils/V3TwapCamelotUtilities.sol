@@ -87,18 +87,23 @@ contract V3TwapCamelotUtilities is IV3TwapUtilities, Ownable {
   function _sqrtPriceX96FromPoolAndInterval(
     address _poolAddress,
     uint32 _interval
-  ) internal view returns (uint160 sqrtPriceX96) {
+  ) internal view returns (uint160 _sqrtPriceX96) {
     IAlgebraV3Pool _pool = IAlgebraV3Pool(_poolAddress);
     if (_interval == 0) {
-      (sqrtPriceX96, , , , , , , ) = _pool.globalState();
+      (_sqrtPriceX96, , , , , , , ) = _pool.globalState();
     } else {
       uint32[] memory secondsAgo = new uint32[](2);
       secondsAgo[0] = _interval;
       secondsAgo[1] = 0;
       (int56[] memory tickCumulatives, , , ) = _pool.getTimepoints(secondsAgo);
-      sqrtPriceX96 = TickMath.getSqrtRatioAtTick(
-        int24((tickCumulatives[1] - tickCumulatives[0]) / int32(_interval))
-      );
+      int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
+      int24 arithmeticMeanTick = int24(tickCumulativesDelta / int32(_interval));
+      // Always round to negative infinity
+      if (
+        tickCumulativesDelta < 0 &&
+        (tickCumulativesDelta % int32(_interval) != 0)
+      ) arithmeticMeanTick--;
+      _sqrtPriceX96 = TickMath.getSqrtRatioAtTick(arithmeticMeanTick);
     }
   }
 

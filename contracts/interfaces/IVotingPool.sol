@@ -11,6 +11,7 @@ interface IVotingPool {
 
   struct Stake {
     uint256 amtStaked;
+    uint256 lockupPeriod;
     uint256 stakedToOutputFactor;
     uint256 stakedToOutputDenomenator;
     uint256 lastStaked;

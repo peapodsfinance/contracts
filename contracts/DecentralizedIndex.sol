@@ -48,9 +48,9 @@ abstract contract DecentralizedIndex is
   mapping(address => bool) _isTokenInIndex;
   mapping(address => uint8) _fundTokenIdx;
   mapping(address => bool) _blacklist;
-
+  mapping(address => uint256) _totalAssets;
+  uint256 _totalSupply;
   uint64 _partnerFirstWrapped;
-
   uint64 _lastSwap;
   uint8 _swapping;
   uint8 _swapAndFeeOn = 1;
@@ -123,8 +123,7 @@ abstract contract DecentralizedIndex is
     REWARDS_WHITELIST = IRewardsWhitelister(_rewardsWhitelister);
     V3_TWAP_UTILS = IV3TwapUtilities(_v3TwapUtils);
     DEX_HANDLER = IDexAdapter(_dexAdapter);
-    address _v2Router = DEX_HANDLER.V2_ROUTER();
-    V2_ROUTER = _v2Router;
+    V2_ROUTER = DEX_HANDLER.V2_ROUTER();
     V3_ROUTER = DEX_HANDLER.V3_ROUTER();
     address _finalPairedLpToken = _pairedLpToken == address(0)
       ? DAI
@@ -153,6 +152,12 @@ abstract contract DecentralizedIndex is
 
   function initialize() external {
     _initialize();
+  }
+
+  /// @notice The ```totalSupply``` function returns the total pTKN supply minted, excluding any used for _flashMint
+  /// @return _totalSupply Valid supply of pTKN excluding flashMinted pTKNs
+  function totalSupply() public view override(IERC20, ERC20) returns (uint256) {
+    return _totalSupply;
   }
 
   /// @notice The ```_initialize``` function initialized a new LP pair for the pod + pairedLpAsset
@@ -189,12 +194,10 @@ abstract contract DecentralizedIndex is
       if (_buy && fees.buy > 0) {
         _fee = (_amount * fees.buy) / DEN;
         super._transfer(_from, address(this), _fee);
-      }
-      if (_sell && fees.sell > 0) {
+      } else if (_sell && fees.sell > 0) {
         _fee = (_amount * fees.sell) / DEN;
         super._transfer(_from, address(this), _fee);
-      }
-      if (!_buy && !_sell && config.hasTransferTax) {
+      } else if (!_buy && !_sell && config.hasTransferTax) {
         _fee = _amount / 10000; // 0.01%
         _fee = _fee == 0 && _amount > 0 ? 1 : _fee;
         super._transfer(_from, address(this), _fee);
@@ -311,14 +314,14 @@ abstract contract DecentralizedIndex is
   /// @notice The ```_isFirstIn``` function confirms if the user is the first to wrap
   /// @return bool Whether the user is the first one in
   function _isFirstIn() internal view returns (bool) {
-    return totalSupply() == 0;
+    return _totalSupply == 0;
   }
 
   /// @notice The ```_isLastOut``` function checks if the user is the last one out
   /// @param _debondAmount Number of pTKN being unwrapped
   /// @return bool Whether the user is the last one out
   function _isLastOut(uint256 _debondAmount) internal view returns (bool) {
-    return _debondAmount >= (totalSupply() * 98) / 100;
+    return _debondAmount >= (_totalSupply * 99) / 100;
   }
 
   /// @notice The ```processPreSwapFeesAndSwap``` function allows the rewards CA for the pod to process fees as needed
@@ -481,6 +484,8 @@ abstract contract DecentralizedIndex is
     if (lpRewardsToken == DAI) {
       IERC20(DAI).safeIncreaseAllowance(_rewards, FLASH_FEE_AMOUNT_DAI);
       ITokenRewards(_rewards).depositRewards(DAI, FLASH_FEE_AMOUNT_DAI);
+    } else if (PAIRED_LP_TOKEN == DAI) {
+      ITokenRewards(_rewards).depositFromPairedLpToken(0);
     }
     uint256 _balance = IERC20(_token).balanceOf(address(this));
     IERC20(_token).safeTransfer(_recipient, _amount);
@@ -490,7 +495,7 @@ abstract contract DecentralizedIndex is
   }
 
   /// @notice The ```flashMint``` function allows to flash mint pTKN and burn it + 0.1% at the end of the transaction
-  /// @param _recipient User to receive ptkn for the flash mint
+  /// @param _recipient User to receive pTKN for the flash mint
   /// @param _amount Number of pTKN to receive/mint
   /// @param _data Any data the recipient wants to be passed on the flash mint callback
   function flashMint(
@@ -500,8 +505,9 @@ abstract contract DecentralizedIndex is
   ) external override lock {
     _mint(_recipient, _amount);
     IFlashLoanRecipient(_recipient).callback(_data);
-    // Make sure the user has and we burn 0.1% more than they flash minted
-    _burn(_recipient, (_amount * 1001) / 1000);
+    // Make sure the calling user pays fee of 0.1% more than they flash minted to recipient
+    _burn(_recipient, _amount);
+    _burn(_msgSender(), _amount / 1000);
     emit FlashMint(_msgSender(), _recipient, _amount);
   }
 

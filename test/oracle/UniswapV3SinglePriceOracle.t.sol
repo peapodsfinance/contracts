@@ -9,7 +9,7 @@ contract UniswapV3SinglePriceOracleTest is Test {
   UniswapV3SinglePriceOracle public oracle;
 
   function setUp() public {
-    oracle = new UniswapV3SinglePriceOracle();
+    oracle = new UniswapV3SinglePriceOracle(address(0));
   }
 
   function test_getPriceUSD18_PEASDAI_NoCL() public view {

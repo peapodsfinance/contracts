@@ -142,4 +142,82 @@ contract WeightedIndexTest is Test {
     IStakingPoolToken(spTkn).stake(address(this), uniBal);
     spTknBal = IERC20(spTkn).balanceOf(address(this));
   }
+
+  function test_totalAssets() public {
+    // Bond some assets
+    peas.approve(address(pod), peas.totalSupply());
+    pod.bond(address(peas), bondAmt, 0);
+
+    // Check total assets
+    uint256 totalAssets = pod.totalAssets();
+    uint256 totalAssetsTkn = pod.totalAssets(address(peas));
+    assertEq(totalAssets, bondAmt, 'Total assets should equal bonded amount');
+    assertEq(
+      totalAssetsTkn,
+      bondAmt,
+      'Total assets should equal bonded amount for TKN'
+    );
+  }
+
+  function test_totalSupply() public {
+    // Bond some assets
+    peas.approve(address(pod), peas.totalSupply());
+    pod.bond(address(peas), bondAmt, 0);
+
+    // Check total supply
+    uint256 totalSupply = pod.totalSupply();
+    assertEq(totalSupply, bondAmt, 'Total supply should equal bonded amount');
+  }
+
+  function test_convertToAssets() public {
+    // Bond some assets
+    peas.approve(address(pod), peas.totalSupply());
+    pod.bond(address(peas), bondAmt, 0);
+
+    // Test conversion with different amounts
+    uint256 smallAmount = 1e15; // 0.001 tokens
+    uint256 largeAmount = 1e21; // 1000 tokens
+
+    uint256 smallAssets = pod.convertToAssets(smallAmount);
+    uint256 largeAssets = pod.convertToAssets(largeAmount);
+
+    assertApproxEqAbs(
+      smallAssets,
+      smallAmount,
+      1,
+      'Small amount conversion should be 1:1 (within 1 wei)'
+    );
+    assertApproxEqAbs(
+      largeAssets,
+      largeAmount,
+      1,
+      'Large amount conversion should be 1:1 (within 1 wei)'
+    );
+  }
+
+  function test_convertToShares() public {
+    // Bond some assets
+    peas.approve(address(pod), peas.totalSupply());
+    pod.bond(address(peas), bondAmt, 0);
+
+    // Test conversion with different amounts
+    uint256 smallAmount = 1e15; // 0.001 tokens
+    uint256 largeAmount = 1e21; // 1000 tokens
+
+    uint256 smallShares = pod.convertToShares(smallAmount);
+    uint256 largeShares = pod.convertToShares(largeAmount);
+
+    assertApproxEqAbs(
+      smallShares,
+      smallAmount,
+      1,
+      'Small amount conversion should be 1:1 (within 1 wei)'
+    );
+    assertApproxEqAbs(
+      largeShares,
+      largeAmount,
+      1,
+      'Large amount conversion should be 1:1 (within 1 wei)'
+    );
+  }
 }

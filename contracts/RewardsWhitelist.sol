@@ -7,11 +7,10 @@ import './interfaces/IRewardsWhitelister.sol';
 contract RewardsWhitelist is IRewardsWhitelister, Ownable {
   uint8 constant MAX = 12;
 
+  mapping(address => bool) public override paused;
   mapping(address => bool) public override whitelist;
   address[] public _whitelistAry;
   mapping(address => uint256) _whitelistAryIdx;
-
-  event ToggleToken(address indexed token, bool isWhitelisted);
 
   function getFullWhitelist()
     external
@@ -20,6 +19,12 @@ contract RewardsWhitelist is IRewardsWhitelister, Ownable {
     returns (address[] memory)
   {
     return _whitelistAry;
+  }
+
+  function setPaused(address _token, bool _isPaused) external onlyOwner {
+    require(paused[_token] != _isPaused, 'OPP');
+    paused[_token] = _isPaused;
+    emit PauseToken(_token, _isPaused);
   }
 
   function toggleRewardsToken(

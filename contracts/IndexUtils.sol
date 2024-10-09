@@ -278,6 +278,9 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
     uint256 _tokenAmtSupplyRatioX96 = _indexFund.totalSupply() == 0
       ? FixedPoint96.Q96
       : (_amountForPoolIdx * FixedPoint96.Q96) / _tokenCurSupply;
+    if (_amountNative > 0) {
+      IWETH(WETH).deposit{ value: _amountNative }();
+    }
     uint256 _nativeLeft = _amountNative;
     uint256 _al = _assets.length;
     for (uint256 _i; _i < _al; _i++) {
@@ -309,9 +312,6 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
     )
   {
     address _weth = DEX_ADAPTER.WETH();
-    if (address(this).balance > 0) {
-      IWETH(WETH).deposit{ value: address(this).balance }();
-    }
     uint256 _nativeBefore = IERC20(_weth).balanceOf(address(this));
     _amountBefore = IERC20(_outToken).balanceOf(address(this));
     uint256 _amountOut = _indexFund.totalSupply() == 0
