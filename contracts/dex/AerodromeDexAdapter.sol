@@ -210,24 +210,4 @@ contract AerodromeDexAdapter is UniswapDexAdapter {
       );
     }
   }
-
-  function extraRewardsHook(
-    address _token0,
-    address _token1
-  )
-    external
-    override
-    returns (address[] memory _tokens, uint256[] memory _amounts)
-  {
-    _tokens[0] = AERO;
-    uint256 _aeroBefore = IERC20(AERO).balanceOf(address(this));
-    address _pool = getV2Pool(_token0, _token1);
-    IAerodromeVoter _voter = IAerodromeVoter(
-      IAerodromeLpSugar(LP_SUGAR).voter()
-    );
-    address[] memory _gauges = new address[](1);
-    _gauges[0] = _voter.gauges(_pool);
-    _voter.claimRewards(_gauges);
-    _amounts[0] = IERC20(AERO).balanceOf(address(this)) - _aeroBefore;
-  }
 }

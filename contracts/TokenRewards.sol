@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Context.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
@@ -22,6 +23,8 @@ contract TokenRewards is ITokenRewards, Context {
   uint256 constant REWARDS_SWAP_SLIPPAGE = 20; // 2%
   uint24 constant REWARDS_POOL_FEE = 10000; // 1%
   int24 constant REWARDS_TICK_SPACING = 200;
+
+  uint256 immutable REWARDS_SWAP_OVERRIDE_MIN;
   address immutable INDEX_FUND;
   address immutable PAIRED_LP_TOKEN;
   IProtocolFeeRouter immutable PROTOCOL_FEE_ROUTER;
@@ -71,6 +74,11 @@ contract TokenRewards is ITokenRewards, Context {
     PAIRED_LP_TOKEN = _pairedLpToken;
     trackingToken = _trackingToken;
     rewardsToken = _rewardsToken;
+
+    // Setup min swap to be small amount of paired LP token to prevent DOS attemps
+    uint8 _pd = IERC20Metadata(_pairedLpToken).decimals();
+    uint256 _minSwap = 10 ** (_pd / 2);
+    REWARDS_SWAP_OVERRIDE_MIN = _minSwap == 0 ? 10 ** _pd : _minSwap;
   }
 
   function setShares(
@@ -240,7 +248,8 @@ contract TokenRewards is ITokenRewards, Context {
       rewards[_token][_wallet].realized += _amount;
       rewards[_token][_wallet].excluded = _cumulativeRewards(
         _token,
-        shares[_wallet]
+        shares[_wallet],
+        true
       );
       if (_amount > 0) {
         rewardsDistributed[_token] += _amount;
@@ -255,7 +264,8 @@ contract TokenRewards is ITokenRewards, Context {
       address _token = _allRewardsTokens[_i];
       rewards[_token][_wallet].excluded = _cumulativeRewards(
         _token,
-        shares[_wallet]
+        shares[_wallet],
+        true
       );
     }
   }
@@ -313,7 +323,9 @@ contract TokenRewards is ITokenRewards, Context {
         rewardsToken,
         REWARDS_POOL_FEE,
         _amountIn,
-        (_amountOut * (1000 - REWARDS_SWAP_SLIPPAGE)) / 1000,
+        _amountIn == REWARDS_SWAP_OVERRIDE_MIN
+          ? 0
+          : (_amountOut * (1000 - REWARDS_SWAP_SLIPPAGE)) / 1000,
         address(this)
       )
     {
@@ -329,7 +341,9 @@ contract TokenRewards is ITokenRewards, Context {
         IERC20(rewardsToken).balanceOf(address(this)) - _balBefore
       );
     } catch {
-      _rewardsSwapAmountInOverride = _amountIn / 2;
+      _rewardsSwapAmountInOverride = _amountIn / 2 < REWARDS_SWAP_OVERRIDE_MIN
+        ? REWARDS_SWAP_OVERRIDE_MIN
+        : _amountIn / 2;
       IERC20(PAIRED_LP_TOKEN).safeDecreaseAllowance(
         address(DEX_ADAPTER),
         _amountIn
@@ -350,7 +364,7 @@ contract TokenRewards is ITokenRewards, Context {
     if (shares[_wallet] == 0) {
       return 0;
     }
-    uint256 earnedRewards = _cumulativeRewards(_token, shares[_wallet]);
+    uint256 earnedRewards = _cumulativeRewards(_token, shares[_wallet], false);
     uint256 rewardsExcluded = rewards[_token][_wallet].excluded;
     if (earnedRewards <= rewardsExcluded) {
       return 0;
@@ -360,8 +374,12 @@ contract TokenRewards is ITokenRewards, Context {
 
   function _cumulativeRewards(
     address _token,
-    uint256 _share
-  ) internal view returns (uint256) {
-    return (_share * _rewardsPerShare[_token]) / PRECISION;
+    uint256 _share,
+    bool _roundUp
+  ) internal view returns (uint256 _r) {
+    _r = (_share * _rewardsPerShare[_token]) / PRECISION;
+    if (_roundUp && (_share * _rewardsPerShare[_token]) % PRECISION > 0) {
+      _r = _r + 1;
+    }
   }
 }

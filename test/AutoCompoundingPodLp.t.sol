@@ -20,6 +20,7 @@ contract AutoCompoundingPodLpTest is Test {
   MockERC20 public mockAsset;
   MockERC20 public rewardToken1;
   MockERC20 public rewardToken2;
+  MockERC20 public rewardToken3;
   MockERC20 public pairedLpToken;
   address public owner;
   address public user;
@@ -36,6 +37,7 @@ contract AutoCompoundingPodLpTest is Test {
     mockAsset = new MockERC20('Mock LP Token', 'MLT');
     rewardToken1 = new MockERC20('Reward Token 1', 'RT1');
     rewardToken2 = new MockERC20('Reward Token 2', 'RT2');
+    rewardToken3 = new MockERC20('Reward Token 3', 'RT3');
     pairedLpToken = new MockERC20('Paired LP Token', 'PLT');
 
     autoCompoundingPodLp = new AutoCompoundingPodLp(
@@ -50,7 +52,39 @@ contract AutoCompoundingPodLpTest is Test {
 
     mockPod.setLpStakingPool(address(mockAsset));
     mockPod.setPairedLpToken(address(pairedLpToken));
-    mockPod.setLpRewardsToken(address(rewardToken1));
+    mockPod.setLpRewardsToken(address(rewardToken3));
+  }
+
+  function testConvertToShares() public view {
+    uint256 assets = 1000 * 1e18;
+    uint256 shares = autoCompoundingPodLp.convertToShares(assets);
+    assertEq(shares, assets);
+  }
+
+  function testConvertToAssets() public view {
+    uint256 shares = 1000 * 1e18;
+    uint256 assets = autoCompoundingPodLp.convertToAssets(shares);
+    assertEq(assets, shares);
+  }
+
+  function testSetYieldConvEnabled() public {
+    assertEq(autoCompoundingPodLp.yieldConvEnabled(), true);
+
+    autoCompoundingPodLp.setYieldConvEnabled(false);
+    assertEq(autoCompoundingPodLp.yieldConvEnabled(), false);
+
+    autoCompoundingPodLp.setYieldConvEnabled(true);
+    assertEq(autoCompoundingPodLp.yieldConvEnabled(), true);
+  }
+
+  function testSetProtocolFee() public {
+    assertEq(autoCompoundingPodLp.protocolFee(), 50);
+
+    autoCompoundingPodLp.setProtocolFee(100);
+    assertEq(autoCompoundingPodLp.protocolFee(), 100);
+
+    vm.expectRevert(bytes('MAX'));
+    autoCompoundingPodLp.setProtocolFee(1001);
   }
 
   function testProcessAllRewardsTokensToPodLp() public {
@@ -166,6 +200,11 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
   function flash(
     address recipient,
     address token,
+    uint256 amount,
+    bytes calldata data
+  ) external pure override {}
+  function flashMint(
+    address recipient,
     uint256 amount,
     bytes calldata data
   ) external pure override {}
@@ -307,10 +346,6 @@ contract MockDexAdapter is IDexAdapter, Test {
   function createV2Pool(address, address) external pure returns (address) {
     return address(0);
   }
-  function extraRewardsHook(
-    address _token0,
-    address _token1
-  ) external returns (address[] memory tokens, uint256[] memory amounts) {}
   function getV2Pool(address, address) external pure returns (address pool) {
     return address(0);
   }

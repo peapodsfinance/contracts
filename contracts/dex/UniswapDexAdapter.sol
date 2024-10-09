@@ -251,17 +251,4 @@ contract UniswapDexAdapter is IDexAdapter, Context {
       );
     }
   }
-
-  function extraRewardsHook(
-    address,
-    address
-  )
-    external
-    virtual
-    override
-    returns (address[] memory _t, uint256[] memory _a)
-  {
-    _t;
-    _a;
-  }
 }

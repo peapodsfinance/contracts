@@ -77,9 +77,4 @@ interface IDexAdapter {
     address to,
     uint256 deadline
   ) external;
-
-  function extraRewardsHook(
-    address _token0,
-    address _token1
-  ) external returns (address[] memory tokens, uint256[] memory amounts);
 }

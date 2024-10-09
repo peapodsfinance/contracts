@@ -124,9 +124,11 @@ contract Zapper is IZapper, Context, Ownable {
         address _token0 = IUniswapV2Pair(_poolInfo.pool1).token0();
         address[] memory _path = new address[](_twoHops ? 3 : 2);
         _path[0] = _in;
-        _path[1] = !_twoHops ? _out : _token0 == _in
-          ? IUniswapV2Pair(_poolInfo.pool1).token1()
-          : _token0;
+        _path[1] = !_twoHops
+          ? _out
+          : _token0 == _in
+            ? IUniswapV2Pair(_poolInfo.pool1).token1()
+            : _token0;
         if (_twoHops) {
           _path[2] = _out;
         }
@@ -241,16 +243,31 @@ contract Zapper is IZapper, Context, Ownable {
     uint256 _amountIn,
     uint256 _amountOutMin
   ) internal returns (uint256) {
-    address _out = _path.length == 3 ? _path[2] : _path[1];
+    bool _twoHops = _path.length == 3;
+    address _out = _twoHops ? _path[2] : _path[1];
     uint256 _outBefore = IERC20(_out).balanceOf(address(this));
     IERC20(_path[0]).safeIncreaseAllowance(address(DEX_ADAPTER), _amountIn);
     DEX_ADAPTER.swapV2Single(
       _path[0],
       _path[1],
       _amountIn,
-      _amountOutMin,
+      _twoHops ? 0 : _amountOutMin,
       address(this)
     );
+    if (_twoHops) {
+      uint256 _intermediateBal = IERC20(_path[1]).balanceOf(address(this));
+      IERC20(_path[1]).safeIncreaseAllowance(
+        address(DEX_ADAPTER),
+        _intermediateBal
+      );
+      DEX_ADAPTER.swapV2Single(
+        _path[1],
+        _path[2],
+        _intermediateBal,
+        _amountOutMin,
+        address(this)
+      );
+    }
     return IERC20(_out).balanceOf(address(this)) - _outBefore;
   }
 

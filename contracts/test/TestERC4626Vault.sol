@@ -21,7 +21,9 @@ contract TestERC4626Vault is IERC4626, ERC20, ERC20Permit {
   }
 
   // Needed for LendingAssetVault
-  function addInterest() external {}
+  function addInterest(
+    bool
+  ) external returns (uint256, uint256, uint256, uint64) {}
 
   function asset() external view override returns (address) {
     return _asset;
@@ -168,9 +170,5 @@ contract TestERC4626Vault is IERC4626, ERC20, ERC20Permit {
   function _cbr() internal view returns (uint256) {
     uint256 _supply = totalSupply();
     return _supply == 0 ? PRECISION : (PRECISION * totalAssets()) / _supply;
-  }
-
-  function _assetDecimals() internal view returns (uint8) {
-    return IERC20Metadata(_asset).decimals();
   }
 }

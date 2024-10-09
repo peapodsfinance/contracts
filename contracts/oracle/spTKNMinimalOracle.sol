@@ -159,10 +159,7 @@ contract spTKNMinimalOracle is IMinimalOracle, Ownable {
       }
     }
     address _pair = _getPair();
-    address _clT0 = IUniswapV2Pair(UNDERLYING_TKN_CL_POOL).token0();
-    uint8 _clT0Decimals = IERC20Metadata(_clT0).decimals();
     address _clT1 = IUniswapV2Pair(UNDERLYING_TKN_CL_POOL).token1();
-    uint8 _clT1Decimals = IERC20Metadata(_clT1).decimals();
     uint256 _pricePTKNPerBase18 = _clT1 == _baseInCl
       ? _accountForCBRInPrice(POD, UNDERLYING_TKN, _price18)
       : 10 ** (18 * 2) / _accountForCBRInPrice(POD, UNDERLYING_TKN, _price18);
@@ -180,14 +177,9 @@ contract spTKNMinimalOracle is IMinimalOracle, Ownable {
       10 ** IERC20Metadata(IUniswapV2Pair(_pair).token1()).decimals();
     uint256 _avgBaseAssetInLp18 = _sqrt((_pricePTKNPerBase18 * _k) / _kDec) *
       10 ** (18 / 2);
-    uint256 _pairPrice18 = (2 *
-      _avgBaseAssetInLp18 *
-      10 ** ((_clT0Decimals + _clT1Decimals) / 2)) /
+    uint256 _basePerSpTkn18 = (2 * _avgBaseAssetInLp18 * 10 ** 18) /
       IERC20(_pair).totalSupply();
-    uint256 _baseTDecimals = _clT1 == _baseInCl ? _clT1Decimals : _clT0Decimals;
-    _spTknBasePrice18 =
-      10 ** (18 * 2) /
-      ((_pairPrice18 * 10 ** _baseTDecimals) / 10 ** 18);
+    _spTknBasePrice18 = 10 ** (18 * 2) / _basePerSpTkn18;
 
     // if the base asset is a pod, we will assume that the CL/chainlink pool(s) are
     // pricing the underlying asset of the base asset pod, and therefore we will

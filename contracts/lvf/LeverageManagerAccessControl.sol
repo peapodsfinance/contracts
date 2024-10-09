@@ -8,7 +8,7 @@ import '../interfaces/IFraxlendPair.sol';
 contract LeverageManagerAccessControl is Ownable {
   // pod => pair
   mapping(address => address) public lendingPairs;
-  // pod => flash source
+  // borrow asset (USDC, DAI, pOHM, etc.) => flash source
   mapping(address => address) public flashSource;
 
   function setLendingPair(address _pod, address _pair) external onlyOwner {
@@ -19,12 +19,12 @@ contract LeverageManagerAccessControl is Ownable {
   }
 
   function setFlashSource(
-    address _pod,
+    address _borrowAsset,
     address _flashSource
   ) external onlyOwner {
     if (_flashSource != address(0)) {
       require(IFlashLoanSource(_flashSource).source() != address(0), 'AFS');
     }
-    flashSource[_pod] = _flashSource;
+    flashSource[_borrowAsset] = _flashSource;
   }
 }

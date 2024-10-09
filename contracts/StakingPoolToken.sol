@@ -82,33 +82,6 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
     emit Unstake(_msgSender(), _amount);
   }
 
-  function externalRewardHook(
-    address _token0,
-    address _token1
-  ) external override {
-    (bool _success, bytes memory _data) = address(DEX_ADAPTER).delegatecall(
-      abi.encodeWithSignature(
-        'extraRewardsHook(address,address)',
-        _token0,
-        _token1
-      )
-    );
-    require(_success, 'UNS');
-    (address[] memory _tokens, uint256[] memory _amounts) = abi.decode(
-      _data,
-      (address[], uint256[])
-    );
-    address _receiver = Ownable(address(V3_TWAP_UTILS)).owner();
-    for (uint256 _i; _i < _tokens.length; _i++) {
-      if (_tokens[_i] == address(0)) {
-        (bool _s, ) = payable(_receiver).call{ value: _amounts[_i] }('');
-        require(_s, 'ES');
-      } else {
-        IERC20(_tokens[_i]).safeTransfer(_receiver, _amounts[_i]);
-      }
-    }
-  }
-
   function setStakingToken(address _stakingToken) external onlyOwner {
     require(stakingToken == address(0), 'S');
     stakingToken = _stakingToken;

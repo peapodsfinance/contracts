@@ -154,4 +154,10 @@ interface IDecentralizedIndex is IERC20 {
     uint256 amount,
     bytes calldata data
   ) external;
+
+  function flashMint(
+    address recipient,
+    uint256 amount,
+    bytes calldata data
+  ) external;
 }

@@ -15,6 +15,10 @@ interface IFraxlendPair is IERC20 {
 
   function userBorrowShares(address user) external view returns (uint256); // represents the shares held by individuals
 
+  function addInterest(
+    bool _returnAccounting
+  ) external returns (uint256, uint256, uint256, uint64);
+
   function deposit(
     uint256 _amount,
     address _receiver
