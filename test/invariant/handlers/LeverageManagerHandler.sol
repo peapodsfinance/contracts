@@ -11,6 +11,7 @@ import {LeveragePositions} from "../../../contracts/lvf/LeveragePositions.sol";
 import {ILeverageManager} from "../../../contracts/interfaces/ILeverageManager.sol";
 import {IFlashLoanSource} from "../../../contracts/interfaces/IFlashLoanSource.sol";
 import {AutoCompoundingPodLp} from "../../../contracts/AutoCompoundingPodLp.sol";
+import {UniswapV3FlashSource} from "../../../contracts/flash/UniswapV3FlashSource.sol";
 
 import {IUniswapV2Pair} from "uniswap-v2/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import {FullMath} from "v3-core/libraries/FullMath.sol";
@@ -41,7 +42,7 @@ contract LeverageManagerHandler is Properties {
         try _leverageManager.initializePosition(
             address(cache.pod),
             cache.user,
-            address(0) // TODO: change when self-lending position is setup
+            address(0)
         ) {} catch {
             fl.t(false, "INIT POSITION FAILED");
         }
@@ -107,7 +108,7 @@ contract LeverageManagerHandler is Properties {
             pairedLpAmount + feeAmount,
             1000,
             block.timestamp,
-            address(0) // TODO: change when self-lending position is setup
+            address(0)
         ) {
             
             // POST-CONDITIONS
@@ -116,13 +117,12 @@ contract LeverageManagerHandler is Properties {
             _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV;
 
             // invariant_POD_4(FraxlendPair(cache.lendingPair));
-            // invariant_POD_16();
+            invariant_POD_17();
             invariant_POD_18();
-            invariant_POD_19();
+            invariant_POD_20();
             invariant_POD_21();
             invariant_POD_22();
-            invariant_POD_23();
-            invariant_POD_44(cache.lendingPair);
+            invariant_POD_42(cache.lendingPair);
 
             if (pairedLpAmount + feeAmount > fraxAssetsLessVault - fraxBorrows) {
                 invariant_POD_9();
@@ -133,8 +133,7 @@ contract LeverageManagerHandler is Properties {
         } catch (bytes memory err) {
             bytes4[1] memory errors =
                 [FraxlendPairConstants.Insolvent.selector];
-            fl.log("ERROR", errors[0]);
-            fl.log("SELECTOR", bytes4(err));
+
             bool expected = false;
             for (uint256 i = 0; i < errors.length; i++) {
                 if (errors[i] == bytes4(err)) {
@@ -144,7 +143,6 @@ contract LeverageManagerHandler is Properties {
                 }
             }
             fl.t(expected, FuzzLibString.getRevertMsg(err));
-            // return;
         } catch Error(string memory reason) {
             
             string[5] memory stringErrors = [
@@ -227,7 +225,8 @@ contract LeverageManagerHandler is Properties {
             borrowAssets <= 1000 || 
             collateralAmount <= 1000 ||
             cache.sharesToBurn > IERC20(cache.lendingPair).balanceOf(address(_lendingAssetVault)) ||
-            borrowAssets > IERC20(IFraxlendPair(cache.lendingPair).asset()).balanceOf(cache.lendingPair)
+            borrowAssets > IERC20(IFraxlendPair(cache.lendingPair).asset()).balanceOf(cache.lendingPair) ||
+            borrowAssets > IERC20(cache.borrowToken).balanceOf(UniswapV3FlashSource(cache.flashSource).source())
             ) return;
 
         if (!_solventCheckAfterRepay(
@@ -259,18 +258,15 @@ contract LeverageManagerHandler is Properties {
             _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV; 
 
             // invariant_POD_4(FraxlendPair(cache.lendingPair));
-            // invariant_POD_16();
-            invariant_POD_17();
-            invariant_POD_20();
-            // invariant_POD_24();
+            invariant_POD_16();
+            invariant_POD_19();
+            // invariant_POD_23();
+            invariant_POD_24();
             invariant_POD_25();
-            invariant_POD_26();
-            invariant_POD_44(cache.lendingPair);
+            invariant_POD_42(cache.lendingPair);
 
             if (_beforeLM.vaultUtilization > 0) {
                 invariant_POD_6();
-                fl.log("_beforeLM.vaultUtilization", _beforeLM.vaultUtilization);
-                fl.log("borrowAssets", borrowAssets);
                 // invariant_POD_7(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization);
                 // invariant_POD_8(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization);
             }
@@ -286,31 +282,13 @@ contract LeverageManagerHandler is Properties {
             bool expected = false;
             for (uint256 i = 0; i < stringErrors.length; i++) {
                 if (compareStrings(stringErrors[i], reason)) {
-                    expected = true;
-                    
+                    expected = true;    
                 } else if (compareStrings(reason, stringErrors[2])) {
                     // invariant_POD_1();
                 }
             }
             fl.t(expected, reason);
         }
-        // catch (bytes memory err) {
-
-        //     bytes4[1] memory errors = [FraxlendPairConstants.Insolvent.selector]; 
-
-        //     bool expected = false;
-        //     for (uint256 i = 0; i < errors.length; i++) {
-        //         if (errors[i] == bytes4(err)) {
-        //             if (
-        //                 IFraxlendPair(cache.lendingPair).userBorrowShares(cache.custodian) != 
-        //                 _beforeLM.custodianBorrowShares
-        //                 ) {
-        //                     invariant_POD_33();
-        //                 }
-        //         }
-        //     }
-
-        // }
     }
 
     function _solventCheckAfterRepay(
@@ -323,9 +301,7 @@ contract LeverageManagerHandler is Properties {
         ( , , , , uint256 highExchangeRate) = FraxlendPair(lendingPair).exchangeRateInfo();
 
         uint256 sharesAfterRepay = sharesAvailable - repayShares;
-        fl.log("SHARES AFTER REPAY", sharesAfterRepay);
-        fl.log("sharesAvailable", sharesAvailable);
-        fl.log("repayShares", repayShares);
+
         isSolvent = true;
         uint256 _ltv = (((sharesAfterRepay * highExchangeRate) / FraxlendPair(lendingPair).EXCHANGE_PRECISION()) * FraxlendPair(lendingPair).LTV_PRECISION()) / _collateralAmount;
         isSolvent = _ltv <= FraxlendPair(lendingPair).maxLTV();

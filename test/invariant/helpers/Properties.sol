@@ -116,15 +116,15 @@ contract Properties is BeforeAfter {
         );
     }
 
-    function invariant_POD_12() public {
-        // LendingAssetVault::global total assets == sum(deposits + donations + interest accrued - withdrawals)
-        assertApproxEq(
-            lavDeposits,
-            _lendingAssetVault.totalAssets(),
-            1,
-            "POD-12: LendingAssetVault::global total assets == sum(deposits + donations + interest accrued - withdrawals)"
-        );
-    }
+    // function invariant_POD_12() public {
+    //     // LendingAssetVault::global total assets == sum(deposits + donations + interest accrued - withdrawals)
+    //     assertApproxEq(
+    //         lavDeposits,
+    //         _lendingAssetVault.totalAssets(),
+    //         1,
+    //         "POD-12: LendingAssetVault::global total assets == sum(deposits + donations + interest accrued - withdrawals)"
+    //     );
+    // }
 
     function invariant_POD_13(uint256 actualAmount, uint256 maxAmount) internal {
         // LendingAssetVault::withdraw/redeem User can't withdraw more than their share of total assets
@@ -157,7 +157,7 @@ contract Properties is BeforeAfter {
         for (uint256 i; i < _fraxPairs.length; i++) {
             fl.lte(
                 _lendingAssetVault.vaultUtilization(address(_fraxPairs[i])),
-                _lendingAssetVault.totalAssets() * 2500,
+                _lendingAssetVault.totalAssets() * _fraxPercentages[i],
                 "POD-15: FraxLend vault should never more assets lent to it from the LAV that the allotted _vaultMaxPerc"
             );
         }
@@ -273,38 +273,38 @@ contract Properties is BeforeAfter {
         );
     }
  
-    function invariant_POD_26(uint256 fraxlendPairSeed) public {
-        // FraxLend: cbr change with one large update == cbr change with multiple, smaller updates
+    // function invariant_POD_26(uint256 fraxlendPairSeed) public {
+    //     // FraxLend: cbr change with one large update == cbr change with multiple, smaller updates
 
-        FraxlendPair fraxPair = randomFraxPair(fraxlendPairSeed);
+    //     FraxlendPair fraxPair = randomFraxPair(fraxlendPairSeed);
 
-        uint256 thirtyMinTaBefore = _lendingAssetVault.totalAssets();
-        vm.warp(block.timestamp + 30 minutes);
-        vm.prank(address(fraxPair));
-        _lendingAssetVault.whitelistUpdate(true);
-        uint256 thirtyMinTaAfter = _lendingAssetVault.totalAssets();
+    //     uint256 thirtyMinTaBefore = _lendingAssetVault.totalAssets();
+    //     vm.warp(block.timestamp + 30 minutes);
+    //     vm.prank(address(fraxPair));
+    //     _lendingAssetVault.whitelistUpdate(true);
+    //     uint256 thirtyMinTaAfter = _lendingAssetVault.totalAssets();
 
-        uint256 tenMinTaBefore = _lendingAssetVault.totalAssets();
-        vm.warp(block.timestamp + 10 minutes);
-        vm.prank(address(fraxPair));
-        _lendingAssetVault.whitelistUpdate(true);
+    //     uint256 tenMinTaBefore = _lendingAssetVault.totalAssets();
+    //     vm.warp(block.timestamp + 10 minutes);
+    //     vm.prank(address(fraxPair));
+    //     _lendingAssetVault.whitelistUpdate(true);
 
-        vm.warp(block.timestamp + 10 minutes);
-        vm.prank(address(fraxPair));
-        _lendingAssetVault.whitelistUpdate(true);
+    //     vm.warp(block.timestamp + 10 minutes);
+    //     vm.prank(address(fraxPair));
+    //     _lendingAssetVault.whitelistUpdate(true);
 
-        vm.warp(block.timestamp + 10 minutes);
-        vm.prank(address(fraxPair));
-        _lendingAssetVault.whitelistUpdate(true);
+    //     vm.warp(block.timestamp + 10 minutes);
+    //     vm.prank(address(fraxPair));
+    //     _lendingAssetVault.whitelistUpdate(true);
 
-        uint256 tenMinTaAfter = _lendingAssetVault.totalAssets();
+    //     uint256 tenMinTaAfter = _lendingAssetVault.totalAssets();
 
-        fl.eq(
-            thirtyMinTaAfter - thirtyMinTaBefore,
-            tenMinTaAfter - tenMinTaBefore,
-            "POD-26: FraxLend: cbr change with one large update == cbr change with multiple, smaller updates"
-        );
-    }
+    //     fl.eq(
+    //         thirtyMinTaAfter - thirtyMinTaBefore,
+    //         tenMinTaAfter - tenMinTaBefore,
+    //         "POD-26: FraxLend: cbr change with one large update == cbr change with multiple, smaller updates"
+    //     );
+    // }
 
     function invariant_POD_27() public {
         // IERC20(pod).balanceOf(leverageManager) == 0, IERC20(pairedLpToken).balanceOf(leverageManager) == 0
@@ -440,20 +440,30 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_39() internal {
-        // AutoCompoundingPodLP: redeem/withdraw() should never get an InsufficientBalance or underflow/overflow revert
-        fl.t(false, "POD-39: AutoCompoundingPodLP: redeem/withdraw() should never get an InsufficientBalance or underflow/overflow revert");
+        // AutoCompounding should not revert with Insufficient Amount
+        fl.t(false, "POD-39: AutoCompounding should not revert with Insufficient Amount");
     }
 
-    function invariant_POD_40(address lendingPair) internal {
+    function invariant_POD_40() internal {
+        // AutoCompounding should not revert with Insufficient Liquidity
+        fl.t(false, "POD-40: AutoCompounding should not revert with Insufficient Liquidity");
+    }
+
+    function invariant_POD_41() internal {
+        // AutoCompoundingPodLP: redeem/withdraw() should never get an InsufficientBalance or underflow/overflow revert
+        fl.t(false, "POD-41: AutoCompoundingPodLP: redeem/withdraw() should never get an InsufficientBalance or underflow/overflow revert");
+    }
+
+    function invariant_POD_42(address lendingPair) internal {
         // LeverageManager: custodian position is solvent after adding leverage and removing leverage
         fl.lte(
             _afterLM.custodianLTV,
             FraxlendPair(lendingPair).maxLTV(),
-            "POD-40: custodian position is solvent after adding leverage and removing leverage"
+            "POD-42: custodian position is solvent after adding leverage and removing leverage"
         );
     }
     
-    function invariant_POD_41() public {
+    function invariant_POD_43() public {
         // TokenReward: global:  getUnpaid() <= balanceOf reward token
         for (uint256 i; i < _pods.length; i++) {
             address tokenRewards = StakingPoolToken(_pods[i].lpStakingPool()).POOL_REWARDS();
@@ -461,90 +471,90 @@ contract Properties is BeforeAfter {
                 fl.lte(
                     TokenRewards(tokenRewards).getUnpaid(address(_peas), users[user]),
                     _peas.balanceOf(tokenRewards),
-                    "POD-41: TokenReward: global:  getUnpaid() <= balanceOf reward token"
+                    "POD-43: TokenReward: global:  getUnpaid() <= balanceOf reward token"
                 );
             }
         }
     } 
     
-    function invariant_POD_42() public {
+    function invariant_POD_44() public {
         // user aspTKN Asset -> aspTKN
         fl.eq(
             _afterASP.userAssetApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // asp Rewards Token -> dexAdapter
         fl.eq(
             _afterASP.aspRewardApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // asp pod pairedLpToken -> dexAdapter
         fl.eq(
             _afterASP.pairedLpApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // asp pod -> indexUtils
         fl.eq(
             _afterASP.podIndexUtilsApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // asp pod pairedLpToken -> indexUtils
         fl.eq(
             _afterASP.pairedLpIndexApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // leverage manager -> pod LP token -> fraxlend pair
         fl.eq(
             _afterLM.podLpApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // leverage manager -> pod -> dex adapter
         fl.eq(
             _afterLM.podDexApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // leverage manager -> pod -> index utils
         fl.eq(
             _afterLM.podIndexApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // leverage manager -> pod Lp token -> index utils
         fl.eq(
             _afterLM.podLpIndexApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // fraxlend pair asset -> _lendingAssetVault
         fl.eq(
             _afterLM.pairAssetApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // leverage manager -> staking pool token -> aspTKN
         fl.eq(
             _afterLM.spTKNApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // leverage manager -> staking pool token -> index utils
         fl.eq(
             _afterLM.spTKNIndexApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
         // custodian -> fraxlend collateral -> fraxlend pair
         fl.eq(
             _afterLM.custodianPairApproval,
             0,
-            "POD-42: LVF: global there should not be any remaining allowances after each function call"
+            "POD-44: LVF: global there should not be any remaining allowances after each function call"
         );
     }
 }

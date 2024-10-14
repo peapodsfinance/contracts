@@ -53,33 +53,15 @@ contract UniswapV2Handler is Properties {
         path[1] = address(cache.pod);
 
         if (IERC20(pairedToken).balanceOf(cache.from) < 1e14) return;
-        // amountIn = fl.clamp(amountIn, 1e14, IERC20(pairedToken).balanceOf(cache.from));
 
         // ACTION
         vm.prank(cache.from);
         IERC20(pairedToken).approve(address(_v2SwapRouter), type(uint256).max);
 
         vm.prank(cache.from);
-        // try 
         _v2SwapRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
             amountIn, 0, path, cache.to, block.timestamp
          );
-        //   {} catch {
-        //     fl.t(false, "BUY TOKENS FAILED");
-        //  }
-         // catch (bytes memory err) {
-        //     bytes4[2] memory errors =
-        //         [g8keepToken.InsufficientBalance.selector, g8keepToken.InsufficientPoolInput.selector];
-        //     bool expected = false;
-        //     for (uint256 i = 0; i < errors.length; i++) {
-        //         if (errors[i] == bytes4(err)) {
-        //             expected = true;
-        //             break;
-        //         }
-        //     }
-        //     fl.t(expected, FuzzLibString.getRevertMsg(err));
-        //     return;
-        // }
     }
 
     // Trading pod token for staking pool token
@@ -116,26 +98,9 @@ contract UniswapV2Handler is Properties {
         IERC20(path[0]).approve(address(_v2SwapRouter), type(uint256).max);
 
         vm.prank(cache.from);
-        // try 
         _v2SwapRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
             amountIn, 0, path, cache.to, block.timestamp
         );
-        //  {} catch {
-        //     fl.t(false, "SELL TOKEN FAILED");
-        // }
-        // catch (bytes memory err) {
-        //     bytes4[2] memory errors =
-        //         [g8keepToken.InsufficientBalance.selector, g8keepToken.InsufficientPoolInput.selector];
-        //     bool expected = false;
-        //     for (uint256 i = 0; i < errors.length; i++) {
-        //         if (errors[i] == bytes4(err)) {
-        //             expected = true;
-        //             break;
-        //         }
-        //     }
-        //     fl.t(expected, FuzzLibString.getRevertMsg(err));
-        //     return;
-        // }
     }
 
     struct AddLiquidityLPTemps {
@@ -183,28 +148,9 @@ contract UniswapV2Handler is Properties {
         IERC20(cache.pairedToken).approve(address(_v2SwapRouter), type(uint256).max);
         // ACTION
         vm.prank(cache.from);
-        // try 
         _v2SwapRouter.addLiquidity(
             cache.pairedToken, address(cache.pod), amount0Desired, amount1Desired, 0, 0, cache.to, block.timestamp
         );
-        //  {} catch Error(string memory reason) {
-            
-        //     string[4] memory stringErrors = [
-        //         "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
-        //         "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
-        //         "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
-        //         "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
-        //     ];
-
-        //     bool expected = false;
-        //     for (uint256 i = 0; i < stringErrors.length; i++) {
-        //         if (compareStrings(stringErrors[i], reason)) {
-        //             expected = true;
-        //             break;
-        //         }
-        //     }
-        //     fl.t(expected, reason);
-        // }
     }
 
     struct RemoveLiquidityTemps {
@@ -250,42 +196,9 @@ contract UniswapV2Handler is Properties {
 
         // ACTION
         vm.prank(cache.from);
-        // try 
         _v2SwapRouter.removeLiquidity(
             cache.pairedToken, address(cache.pod), liquidity, 0, 0, cache.to, block.timestamp
         );
-        //  {} catch {
-        //     fl.t(false, "REMOVE LIQUIDITY FAILED");
-        // }
-        // catch (bytes memory err) {
-        //     bytes4[2] memory errors =
-        //         [g8keepToken.InsufficientBalance.selector, g8keepToken.InsufficientPoolInput.selector];
-        //     bool expected = false;
-        //     for (uint256 i = 0; i < errors.length; i++) {
-        //         if (errors[i] == bytes4(err)) {
-        //             expected = true;
-        //             break;
-        //         }
-        //     }
-        //     fl.t(expected, FuzzLibString.getRevertMsg(err));
-        //     return;
-        // } catch Error(string memory reason) {
-        //     string[4] memory stringErrors = [
-        //         "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
-        //         "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
-        //         "UniswapV2: INSUFFICIENT_LIQUIDITY_BURNED",
-        //         "UniswapV2: TRANSFER_FAILED"
-        //     ];
-        //     bool expected = false;
-        //     for (uint256 i = 0; i < stringErrors.length; i++) {
-        //         if (compareStrings(stringErrors[i], reason)) {
-        //             expected = true;
-        //             break;
-        //         }
-        //     }
-        //     fl.t(expected, reason);
-        //     return;
-        // }
     }
 
     struct SyncTemps {
@@ -294,7 +207,7 @@ contract UniswapV2Handler is Properties {
         IUniswapV2Pair pair;
     }
 
-    function g8keepToken_sync(uint256 podIndexSeed) public {
+    function stakingPoolLp_sync(uint256 podIndexSeed) public {
         // PRE-CONDITIONS
         SyncTemps memory cache;
         cache.pod = randomPod(podIndexSeed);

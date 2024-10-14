@@ -95,10 +95,6 @@ contract PodHandler is Properties {
         cache.pairedLpToken = cache.pod.PAIRED_LP_TOKEN();
         cache.v2Pool = _uniV2Factory.getPair(address(cache.pod), cache.pairedLpToken);
 
-        fl.log("POD ADDRESS", address(cache.pod));
-        fl.log("TOKEN 0", IUniswapV2Pair(cache.v2Pool).token0());
-        fl.log("PAIRED TOKEN ADDRESS", cache.pairedLpToken);
-        fl.log("TOKEN 1", IUniswapV2Pair(cache.v2Pool).token1());
         indexLpTokens = fl.clamp(indexLpTokens, 0, cache.pod.balanceOf(cache.user));
 
         (uint256 reserve0, uint256 reserve1, ) = IUniswapV2Pair(cache.v2Pool).getReserves();
@@ -107,7 +103,7 @@ contract PodHandler is Properties {
         pairedLpTokens = _v2SwapRouter.quote(indexLpTokens, reserve0, reserve1) : 
         pairedLpTokens = _v2SwapRouter.quote(indexLpTokens, reserve1, reserve0);
 
-        if (indexLpTokens < 1e18 || IERC20(cache.pairedLpToken).balanceOf(cache.user) < pairedLpTokens) return;
+        if (indexLpTokens < 1000 || IERC20(cache.pairedLpToken).balanceOf(cache.user) < pairedLpTokens) return;
 
         vm.prank(cache.user);
         IERC20(cache.pairedLpToken).approve(address(cache.pod), pairedLpTokens);
@@ -121,8 +117,20 @@ contract PodHandler is Properties {
             pairedLpTokens,
             100,
             block.timestamp
-        ) {} catch {
-            fl.t(false, "ADD LIQUIDITY FAILED");
+        ) {} catch Error(string memory reason) {
+            
+            string[1] memory stringErrors = [
+                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
+            ];
+
+            bool expected = false;
+            for (uint256 i = 0; i < stringErrors.length; i++) {
+                if (compareStrings(stringErrors[i], reason)) {
+                    expected = true;    
+                    break;
+                }
+            }
+            fl.t(expected, reason);
         }
     }
 }

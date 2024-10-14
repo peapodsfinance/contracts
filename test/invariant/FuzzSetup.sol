@@ -94,6 +94,7 @@ contract FuzzSetup is Test, FuzzBase {
     address internal user2 = vm.addr(uint256(keccak256("User2")));
 
     address[] internal users = [user0, user1, user2];
+    uint256[] internal _fraxPercentages = [10000, 2500, 7500, 5000];
 
     // fraxlend protocol actors
     address internal comptroller = vm.addr(uint256(keccak256("comptroller")));
@@ -1038,13 +1039,7 @@ contract FuzzSetup is Test, FuzzBase {
         vaultAddresses[2] = address(_fraxLPToken2);
         vaultAddresses[3] = address(_fraxLPToken4);
 
-        uint256[] memory percentages = new uint256[](4);
-        percentages[0] = 2500;
-        percentages[1] = 2500;
-        percentages[2] = 2500;
-        percentages[3] = 2500;
-
-        _lendingAssetVault.setVaultMaxPerc(vaultAddresses, percentages);
+        _lendingAssetVault.setVaultMaxPerc(vaultAddresses, _fraxPercentages);
     }
 
     function _deployBalancerVault() internal {

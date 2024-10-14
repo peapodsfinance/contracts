@@ -393,7 +393,7 @@ contract FraxlendPairHandler is Properties {
             bool expected = false;
             for (uint256 i = 0; i < errors.length; i++) {
                 if (errors[i] == bytes4(err)) {
-                    invariant_POD_33();
+                    invariant_POD_30();
                 }
             }
             fl.t(expected, FuzzLibString.getRevertMsg(err));

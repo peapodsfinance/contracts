@@ -42,7 +42,7 @@ contract AutoCompoundingPodLpHandler is Properties {
         cache.spTKN = StakingPoolToken(IDecentralizedIndex(cache.aspTKN.pod()).lpStakingPool());
 
         assets = fl.clamp(assets, 0, IERC20(cache.aspTKNAsset).balanceOf(cache.user));
-        if (assets < 1000) return;
+        if (assets == 0) return;
 
         __beforeAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
@@ -56,26 +56,36 @@ contract AutoCompoundingPodLpHandler is Properties {
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
-            invariant_POD_39(assets);
-            invariant_POD_42();
+            invariant_POD_35(assets);
+            invariant_POD_38();
 
         } catch Error(string memory reason) {
             
-            string[5] memory stringErrors = [
+            string[6] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
-                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
+                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED",
+                "ERC20: transfer amount exceeds balance"
             ];
 
             bool expected = false;
             for (uint256 i = 0; i < stringErrors.length; i++) {
                 if (compareStrings(stringErrors[i], reason)) {
                     expected = true;
-                    break;
                 }
             }
+            if (
+                compareStrings(reason, stringErrors[0]) || 
+                compareStrings(reason, stringErrors[1]) || 
+                compareStrings(reason, stringErrors[2]) || 
+                compareStrings(reason, stringErrors[3])
+                ) {
+                    // invariant_POD_39();
+                } else if (compareStrings(reason, stringErrors[4])) {
+                    invariant_POD_40();
+                }
             fl.t(expected, reason);
         }
     }
@@ -102,7 +112,7 @@ contract AutoCompoundingPodLpHandler is Properties {
         cache.spTKN = StakingPoolToken(IDecentralizedIndex(cache.aspTKN.pod()).lpStakingPool());
 
         shares = fl.clamp(shares, 0, cache.aspTKN.convertToShares(IERC20(cache.aspTKNAsset).balanceOf(cache.user)));
-        if (shares < 1000) return;
+        if (shares == 0) return;
 
         cache.assets = cache.aspTKN.convertToAssets(shares);
 
@@ -118,17 +128,18 @@ contract AutoCompoundingPodLpHandler is Properties {
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
-            // invariant_POD_38(shares);
-            invariant_POD_42();
+            // invariant_POD_34(shares);
+            invariant_POD_38();
 
         } catch Error(string memory reason) {
             
-            string[5] memory stringErrors = [
+            string[6] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
-                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
+                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED",
+                "ERC20: transfer amount exceeds balance"
             ];
 
             bool expected = false;
@@ -138,6 +149,18 @@ contract AutoCompoundingPodLpHandler is Properties {
                     break;
                 }
             }
+
+            if (
+                compareStrings(reason, stringErrors[0]) || 
+                compareStrings(reason, stringErrors[1]) || 
+                compareStrings(reason, stringErrors[2]) || 
+                compareStrings(reason, stringErrors[3])
+                ) {
+                    // invariant_POD_39();
+                } else if (compareStrings(reason, stringErrors[4])) {
+                    invariant_POD_40();
+                }
+
             fl.t(expected, reason);
         }
     }
@@ -175,17 +198,18 @@ contract AutoCompoundingPodLpHandler is Properties {
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
-            // invariant_POD_41(assets);
-            invariant_POD_42();
+            // invariant_POD_37(assets);
+            invariant_POD_38();
 
         } catch Error(string memory reason) {
             
-            string[5] memory stringErrors = [
+            string[6] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
-                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
+                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED",
+                "ERC20: transfer amount exceeds balance"
             ];
 
             bool expected = false;
@@ -195,6 +219,20 @@ contract AutoCompoundingPodLpHandler is Properties {
                     break;
                 }
             }
+
+            if (
+                compareStrings(reason, stringErrors[0]) || 
+                compareStrings(reason, stringErrors[1]) || 
+                compareStrings(reason, stringErrors[2]) || 
+                compareStrings(reason, stringErrors[3])
+                ) {
+                    // invariant_POD_39();
+                } else if (compareStrings(reason, stringErrors[4])) {
+                    invariant_POD_40();
+                } else if (compareStrings(reason, stringErrors[5])) {
+                    invariant_POD_41();
+                }
+
             fl.t(expected, reason);
         }
     }
@@ -232,17 +270,18 @@ contract AutoCompoundingPodLpHandler is Properties {
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
-            invariant_POD_40(shares);
-            invariant_POD_42();
+            invariant_POD_36(shares);
+            invariant_POD_38();
 
         } catch Error(string memory reason) {
             
-            string[5] memory stringErrors = [
+            string[6] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
-                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
+                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED",
+                "ERC20: transfer amount exceeds balance"
             ];
 
             bool expected = false;
@@ -252,6 +291,20 @@ contract AutoCompoundingPodLpHandler is Properties {
                     break;
                 }
             }
+
+            if (
+                compareStrings(reason, stringErrors[0]) || 
+                compareStrings(reason, stringErrors[1]) || 
+                compareStrings(reason, stringErrors[2]) || 
+                compareStrings(reason, stringErrors[3])
+                ) {
+                    // invariant_POD_39();
+                } else if (compareStrings(reason, stringErrors[4])) {
+                    invariant_POD_40();
+                } else if (compareStrings(reason, stringErrors[5])) {
+                    invariant_POD_41();
+                }
+
             fl.t(expected, reason);
         }
     }

@@ -634,27 +634,7 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
         VaultAccount memory _totalAsset = totalAsset;
 
         // Calculate the number of shares to burn based on the assets to transfer
-        // _shares = _totalAsset.toShares(_amountToReturn, true); @audit original 
-        _shares = _totalAsset.toShares(_amountToReturn, false);
-
-        // Deposit assets to external vault
-        assetContract.approve(address(externalAssetVault), _amountToReturn);
-        externalAssetVault.whitelistDeposit(_amountToReturn);
-
-        // Execute the withdraw effects for vault
-        // receive assets here in order to call whitelistDeposit and handle accounting in external vault
-        _redeem(_totalAsset, _amountToReturn.toUint128(), _shares.toUint128(), address(this), address(externalAssetVault), true);
-    }
-
-    function _withdrawToVaultWithShares(uint256 _shares) internal returns (uint256 _amountToReturn) {
-        // Accrue interest if necessary
-        _addInterest();
-
-        // Pull from storage to save gas
-        VaultAccount memory _totalAsset = totalAsset;
-
-        // Calculate the amount to return
-        _amountToReturn = _totalAsset.toAmount(_shares, false);
+        _shares = _totalAsset.toShares(_amountToReturn, true);
 
         // Deposit assets to external vault
         assetContract.approve(address(externalAssetVault), _amountToReturn);
@@ -1035,8 +1015,6 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
             if (_externalAssetsToWithdraw > 0) {
                 uint256 _extAmount = _externalAssetsToWithdraw > _amountToRepay ? _amountToRepay : _externalAssetsToWithdraw;
                 _withdrawToVault(_extAmount);
-                // uint lavShareBalance = IERC20(address(this)).balanceOf(address(externalAssetVault));
-                // _withdrawToVaultWithShares(_shares > lavShareBalance ? lavShareBalance : _shares);
             }
         }
         emit RepayAsset(_payer, _borrower, _amountToRepay, _shares);
