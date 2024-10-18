@@ -64,10 +64,11 @@ contract LeverageManagerTest is Test {
       _f,
       _t,
       _w,
-      dai,
-      address(peas),
+      false,
       false,
       abi.encode(
+        dai,
+        address(peas),
         0x6B175474E89094C44Da98b954EedeAC495271d0F,
         0x7d544DD34ABbE24C8832db27820Ff53C151e949b,
         whitelister,
@@ -80,11 +81,10 @@ contract LeverageManagerTest is Test {
     aspTkn = new AutoCompoundingPodLp(
       'aspTKN',
       'aspTKN',
+      false,
       pod,
       dexAdapter,
-      IIndexUtils(address(idxUtils)),
-      whitelister,
-      twapUtils
+      IIndexUtils(address(idxUtils))
     );
 
     // Deploy MockFraxlendPair

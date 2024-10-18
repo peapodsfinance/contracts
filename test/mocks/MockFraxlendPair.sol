@@ -20,6 +20,14 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
     _collateralContract = collateralContract_;
   }
 
+  function exchangeRateInfo()
+    external
+    pure
+    returns (ExchangeRateInfo memory _r)
+  {
+    return _r;
+  }
+
   function totalBorrow() external view override returns (VaultAccount memory) {
     return _totalBorrow;
   }

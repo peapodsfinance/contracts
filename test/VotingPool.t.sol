@@ -30,12 +30,15 @@ contract VotingPoolTest is Test {
     mockV3TwapUtilities = new MockV3TwapUtilities();
 
     votingPool = new VotingPool(
-      address(pairedLpToken),
-      address(rewardsToken),
-      IProtocolFeeRouter(address(mockFeeRouter)),
-      IRewardsWhitelister(address(mockRewardsWhitelister)),
-      IDexAdapter(address(mockDexAdapter)),
-      IV3TwapUtilities(address(mockV3TwapUtilities))
+      abi.encode(
+        address(pairedLpToken),
+        address(rewardsToken),
+        address(pairedLpToken),
+        address(mockFeeRouter),
+        address(mockRewardsWhitelister),
+        address(mockV3TwapUtilities),
+        address(mockDexAdapter)
+      )
     );
 
     // Mint initial balances

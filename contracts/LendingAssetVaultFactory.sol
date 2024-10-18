@@ -26,7 +26,7 @@ contract LendingAssetVaultFactory is Ownable {
     if (minimumDepositAtCreation > 0) {
       _depositMin(_vault, _asset);
     }
-    LendingAssetVault(_vault).transferOwnership(_msgSender());
+    LendingAssetVault(_vault).transferOwnership(owner());
     emit Create(_vault);
   }
 

@@ -13,7 +13,7 @@ contract LeverageManagerAccessControl is Ownable {
 
   function setLendingPair(address _pod, address _pair) external onlyOwner {
     if (_pair != address(0)) {
-      require(IFraxlendPair(_pair).collateralContract() != address(0), 'AV');
+      require(IFraxlendPair(_pair).collateralContract() != address(0), 'LPS');
     }
     lendingPairs[_pod] = _pair;
   }

@@ -16,29 +16,27 @@ contract AutoCompoundingPodLpFactory is Ownable {
   function create(
     string memory _name,
     string memory _symbol,
+    bool _isSelfLendingPod,
     IDecentralizedIndex _pod,
     IDexAdapter _dexAdapter,
-    IIndexUtils _utils,
-    IRewardsWhitelister _whitelist,
-    IV3TwapUtilities _v3TwapUtilities,
+    IIndexUtils _indexUtils,
     uint96 _salt
   ) external onlyOwner {
     address _aspAddy = _deploy(
       getBytecode(
         _name,
         _symbol,
+        _isSelfLendingPod,
         _pod,
         _dexAdapter,
-        _utils,
-        _whitelist,
-        _v3TwapUtilities
+        _indexUtils
       ),
       _getFullSalt(_salt)
     );
     if (address(_pod) != address(0) && minimumDepositAtCreation > 0) {
       _depositMin(_aspAddy, _pod);
     }
-    AutoCompoundingPodLp(_aspAddy).transferOwnership(_msgSender());
+    AutoCompoundingPodLp(_aspAddy).transferOwnership(owner());
     emit Create(_aspAddy);
   }
 
@@ -59,21 +57,19 @@ contract AutoCompoundingPodLpFactory is Ownable {
   function getNewCaFromParams(
     string memory _name,
     string memory _symbol,
+    bool _isSelfLendingPod,
     IDecentralizedIndex _pod,
     IDexAdapter _dexAdapter,
-    IIndexUtils _utils,
-    IRewardsWhitelister _whitelist,
-    IV3TwapUtilities _v3TwapUtilities,
+    IIndexUtils _indexUtils,
     uint96 _salt
   ) external view returns (address) {
     bytes memory _bytecode = getBytecode(
       _name,
       _symbol,
+      _isSelfLendingPod,
       _pod,
       _dexAdapter,
-      _utils,
-      _whitelist,
-      _v3TwapUtilities
+      _indexUtils
     );
     return getNewCaAddress(_bytecode, _salt);
   }
@@ -81,11 +77,10 @@ contract AutoCompoundingPodLpFactory is Ownable {
   function getBytecode(
     string memory _name,
     string memory _symbol,
+    bool _isSelfLendingPod,
     IDecentralizedIndex _pod,
     IDexAdapter _dexAdapter,
-    IIndexUtils _utils,
-    IRewardsWhitelister _whitelist,
-    IV3TwapUtilities _v3TwapUtilities
+    IIndexUtils _indexUtils
   ) public pure returns (bytes memory) {
     bytes memory _bytecode = type(AutoCompoundingPodLp).creationCode;
     return
@@ -94,11 +89,10 @@ contract AutoCompoundingPodLpFactory is Ownable {
         abi.encode(
           _name,
           _symbol,
+          _isSelfLendingPod,
           _pod,
           _dexAdapter,
-          _utils,
-          _whitelist,
-          _v3TwapUtilities
+          _indexUtils
         )
       );
   }

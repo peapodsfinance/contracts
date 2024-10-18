@@ -26,6 +26,7 @@ contract TokenRewards is ITokenRewards, Context {
   uint256 immutable REWARDS_SWAP_OVERRIDE_MIN;
   address immutable INDEX_FUND;
   address immutable PAIRED_LP_TOKEN;
+  bool immutable LEAVE_AS_PAIRED_LP_TOKEN;
   IProtocolFeeRouter immutable PROTOCOL_FEE_ROUTER;
   IRewardsWhitelister immutable REWARDS_WHITELISTER;
   IDexAdapter immutable DEX_ADAPTER;
@@ -56,23 +57,33 @@ contract TokenRewards is ITokenRewards, Context {
   mapping(address => bool) _depositedRewardsToken;
 
   constructor(
-    IProtocolFeeRouter _feeRouter,
-    IRewardsWhitelister _rewardsWhitelist,
-    IDexAdapter _dexHandler,
-    IV3TwapUtilities _v3TwapUtilities,
     address _indexFund,
-    address _pairedLpToken,
     address _trackingToken,
-    address _rewardsToken
+    bool _leaveAsPaired,
+    bytes memory _immutables
   ) {
-    PROTOCOL_FEE_ROUTER = _feeRouter;
-    REWARDS_WHITELISTER = _rewardsWhitelist;
-    DEX_ADAPTER = _dexHandler;
-    V3_TWAP_UTILS = _v3TwapUtilities;
+    (
+      address _pairedLpToken,
+      address _lpRewardsToken,
+      ,
+      address _feeRouter,
+      address _rewardsWhitelist,
+      address _v3TwapUtilities,
+      address _dexAdapter
+    ) = abi.decode(
+        _immutables,
+        (address, address, address, address, address, address, address)
+      );
+
+    PROTOCOL_FEE_ROUTER = IProtocolFeeRouter(_feeRouter);
+    REWARDS_WHITELISTER = IRewardsWhitelister(_rewardsWhitelist);
+    DEX_ADAPTER = IDexAdapter(_dexAdapter);
+    V3_TWAP_UTILS = IV3TwapUtilities(_v3TwapUtilities);
     INDEX_FUND = _indexFund;
     PAIRED_LP_TOKEN = _pairedLpToken;
+    LEAVE_AS_PAIRED_LP_TOKEN = _leaveAsPaired;
     trackingToken = _trackingToken;
-    rewardsToken = _rewardsToken;
+    rewardsToken = _lpRewardsToken;
 
     // Setup min swap to be small amount of paired LP token to prevent DOS attemps
     uint8 _pd = IERC20Metadata(_pairedLpToken).decimals();
@@ -143,10 +154,28 @@ contract TokenRewards is ITokenRewards, Context {
         _amountTknDepositing
       );
     }
-    uint256 _amountTkn = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
+    uint256 _unclaimedPairedLpTkns = rewardsDeposited[PAIRED_LP_TOKEN] -
+      rewardsDistributed[PAIRED_LP_TOKEN];
+    uint256 _amountTkn = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) -
+      _unclaimedPairedLpTkns;
     require(_amountTkn > 0, 'A');
     uint256 _adminAmt = _getAdminFeeFromAmount(_amountTkn);
     _amountTkn -= _adminAmt;
+
+    // if we want to leave rewards for this pod as the paired LP token without
+    // swapping into rewardsToken, simply deposit them here for stakers to claim
+    if (LEAVE_AS_PAIRED_LP_TOKEN) {
+      // since we will not execute the burn fee in this case,
+      // we will take 2x the admin fee
+      _adminAmt += _adminAmt;
+      _amountTkn -= _adminAmt;
+      if (_adminAmt > 0) {
+        _processAdminFee(_adminAmt);
+      }
+      _depositRewards(PAIRED_LP_TOKEN, _amountTkn);
+      return;
+    }
+
     (address _token0, address _token1) = PAIRED_LP_TOKEN < rewardsToken
       ? (PAIRED_LP_TOKEN, rewardsToken)
       : (rewardsToken, PAIRED_LP_TOKEN);
@@ -207,12 +236,12 @@ contract TokenRewards is ITokenRewards, Context {
   }
 
   function _depositRewards(address _token, uint256 _amountTotal) internal {
+    if (_amountTotal == 0) {
+      return;
+    }
     if (!_depositedRewardsToken[_token]) {
       _depositedRewardsToken[_token] = true;
       _allRewardsTokens.push(_token);
-    }
-    if (_amountTotal == 0) {
-      return;
     }
     if (totalShares == 0) {
       require(_token == rewardsToken, 'R');
@@ -221,7 +250,7 @@ contract TokenRewards is ITokenRewards, Context {
     }
 
     uint256 _depositAmount = _amountTotal;
-    if (_token == rewardsToken) {
+    if (_token == rewardsToken && !LEAVE_AS_PAIRED_LP_TOKEN) {
       (, uint256 _yieldBurnFee) = _getYieldFees();
       if (_yieldBurnFee > 0) {
         uint256 _burnAmount = (_amountTotal * _yieldBurnFee) /
@@ -336,10 +365,7 @@ contract TokenRewards is ITokenRewards, Context {
     {
       _rewardsSwapAmountInOverride = 0;
       if (_adminAmt > 0) {
-        IERC20(PAIRED_LP_TOKEN).safeTransfer(
-          Ownable(address(V3_TWAP_UTILS)).owner(),
-          _adminAmt
-        );
+        _processAdminFee(_adminAmt);
       }
       _depositRewards(
         rewardsToken,
@@ -357,9 +383,25 @@ contract TokenRewards is ITokenRewards, Context {
     }
   }
 
+  function _processAdminFee(uint256 _amount) internal {
+    IERC20(PAIRED_LP_TOKEN).safeTransfer(
+      Ownable(address(V3_TWAP_UTILS)).owner(),
+      _amount
+    );
+  }
+
   function claimReward(address _wallet) external override {
     _distributeReward(_wallet);
     emit ClaimReward(_wallet);
+  }
+
+  function getAllRewardsTokens()
+    external
+    view
+    override
+    returns (address[] memory)
+  {
+    return _allRewardsTokens;
   }
 
   function getUnpaid(

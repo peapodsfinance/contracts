@@ -30,28 +30,24 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
   constructor(
     string memory _name,
     string memory _symbol,
-    address _pairedLpToken,
-    address _rewardsToken,
     address _stakeUserRestriction,
-    IProtocolFeeRouter _feeRouter,
-    IRewardsWhitelister _rewardsWhitelist,
-    IDexAdapter _dexAdapter,
-    IV3TwapUtilities _v3TwapUtilities
+    bool _leaveRewardsAsPairedLp,
+    bytes memory _immutables
   ) ERC20(_name, _symbol) {
     stakeUserRestriction = _stakeUserRestriction;
     INDEX_FUND = _msgSender();
-    DEX_ADAPTER = _dexAdapter;
-    V3_TWAP_UTILS = _v3TwapUtilities;
+    (, , , , , address _v3TwapUtilities, address _dexAdapter) = abi.decode(
+      _immutables,
+      (address, address, address, address, address, address, address)
+    );
+    DEX_ADAPTER = IDexAdapter(_dexAdapter);
+    V3_TWAP_UTILS = IV3TwapUtilities(_v3TwapUtilities);
     POOL_REWARDS = address(
       new TokenRewards(
-        _feeRouter,
-        _rewardsWhitelist,
-        _dexAdapter,
-        _v3TwapUtilities,
         INDEX_FUND,
-        _pairedLpToken,
         address(this),
-        _rewardsToken
+        _leaveRewardsAsPairedLp,
+        _immutables
       )
     );
   }

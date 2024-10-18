@@ -152,7 +152,6 @@ contract LeverageManager is
   /// @param _collateralAssetRemoveAmt Amount of collateral asset to remove from the position
   /// @param _podAmtMin Minimum amount of pTKN to receive on remove LP transaction (slippage)
   /// @param _pairedAssetAmtMin Minimum amount of pairedLpTkn to receive on remove LP transaction (slippage)
-  /// @param _dexAdapter Adapter to use to optionally swap pod token into borrow token if not received enough to pay back flash loan
   /// @param _userProvidedDebtAmtMax Amt of borrow token a user will allow to transfer from their wallet to pay back flash loan
   function removeLeverage(
     uint256 _positionId,
@@ -160,7 +159,6 @@ contract LeverageManager is
     uint256 _collateralAssetRemoveAmt,
     uint256 _podAmtMin,
     uint256 _pairedAssetAmtMin,
-    address _dexAdapter,
     uint256 _userProvidedDebtAmtMax
   ) external override workflow(true) {
     address _sender = _msgSender();
@@ -196,7 +194,6 @@ contract LeverageManager is
       _collateralAssetRemoveAmt,
       _podAmtMin,
       _pairedAssetAmtMin,
-      _dexAdapter,
       _userProvidedDebtAmtMax
     );
     IFlashLoanSource(_getFlashSource(_positionId)).flash(
@@ -397,11 +394,10 @@ contract LeverageManager is
       uint256 _collateralAssetRemoveAmt,
       uint256 _podAmtMin,
       uint256 _pairedAssetAmtMin,
-      address _dexAdapter,
       uint256 _userProvidedDebtAmtMax
     ) = abi.decode(
         _additionalInfo,
-        (uint256, uint256, uint256, uint256, address, uint256)
+        (uint256, uint256, uint256, uint256, uint256)
       );
 
     LeveragePositionProps memory _posProps = positionProps[_props.positionId];
@@ -450,7 +446,6 @@ contract LeverageManager is
         _props,
         _posProps.pod,
         _d.token,
-        _dexAdapter,
         _repayAmount,
         _pairedAmtReceived,
         _podAmtReceived,
@@ -484,7 +479,6 @@ contract LeverageManager is
     LeverageFlashProps memory _props,
     address _pod,
     address _borrowToken,
-    address _dexAdapter,
     uint256 _repayAmount,
     uint256 _pairedAmtReceived,
     uint256 _podAmtReceived,
@@ -509,7 +503,6 @@ contract LeverageManager is
     if (_borrowAmtNeededToSwap > 0) {
       if (_isSelfLendingAndOrPodded(_props.positionId)) {
         _podAmtRemaining = _swapPodForBorrowToken(
-          IDexAdapter(_dexAdapter),
           _pod,
           positionProps[_props.positionId].lendingPair,
           _podAmtReceived,
@@ -520,7 +513,6 @@ contract LeverageManager is
         ).redeem(_podAmtRemaining, address(this), address(this));
       } else {
         _podAmtRemaining = _swapPodForBorrowToken(
-          IDexAdapter(_dexAdapter),
           _pod,
           _borrowToken,
           _podAmtReceived,
@@ -531,27 +523,24 @@ contract LeverageManager is
   }
 
   function _swapPodForBorrowToken(
-    IDexAdapter _dexAdapter,
-    address _sourceToken,
+    address _pod,
     address _targetToken,
-    uint256 _sourceAmt,
+    uint256 _podAmt,
     uint256 _targetNeededAmt
   ) internal returns (uint256 _podRemainingAmt) {
-    uint256 _balBefore = IERC20(_sourceToken).balanceOf(address(this));
-    IERC20(_sourceToken).safeIncreaseAllowance(
-      address(_dexAdapter),
-      _sourceAmt
-    );
+    IDexAdapter _dexAdapter = IDecentralizedIndex(_pod).DEX_HANDLER();
+    uint256 _balBefore = IERC20(_pod).balanceOf(address(this));
+    IERC20(_pod).safeIncreaseAllowance(address(_dexAdapter), _podAmt);
     _dexAdapter.swapV2SingleExactOut(
-      _sourceToken,
+      _pod,
       _targetToken,
-      _sourceAmt,
+      _podAmt,
       _targetNeededAmt,
       address(this)
     );
     _podRemainingAmt =
-      _sourceAmt -
-      (_balBefore - IERC20(_sourceToken).balanceOf(address(this)));
+      _podAmt -
+      (_balBefore - IERC20(_pod).balanceOf(address(this)));
   }
 
   function _lpAndStakeInPod(
@@ -722,12 +711,7 @@ contract LeverageManager is
   function _getBorrowTknForPod(
     uint256 _positionId
   ) internal view returns (address) {
-    address _pod = positionProps[_positionId].pod;
-    address _lendingPair = positionProps[_positionId].lendingPair;
-    return
-      _isSelfLendingAndOrPodded(_positionId)
-        ? IFraxlendPair(_lendingPair).asset()
-        : IDecentralizedIndex(_pod).PAIRED_LP_TOKEN();
+    return IFraxlendPair(positionProps[_positionId].lendingPair).asset();
   }
 
   function _getFlashSource(

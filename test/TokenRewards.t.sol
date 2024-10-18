@@ -18,14 +18,18 @@ contract TokenRewardsExposed is TokenRewards {
     address _rewardsToken
   )
     TokenRewards(
-      _feeRouter,
-      _rewardsWhitelist,
-      _dexHandler,
-      _v3TwapUtilities,
       _indexFund,
-      _pairedLpToken,
       _trackingToken,
-      _rewardsToken
+      false,
+      abi.encode(
+        _pairedLpToken,
+        _rewardsToken,
+        _pairedLpToken,
+        address(_feeRouter),
+        address(_rewardsWhitelist),
+        address(_v3TwapUtilities),
+        address(_dexHandler)
+      )
     )
   {}
 

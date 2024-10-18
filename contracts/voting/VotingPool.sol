@@ -18,25 +18,9 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
   // user => asset => State
   mapping(address => mapping(address => Stake)) public stakes;
 
-  constructor(
-    address _pairedLpToken,
-    address _rewardsToken,
-    IProtocolFeeRouter _feeRouter,
-    IRewardsWhitelister _rewardsWhitelist,
-    IDexAdapter _dexHandler,
-    IV3TwapUtilities _v3TwapUtilities
-  ) ERC20('Peapods Voting', 'vlPEAS') {
+  constructor(bytes memory _immutables) ERC20('Peapods Voting', 'vlPEAS') {
     REWARDS = address(
-      new TokenRewards(
-        _feeRouter,
-        _rewardsWhitelist,
-        _dexHandler,
-        _v3TwapUtilities,
-        address(this),
-        _pairedLpToken,
-        address(this),
-        _rewardsToken
-      )
+      new TokenRewards(address(this), address(this), false, _immutables)
     );
   }
 
@@ -66,10 +50,9 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
   }
 
   function update(
-    address _user,
     address _asset
   ) external returns (uint256 _convFctr, uint256 _convDenom) {
-    return _update(_user, _asset, 0);
+    return _update(_msgSender(), _asset, 0);
   }
 
   function _update(

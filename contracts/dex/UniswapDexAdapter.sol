@@ -8,6 +8,7 @@ import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol'
 import '../interfaces/IDexAdapter.sol';
 import '../interfaces/ISwapRouter02.sol';
 import '../interfaces/IUniswapV2Factory.sol';
+import '../interfaces/IUniswapV2Pair.sol';
 import '../interfaces/IUniswapV2Router02.sol';
 import '../interfaces/IV3TwapUtilities.sol';
 
@@ -67,6 +68,18 @@ contract UniswapDexAdapter is IDexAdapter, Context {
         _token0,
         _token1
       );
+  }
+
+  function getReserves(
+    address _pool
+  )
+    external
+    view
+    virtual
+    override
+    returns (uint112 _reserve0, uint112 _reserve1)
+  {
+    (_reserve0, _reserve1, ) = IUniswapV2Pair(_pool).getReserves();
   }
 
   function createV2Pool(

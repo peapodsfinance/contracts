@@ -26,6 +26,32 @@ contract spTKNMinimalOracleTest is Test {
     _uniOracle = new UniswapV3SinglePriceOracle(address(0));
   }
 
+  function test_getPodPerBasePrice_PEASDAI() public {
+    address _podToDup = IStakingPoolToken(
+      0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1 // spPDAI
+    ).indexFund();
+    address _newPod = _dupPodAndSeedLp(_podToDup, address(0), 0);
+    spTKNMinimalOracle oraclePEASDAI = new spTKNMinimalOracle(
+      0x6B175474E89094C44Da98b954EedeAC495271d0F, // DAI
+      false,
+      IDecentralizedIndex(_newPod).lpStakingPool(),
+      0xAe750560b09aD1F5246f3b279b3767AfD1D79160, // UniV3: PEAS / DAI
+      0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9, // CL: DAI / USD
+      address(0),
+      address(0),
+      address(0),
+      address(_clOracle),
+      address(_uniOracle),
+      address(_v2Res)
+    );
+    uint256 _price18 = oraclePEASDAI.getPodPerBasePrice();
+    assertApproxEqAbs(
+      _price18,
+      0.25 ether, // NOTE: At the time of writing test DAI/PEAS == $4, so inverse is 1/4 == 0.25
+      1e18 // NOTE: At the time of writing test DAI/PEAS ~= $4, so _price18 would be ~1/4 == 0.25, so precision to <= 1 here (it's wide I know)
+    );
+  }
+
   function test_getPrices_PEASDAI() public {
     address _podToDup = IStakingPoolToken(
       0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1 // spPDAI
@@ -282,19 +308,21 @@ contract spTKNMinimalOracleTest is Test {
         _f,
         _t,
         _w,
-        _pairedLpToken,
-        0x02f92800F57BCD74066F5709F1Daa1A4302Df875,
         false,
-        _getImmutables(_dexAdapter)
+        false,
+        _getImmutables(_pairedLpToken, _dexAdapter)
       )
     );
   }
 
   function _getImmutables(
+    address _pairedLpToken,
     address _dexAdapter
   ) internal pure returns (bytes memory) {
     return
       abi.encode(
+        _pairedLpToken,
+        0x02f92800F57BCD74066F5709F1Daa1A4302Df875,
         0x6B175474E89094C44Da98b954EedeAC495271d0F,
         0x7d544DD34ABbE24C8832db27820Ff53C151e949b,
         0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F,

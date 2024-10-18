@@ -25,7 +25,7 @@ abstract contract DecentralizedIndex is
 
   IProtocolFeeRouter immutable PROTOCOL_FEE_ROUTER;
   IRewardsWhitelister immutable REWARDS_WHITELIST;
-  IDexAdapter public immutable DEX_HANDLER;
+  IDexAdapter public immutable override DEX_HANDLER;
   IV3TwapUtilities immutable V3_TWAP_UTILS;
 
   uint256 public immutable override FLASH_FEE_AMOUNT_DAI; // 10 DAI
@@ -54,6 +54,7 @@ abstract contract DecentralizedIndex is
   uint64 _lastSwap;
   uint8 _swapping;
   uint8 _swapAndFeeOn = 1;
+  uint8 _shortCircuitRewards;
   bool _initialized;
 
   event FlashLoan(
@@ -93,9 +94,8 @@ abstract contract DecentralizedIndex is
     IndexType _idxType,
     Config memory _config,
     Fees memory _fees,
-    address _pairedLpToken,
-    address _lpRewardsToken,
     bool _stakeRestriction,
+    bool _leaveRewardsAsPairedLp,
     bytes memory _immutables
   ) ERC20(_name, _symbol) ERC20Permit(_name) {
     require(_fees.buy <= (uint256(DEN) * 20) / 100);
@@ -109,15 +109,21 @@ abstract contract DecentralizedIndex is
     created = block.timestamp;
     fees = _fees;
     config = _config;
-    lpRewardsToken = _lpRewardsToken;
 
     (
+      address _pairedLpToken,
+      address _lpRewardsToken,
       address _dai,
       address _feeRouter,
       address _rewardsWhitelister,
       address _v3TwapUtils,
       address _dexAdapter
-    ) = abi.decode(_immutables, (address, address, address, address, address));
+    ) = abi.decode(
+        _immutables,
+        (address, address, address, address, address, address, address)
+      );
+    require(_pairedLpToken != address(0), 'PLP');
+    lpRewardsToken = _lpRewardsToken;
     DAI = _dai;
     PROTOCOL_FEE_ROUTER = IProtocolFeeRouter(_feeRouter);
     REWARDS_WHITELIST = IRewardsWhitelister(_rewardsWhitelister);
@@ -125,22 +131,15 @@ abstract contract DecentralizedIndex is
     DEX_HANDLER = IDexAdapter(_dexAdapter);
     V2_ROUTER = DEX_HANDLER.V2_ROUTER();
     V3_ROUTER = DEX_HANDLER.V3_ROUTER();
-    address _finalPairedLpToken = _pairedLpToken == address(0)
-      ? DAI
-      : _pairedLpToken;
-    PAIRED_LP_TOKEN = _finalPairedLpToken;
-    FLASH_FEE_AMOUNT_DAI = 10 * 10 ** IERC20Metadata(DAI).decimals(); // 10 DAI
+    PAIRED_LP_TOKEN = _pairedLpToken;
+    FLASH_FEE_AMOUNT_DAI = 10 * 10 ** IERC20Metadata(_dai).decimals(); // 10 DAI
     lpStakingPool = address(
       new StakingPoolToken(
         string.concat('Staked ', _name),
         string.concat('s', _symbol),
-        _finalPairedLpToken,
-        lpRewardsToken,
         _stakeRestriction ? _msgSender() : address(0),
-        PROTOCOL_FEE_ROUTER,
-        REWARDS_WHITELIST,
-        DEX_HANDLER,
-        V3_TWAP_UTILS
+        _leaveRewardsAsPairedLp,
+        _immutables
       )
     );
     if (!DEX_HANDLER.ASYNC_INITIALIZE()) {
@@ -209,6 +208,9 @@ abstract contract DecentralizedIndex is
 
   /// @notice The ```_processPreSwapFeesAndSwap``` function processes fees that could be pending for a pod
   function _processPreSwapFeesAndSwap() internal {
+    if (_shortCircuitRewards == 1) {
+      return;
+    }
     bool _passesSwapDelay = block.timestamp > _lastSwap + SWAP_DELAY;
     if (!_passesSwapDelay) {
       return;
@@ -503,11 +505,14 @@ abstract contract DecentralizedIndex is
     uint256 _amount,
     bytes calldata _data
   ) external override lock {
+    _shortCircuitRewards = 1;
+    uint256 _fee = _amount / 1000;
     _mint(_recipient, _amount);
     IFlashLoanRecipient(_recipient).callback(_data);
     // Make sure the calling user pays fee of 0.1% more than they flash minted to recipient
     _burn(_recipient, _amount);
-    _burn(_msgSender(), _amount / 1000);
+    _burn(_msgSender(), _fee == 0 ? 1 : _fee);
+    _shortCircuitRewards = 0;
     emit FlashMint(_msgSender(), _recipient, _amount);
   }
 

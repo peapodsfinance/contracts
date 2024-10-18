@@ -45,10 +45,11 @@ contract WeightedIndexTest is Test {
       _f,
       _t,
       _w,
-      dai,
-      address(peas),
+      false,
       false,
       abi.encode(
+        dai,
+        address(peas),
         0x6B175474E89094C44Da98b954EedeAC495271d0F,
         0x7d544DD34ABbE24C8832db27820Ff53C151e949b,
         0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F,

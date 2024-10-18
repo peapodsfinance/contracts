@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import './IDexAdapter.sol';
 
 interface IDecentralizedIndex is IERC20 {
   enum IndexType {
@@ -83,6 +84,8 @@ interface IDecentralizedIndex is IERC20 {
   function BOND_FEE() external view returns (uint16);
 
   function DEBOND_FEE() external view returns (uint16);
+
+  function DEX_HANDLER() external view returns (IDexAdapter);
 
   function FLASH_FEE_AMOUNT_DAI() external view returns (uint256);
 
