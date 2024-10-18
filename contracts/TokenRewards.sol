@@ -54,8 +54,6 @@ contract TokenRewards is ITokenRewards, Context {
   address[] _allRewardsTokens;
   mapping(address => bool) _depositedRewardsToken;
 
-    event Debug(string a);
-
   constructor(
     IProtocolFeeRouter _feeRouter,
     IRewardsWhitelister _rewardsWhitelist,
@@ -233,8 +231,6 @@ contract TokenRewards is ITokenRewards, Context {
     emit DepositRewards(_msgSender(), _token, _depositAmount);
   }
 
-  event DebugUint(string a, uint256 b);
-
   function _distributeReward(address _wallet) internal {
     if (shares[_wallet] == 0) {
       return;
@@ -250,8 +246,6 @@ contract TokenRewards is ITokenRewards, Context {
       );
       if (_amount > 0) {
         rewardsDistributed[_token] += _amount;
-        emit Debug("WE ARE HERE");
-        emit DebugUint("PEAS BALANCE", IERC20(_token).balanceOf(address(this)));
         IERC20(_token).safeTransfer(_wallet, _amount);
         emit DistributeReward(_wallet, _token, _amount);
       }

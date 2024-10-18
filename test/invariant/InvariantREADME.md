@@ -18,7 +18,7 @@ All of the invariants reside in the following contracts:
 
 ## Source code changes to go deeper in testing
 
-LendingAssetVault.sol
+**LendingAssetVault.sol**
 ```diff
 interface IVaultInterestUpdate {
 -  function addInterest() external;
@@ -42,6 +42,73 @@ interface IVaultInterestUpdate {
 +      IVaultInterestUpdate(_vault).addInterest(false);
       _updateAssetMetadataFromVault(_vault);
     }
+  }
+```
+
+**TokenRewards.sol**
+```diff
+function _distributeReward(address _wallet) internal {
+    if (shares[_wallet] == 0) {
+      return;
+    }
+    for (uint256 _i; _i < _allRewardsTokens.length; _i++) {
+      address _token = _allRewardsTokens[_i];
+      uint256 _amount = getUnpaid(_token, _wallet);
+      rewards[_token][_wallet].realized += _amount;
+      rewards[_token][_wallet].excluded = _cumulativeRewards(
+        _token,
+        shares[_wallet],
++        Math.Rounding.Up
+      );
+      if (_amount > 0) {
+        rewardsDistributed[_token] += _amount;
+        IERC20(_token).safeTransfer(_wallet, _amount);
+        emit DistributeReward(_wallet, _token, _amount);
+      }
+    }
+  }
+```
+
+```diff
+function _resetExcluded(address _wallet) internal {
+    for (uint256 _i; _i < _allRewardsTokens.length; _i++) {
+      address _token = _allRewardsTokens[_i];
+      rewards[_token][_wallet].excluded = _cumulativeRewards(
+        _token,
+        shares[_wallet],
++        Math.Rounding.Up
+      );
+    }
+  }
+```
+
+```diff
+function getUnpaid(
+    address _token,
+    address _wallet
+  ) public view returns (uint256) {
+    if (shares[_wallet] == 0) {
+      return 0;
+    }
+-    uint256 earnedRewards = _cumulativeRewards(_token, shares[_wallet]);
++    uint256 earnedRewards = _cumulativeRewards(_token, shares[_wallet], Math.Rounding.Down);
+    uint256 rewardsExcluded = rewards[_token][_wallet].excluded;
+    if (earnedRewards <= rewardsExcluded) {
+      return 0;
+    }
+    return earnedRewards - rewardsExcluded;
+  }
+```
+
+```diff
+function _cumulativeRewards(
+    address _token,
+    uint256 _share,
++    Math.Rounding rounding
+  ) internal view returns (uint256) {
+
+-    return (_share * _rewardsPerShare[_token]) / PRECISION;
++    return Math.mulDiv(_share, _rewardsPerShare[_token], PRECISION, rounding);
   }
 ```
 
