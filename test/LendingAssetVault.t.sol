@@ -512,4 +512,33 @@ contract LendingAssetVaultTest is Test {
       'Number of shares should not change after donation'
     );
   }
+
+  function test_vaultMaxWithdraw() public {
+    address[] memory _tvs = new address[](1);
+    uint256[] memory _ps = new uint256[](1);
+    _tvs[0] = address(_testVault);
+    _ps[0] = 10000;
+    _lendingAssetVault.setVaultMaxPerc(_tvs, _ps);
+
+    uint256 _lavDepAmt = 10e18;
+    uint256 _extDepAmt = _lavDepAmt / 2;
+    _lendingAssetVault.deposit(_lavDepAmt, address(this));
+    assertEq(_lendingAssetVault.totalSupply(), _lavDepAmt);
+
+    uint256 maxWithdraw = _lendingAssetVault.maxWithdraw(address(this));
+    uint256 balanceInVault = _asset.balanceOf(address(_lendingAssetVault));
+    assertEq(maxWithdraw, balanceInVault);
+
+    _testVault.depositFromLendingAssetVault(
+      address(_lendingAssetVault),
+      _extDepAmt
+    );
+
+    maxWithdraw = _lendingAssetVault.maxWithdraw(address(this));
+    balanceInVault = _asset.balanceOf(address(_lendingAssetVault));
+    assertEq(maxWithdraw, balanceInVault);
+
+    // should not revert
+    _lendingAssetVault.withdraw(maxWithdraw, address(this), address(this));
+  }
 }

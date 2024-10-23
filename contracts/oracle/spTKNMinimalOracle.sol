@@ -26,7 +26,6 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
   /// @dev of the pod represented through SP_TKN and then convert it to the spTKN price
   address public immutable UNDERLYING_TKN_CL_POOL;
   address public immutable UNDERLYING_TKN;
-  address internal immutable UNDERLYING_CL_POOL_TOKEN1;
 
   /// @dev The Chainlink price feed we can use to convert the price we fetch through UNDERLYING_TKN_CL_POOL
   /// @dev into a BASE_TOKEN normalized price,
@@ -49,6 +48,8 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
   IV2Reserves public immutable V2_RESERVES;
 
   uint32 twapInterval = 10 minutes;
+
+  event SetTwapInterval(uint32 oldMax, uint32 newMax);
 
   constructor(
     address _baseToken,
@@ -74,7 +75,6 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     BASE_IS_POD = _baseIsPod;
     SP_TKN = _spTKN;
     UNDERLYING_TKN_CL_POOL = _underlyingClPool;
-    UNDERLYING_CL_POOL_TOKEN1 = IUniswapV2Pair(_underlyingClPool).token1();
     BASE_CONVERSION_CHAINLINK_FEED = _baseConversionChainlinkFeed;
     BASE_CONVERSION_CL_POOL = _baseConversionClPool;
     CHAINLINK_BASE_PRICE_FEED = _clBaseFeed;
@@ -82,6 +82,10 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     CHAINLINK_SINGLE_PRICE_ORACLE = _clSinglePriceOracle;
     UNISWAP_V3_SINGLE_PRICE_ORACLE = _uniswapSinglePriceOracle;
     V2_RESERVES = IV2Reserves(_v2Reserves);
+
+    if (_clQuoteFeed != address(0)) {
+      require(_clBaseFeed != address(0), 'BCLF');
+    }
 
     address _baseInCl = _baseToken;
     if (BASE_IS_POD) {
@@ -103,9 +107,9 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     external
     view
     override
-    returns (uint256 _pricePTKNPerBase18)
+    returns (uint256 _pricePTknPerBase18)
   {
-    _pricePTKNPerBase18 = 10 ** (18 * 2) / _calculatePTknPerBase(0);
+    _pricePTknPerBase18 = 10 ** (18 * 2) / _calculateBasePerPTkn(0);
   }
 
   /// @notice The ```getPrices``` function gets the mathematical price of SP_TKN / BASE_TOKEN, so in plain english will
@@ -155,7 +159,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
   function _calculateSpTknPerBase(
     uint256 _price18
   ) internal view returns (uint256 _spTknBasePrice18) {
-    uint256 _pricePTKNPerBase18 = _calculatePTknPerBase(_price18);
+    uint256 _priceBasePerPTkn18 = _calculateBasePerPTkn(_price18);
     address _pair = _getPair();
 
     (uint112 _reserve0, uint112 _reserve1) = V2_RESERVES.getReserves(_pair);
@@ -163,10 +167,11 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     uint256 _kDec = 10 **
       IERC20Metadata(IUniswapV2Pair(_pair).token0()).decimals() *
       10 ** IERC20Metadata(IUniswapV2Pair(_pair).token1()).decimals();
-    uint256 _avgBaseAssetInLp18 = _sqrt((_pricePTKNPerBase18 * _k) / _kDec) *
+    uint256 _avgBaseAssetInLp18 = _sqrt((_priceBasePerPTkn18 * _k) / _kDec) *
       10 ** (18 / 2);
-    uint256 _basePerSpTkn18 = (2 * _avgBaseAssetInLp18 * 10 ** 18) /
-      IERC20(_pair).totalSupply();
+    uint256 _basePerSpTkn18 = (2 *
+      _avgBaseAssetInLp18 *
+      10 ** IERC20Metadata(_pair).decimals()) / IERC20(_pair).totalSupply();
     _spTknBasePrice18 = 10 ** (18 * 2) / _basePerSpTkn18;
 
     // if the base asset is a pod, we will assume that the CL/chainlink pool(s) are
@@ -178,7 +183,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     }
   }
 
-  function _calculatePTknPerBase(
+  function _calculateBasePerPTkn(
     uint256 _price18
   ) internal view returns (uint256 _pTknBasePrice18) {
     // pull from UniV3 TWAP if passed as 0
@@ -210,12 +215,10 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         if (_subBadData) {
           return 0;
         }
-        _price18 = (10 ** 18 * _baseConvPrice18) / _price18;
+        _price18 = (10 ** 18 * _price18) / _baseConvPrice18;
       }
     }
-    _pTknBasePrice18 = UNDERLYING_CL_POOL_TOKEN1 == BASE_IN_CL
-      ? _accountForCBRInPrice(POD, UNDERLYING_TKN, _price18)
-      : 10 ** (18 * 2) / _accountForCBRInPrice(POD, UNDERLYING_TKN, _price18);
+    _pTknBasePrice18 = _accountForCBRInPrice(POD, UNDERLYING_TKN, _price18);
 
     // adjust current price for spTKN pod unwrap fee, which will end up making the end price
     // (spTKN per base) higher, meaning it will take more spTKN to equal the value
@@ -306,6 +309,8 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
 
   function setTwapInterval(uint32 _interval) external onlyOwner {
     require(_interval > 0, 'Z');
+    uint32 _oldInterval = twapInterval;
     twapInterval = _interval;
+    emit SetTwapInterval(_oldInterval, _interval);
   }
 }

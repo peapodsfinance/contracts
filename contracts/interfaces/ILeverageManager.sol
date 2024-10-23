@@ -25,6 +25,25 @@ interface ILeverageManager {
     address selfLendingPod;
   }
 
+  event AddLeverage(
+    uint256 indexed positionId,
+    address indexed user,
+    uint256 collateralAmt,
+    uint256 borrowAmt
+  );
+
+  event RemoveLeverage(
+    uint256 indexed positionId,
+    address indexed user,
+    uint256 collateralAmt
+  );
+
+  event SetIndexUtils(address oldIdxUtils, address newIdxUtils);
+
+  event SetOpenFeePerc(uint16 oldFee, uint16 newFee);
+
+  event SetCloseFeePerc(uint16 oldFee, uint16 newFee);
+
   function initializePosition(
     address _pod,
     address _recipient,

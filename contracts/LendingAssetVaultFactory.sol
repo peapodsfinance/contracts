@@ -13,6 +13,8 @@ contract LendingAssetVaultFactory is Ownable {
 
   event Create(address newVault);
 
+  event SetMinimumDepositAtCreation(uint256 olfFee, uint256 newFee);
+
   function create(
     string memory _name,
     string memory _symbol,
@@ -96,6 +98,8 @@ contract LendingAssetVaultFactory is Ownable {
   }
 
   function setMinimumDepositAtCreation(uint256 _minDeposit) external onlyOwner {
+    uint256 _oldDeposit = minimumDepositAtCreation;
     minimumDepositAtCreation = _minDeposit;
+    emit SetMinimumDepositAtCreation(_oldDeposit, _minDeposit);
   }
 }

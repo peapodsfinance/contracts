@@ -158,7 +158,9 @@ contract LendingAssetVault is
   function maxWithdraw(
     address _owner
   ) external view override returns (uint256 _maxAssets) {
-    _maxAssets = (balanceOf(_owner) * _cbr()) / PRECISION;
+    uint256 _totalAvailable = totalAvailableAssets();
+    uint256 _ownerMax = (balanceOf(_owner) * _cbr()) / PRECISION;
+    _maxAssets = _ownerMax > _totalAvailable ? _totalAvailable : _ownerMax;
   }
 
   function previewWithdraw(
@@ -180,7 +182,11 @@ contract LendingAssetVault is
   function maxRedeem(
     address _owner
   ) external view override returns (uint256 _maxShares) {
-    _maxShares = balanceOf(_owner);
+    uint256 _totalAvailableShares = convertToShares(totalAvailableAssets());
+    uint256 _ownerMax = balanceOf(_owner);
+    _maxShares = _ownerMax > _totalAvailableShares
+      ? _totalAvailableShares
+      : _ownerMax;
   }
 
   function previewRedeem(
@@ -321,6 +327,7 @@ contract LendingAssetVault is
       _totalAssets -
       _currentAssetsUtilized +
       vaultUtilization[_vault];
+    emit UpdateAssetMetadataFromVault(_vault);
   }
 
   /// @notice The ```redeemFromVault``` function redeems shares from a specific vault
@@ -351,7 +358,9 @@ contract LendingAssetVault is
   /// @param _newMax The new maximum number of vaults (must be <= 20)
   function setMaxVaults(uint8 _newMax) external onlyOwner {
     require(_newMax <= 20, 'M');
+    uint8 _oldMax = maxVaults;
     maxVaults = _newMax;
+    emit SetMaxVaults(_oldMax, _newMax);
   }
 
   /// @notice Add or remove a vault from the whitelist

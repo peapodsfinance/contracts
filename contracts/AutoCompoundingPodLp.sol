@@ -32,6 +32,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     uint256 amountIn
   );
 
+  event SetProtocolFee(uint16 oldFee, uint16 newFee);
+
   event TokenToPairedLpSwapError(
     address rewardsToken,
     address pairedLpToken,
@@ -53,6 +55,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
   uint16 public protocolFee = 50; // 1000 precision
   // token in => token out => swap pool(s)
   mapping(address => mapping(address => Pools)) public swapMaps;
+  // token in => max input amount to swap
+  mapping(address => uint256) public maxSwap;
 
   // inputTkn => outputTkn => amountInOverride
   mapping(address => mapping(address => uint256)) _tokenToPairedSwapAmountInOverride;
@@ -282,6 +286,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     address _swapOutputTkn = _pairedLpToken;
     if (_token == _pairedLpToken) {
       return _amountIn;
+    } else if (maxSwap[_token] > 0 && _amountIn > maxSwap[_token]) {
+      _amountIn = maxSwap[_token];
     }
 
     // if self lending pod, we need to swap for the lending pair borrow token,
@@ -454,6 +460,10 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     uint256 _amountOutMin
   ) internal returns (uint256 _amountOut) {
     bool _twoHops = _path.length == 3;
+    if (maxSwap[_path[0]] > 0 && _amountIn > maxSwap[_path[0]]) {
+      _amountOutMin = (_amountOutMin * maxSwap[_path[0]]) / _amountIn;
+      _amountIn = maxSwap[_path[0]];
+    }
     IERC20(_path[0]).safeIncreaseAllowance(address(DEX_ADAPTER), _amountIn);
     _amountOut = DEX_ADAPTER.swapV2Single(
       _path[0],
@@ -510,12 +520,16 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     IERC20(pod.PAIRED_LP_TOKEN()).safeTransfer(_msgSender(), _feesToPay);
   }
 
-  function setZapMap(
+  function setSwapMap(
     address _in,
     address _out,
     Pools memory _pools
   ) external onlyOwner {
     swapMaps[_in][_out] = _pools;
+  }
+
+  function setMaxSwap(address _in, uint256 _amt) external onlyOwner {
+    maxSwap[_in] = _amt;
   }
 
   function setPod(IDecentralizedIndex _pod) external onlyOwner {
@@ -551,6 +565,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
   ) external onlyOwner {
     require(_newFee <= 1000, 'MAX');
     _processRewardsToPodLp(_lpMinOut, _deadline);
+    uint16 _oldFee = protocolFee;
     protocolFee = _newFee;
+    emit SetProtocolFee(_oldFee, _newFee);
   }
 }

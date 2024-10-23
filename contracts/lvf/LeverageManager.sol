@@ -35,8 +35,6 @@ contract LeverageManager is
   // positionId => position props
   mapping(uint256 => LeveragePositionProps) public positionProps;
 
-  event AddLeverage(uint256 indexed positionId, address indexed user);
-
   modifier onlyPositionOwner(uint256 _positionId) {
     require(positionNFT.ownerOf(_positionId) == _msgSender(), 'AUTH');
     _;
@@ -350,6 +348,9 @@ contract LeverageManager is
     }
 
     uint256 _flashPaybackAmt = _d.amount + _d.fee;
+    uint256 _borrowAmt = _overrideBorrowAmt > _flashPaybackAmt
+      ? _overrideBorrowAmt
+      : _flashPaybackAmt;
 
     IERC20(_aspTkn).safeTransfer(
       positionProps[_props.positionId].custodian,
@@ -358,9 +359,7 @@ contract LeverageManager is
     LeveragePositionCustodian(positionProps[_props.positionId].custodian)
       .borrowAsset(
         positionProps[_props.positionId].lendingPair,
-        _overrideBorrowAmt > _flashPaybackAmt
-          ? _overrideBorrowAmt
-          : _flashPaybackAmt,
+        _borrowAmt,
         _aspTknCollateralBal,
         address(this)
       );
@@ -377,7 +376,12 @@ contract LeverageManager is
         _remaining
       );
     }
-    emit AddLeverage(_props.positionId, _props.user);
+    emit AddLeverage(
+      _props.positionId,
+      _props.user,
+      _aspTknCollateralBal,
+      _borrowAmt
+    );
   }
 
   function _removeLeverage(
@@ -422,7 +426,7 @@ contract LeverageManager is
     _podAmtRemaining = _podAmtReceived;
 
     // redeem borrow asset from lending pair for self lending positions
-    if (_isSelfLendingAndOrPodded(_props.positionId)) {
+    if (_isPodSelfLending(_props.positionId)) {
       // unwrap from self lending pod for lending pair asset
       if (_posProps.selfLendingPod != address(0)) {
         _pairedAmtReceived = _debondFromSelfLendingPod(
@@ -459,6 +463,11 @@ contract LeverageManager is
     _borrowAmtRemaining = _pairedAmtReceived > _repayAmount
       ? _pairedAmtReceived - _repayAmount
       : 0;
+    emit RemoveLeverage(
+      _props.positionId,
+      _props.user,
+      _collateralAssetRemoveAmt
+    );
   }
 
   function _debondFromSelfLendingPod(
@@ -501,7 +510,7 @@ contract LeverageManager is
     // sell pod token into LP for enough borrow token to get enough to repay
     // if self-lending swap for lending pair then redeem for borrow token
     if (_borrowAmtNeededToSwap > 0) {
-      if (_isSelfLendingAndOrPodded(_props.positionId)) {
+      if (_isPodSelfLending(_props.positionId)) {
         _podAmtRemaining = _swapPodForBorrowToken(
           _pod,
           positionProps[_props.positionId].lendingPair,
@@ -559,12 +568,15 @@ contract LeverageManager is
       _props.config,
       (uint256, uint256, uint256)
     );
-    (address _pairedLpForPod, uint256 _pairedLpAmt) = _getPairedTknAndAmt(
-      _props.positionId,
-      _borrowToken,
-      _borrowAmt,
-      positionProps[_props.positionId].selfLendingPod
-    );
+    (
+      address _pairedLpForPod,
+      uint256 _pairedLpAmt
+    ) = _processAndGetPairedTknAndAmt(
+        _props.positionId,
+        _borrowToken,
+        _borrowAmt,
+        positionProps[_props.positionId].selfLendingPod
+      );
     uint256 _podBalBefore = IERC20(positionProps[_props.positionId].pod)
       .balanceOf(address(this));
     uint256 _pairedLpBalBefore = IERC20(_pairedLpForPod).balanceOf(
@@ -607,9 +619,7 @@ contract LeverageManager is
     _newAspTkns = IERC4626(_aspTkn).deposit(_stakingBal, address(this));
 
     // for self lending pods redeem any extra paired LP asset back into main asset
-    if (
-      _isSelfLendingAndOrPodded(_props.positionId) && _pairedRemainingAmt > 0
-    ) {
+    if (_isPodSelfLending(_props.positionId) && _pairedRemainingAmt > 0) {
       if (positionProps[_props.positionId].selfLendingPod != address(0)) {
         address[] memory _noop1;
         uint8[] memory _noop2;
@@ -627,7 +637,7 @@ contract LeverageManager is
     }
   }
 
-  function _getPairedTknAndAmt(
+  function _processAndGetPairedTknAndAmt(
     uint256 _positionId,
     address _borrowedTkn,
     uint256 _borrowedAmt,
@@ -636,7 +646,7 @@ contract LeverageManager is
     _finalPairedTkn = _borrowedTkn;
     _finalPairedAmt = _borrowedAmt;
     address _lendingPair = positionProps[_positionId].lendingPair;
-    if (_isSelfLendingAndOrPodded(_positionId)) {
+    if (_isPodSelfLending(_positionId)) {
       _finalPairedTkn = _lendingPair;
       IERC20(_borrowedTkn).safeIncreaseAllowance(_lendingPair, _finalPairedAmt);
       _finalPairedAmt = IFraxlendPair(_lendingPair).deposit(
@@ -698,9 +708,7 @@ contract LeverageManager is
       _pairedTokenAmtBefore;
   }
 
-  function _isSelfLendingAndOrPodded(
-    uint256 _positionId
-  ) internal view returns (bool) {
+  function _isPodSelfLending(uint256 _positionId) internal view returns (bool) {
     address _pod = positionProps[_positionId].pod;
     address _lendingPair = positionProps[_positionId].lendingPair;
     return
@@ -727,17 +735,23 @@ contract LeverageManager is
   }
 
   function setIndexUtils(IIndexUtils_LEGACY _utils) external onlyOwner {
+    address _old = address(indexUtils);
     indexUtils = _utils;
+    emit SetIndexUtils(_old, address(_utils));
   }
 
   function setOpenFeePerc(uint16 _newFee) external onlyOwner {
     require(_newFee <= 250, 'MAX');
+    uint16 _oldFee = openFeePerc;
     openFeePerc = _newFee;
+    emit SetOpenFeePerc(_oldFee, _newFee);
   }
 
   function setCloseFeePerc(uint16 _newFee) external onlyOwner {
     require(_newFee <= 250, 'MAX');
+    uint16 _oldFee = closeFeePerc;
     closeFeePerc = _newFee;
+    emit SetCloseFeePerc(_oldFee, _newFee);
   }
 
   function rescueETH() external onlyOwner {
