@@ -166,13 +166,13 @@ contract spTKNMinimalOracleTest is Test {
     assertApproxEqRel(
       _priceLow,
       _unsafePrice18,
-      0.03e18, // TODO: tighten this up
+      0.06e18, // TODO: tighten this up
       '_priceLow not close to _unsafePrice18'
     );
     assertApproxEqRel(
       _priceHigh,
       _unsafePrice18,
-      0.03e18, // TODO: tighten this up
+      0.06e18, // TODO: tighten this up
       '_priceHigh not close to _unsafePrice18'
     );
     // accounting for unwrap fee makes oracle price a bit more

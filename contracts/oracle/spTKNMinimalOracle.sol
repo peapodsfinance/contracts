@@ -185,7 +185,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
 
   function _calculateBasePerPTkn(
     uint256 _price18
-  ) internal view returns (uint256 _pTknBasePrice18) {
+  ) internal view returns (uint256 _basePerPTkn18) {
     // pull from UniV3 TWAP if passed as 0
     if (_price18 == 0) {
       bool _isBadData;
@@ -218,13 +218,13 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         _price18 = (10 ** 18 * _price18) / _baseConvPrice18;
       }
     }
-    _pTknBasePrice18 = _accountForCBRInPrice(POD, UNDERLYING_TKN, _price18);
+    _basePerPTkn18 = _accountForCBRInPrice(POD, UNDERLYING_TKN, _price18);
 
     // adjust current price for spTKN pod unwrap fee, which will end up making the end price
     // (spTKN per base) higher, meaning it will take more spTKN to equal the value
     // of base token. This will more accurately ensure healthy LTVs when lending since
     // a liquidation path will need to account for unwrap fees
-    _pTknBasePrice18 = _accountForUnwrapFeeInPrice(POD, _pTknBasePrice18);
+    _basePerPTkn18 = _accountForUnwrapFeeInPrice(POD, _basePerPTkn18);
   }
 
   function _getBaseTokenInClPool() internal view returns (address _base) {
