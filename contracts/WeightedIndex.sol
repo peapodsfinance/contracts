@@ -20,10 +20,9 @@ contract WeightedIndex is DecentralizedIndex {
     Fees memory _fees,
     address[] memory _tokens,
     uint256[] memory _weights,
-    address _pairedLpToken,
-    address _lpRewardsToken,
-    address _dexHandler,
-    bool _stakeRestriction
+    bool _stakeRestriction,
+    bool _leaveRewardsAsPairedLp,
+    bytes memory _immutables
   )
     DecentralizedIndex(
       _name,
@@ -31,10 +30,9 @@ contract WeightedIndex is DecentralizedIndex {
       IndexType.WEIGHTED,
       _config,
       _fees,
-      _pairedLpToken,
-      _lpRewardsToken,
-      _dexHandler,
-      _stakeRestriction
+      _stakeRestriction,
+      _leaveRewardsAsPairedLp,
+      _immutables
     )
   {
     require(_tokens.length == _weights.length, 'V');
@@ -55,8 +53,12 @@ contract WeightedIndex is DecentralizedIndex {
       _fundTokenIdx[_tokens[_i]] = _i;
       _isTokenInIndex[_tokens[_i]] = true;
 
+      (address _pairedLpToken, , , , , , address _dexAdapter) = abi.decode(
+        _immutables,
+        (address, address, address, address, address, address, address)
+      );
       if (_config.blacklistTKNpTKNPoolV2 && _tokens[_i] != _pairedLpToken) {
-        address _blkPool = IDexAdapter(_dexHandler).createV2Pool(
+        address _blkPool = IDexAdapter(_dexAdapter).createV2Pool(
           address(this),
           _tokens[_i]
         );
@@ -128,7 +130,16 @@ contract WeightedIndex is DecentralizedIndex {
     override
     returns (uint256 _totalManagedAssets)
   {
-    _totalManagedAssets = IERC20(indexTokens[0].token).balanceOf(address(this));
+    _totalManagedAssets = _totalAssets[indexTokens[0].token];
+  }
+
+  /// @notice The ```totalAssets``` function returns the number of assets for the specified TKN in the pod
+  /// @param _asset The asset we're querying for the total managed assets
+  /// @return _totalManagedAssets Number of tkns currently in the pod
+  function totalAssets(
+    address _asset
+  ) public view override returns (uint256 _totalManagedAssets) {
+    _totalManagedAssets = _totalAssets[_asset];
   }
 
   /// @notice The ```convertToShares``` function returns the number of pTKN minted based on _assets TKN excluding fees
@@ -147,7 +158,7 @@ contract WeightedIndex is DecentralizedIndex {
         (_assets * FixedPoint96.Q96 * 10 ** decimals()) /
         indexTokens[0].q1;
     } else {
-      _shares = (totalSupply() * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+      _shares = (_totalSupply * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
     }
   }
 
@@ -157,11 +168,10 @@ contract WeightedIndex is DecentralizedIndex {
   function convertToAssets(
     uint256 _shares
   ) external view override returns (uint256 _assets) {
-    uint256 _percAfterFeeX96 = (_shares * FixedPoint96.Q96) / totalSupply();
-    uint256 _tokenSupply = IERC20(indexTokens[0].token).balanceOf(
-      address(this)
-    );
-    _assets = (_tokenSupply * _percAfterFeeX96) / FixedPoint96.Q96;
+    uint256 _percAfterFeeX96 = (_shares * FixedPoint96.Q96) / _totalSupply;
+    _assets =
+      (_totalAssets[indexTokens[0].token] * _percAfterFeeX96) /
+      FixedPoint96.Q96;
   }
 
   /// @notice The ```bond``` function wraps a user into a pod and mints new pTKN
@@ -184,11 +194,11 @@ contract WeightedIndex is DecentralizedIndex {
   ) internal {
     require(_isTokenInIndex[_token], 'IT');
     uint256 _tokenIdx = _fundTokenIdx[_token];
-    uint256 _tokenCurSupply = IERC20(_token).balanceOf(address(this));
+
     bool _firstIn = _isFirstIn();
     uint256 _tokenAmtSupplyRatioX96 = _firstIn
       ? FixedPoint96.Q96
-      : (_amount * FixedPoint96.Q96) / _tokenCurSupply;
+      : (_amount * FixedPoint96.Q96) / _totalAssets[_token];
     uint256 _tokensMinted;
     if (_firstIn) {
       _tokensMinted =
@@ -196,13 +206,14 @@ contract WeightedIndex is DecentralizedIndex {
         indexTokens[_tokenIdx].q1;
     } else {
       _tokensMinted =
-        (totalSupply() * _tokenAmtSupplyRatioX96) /
+        (_totalSupply * _tokenAmtSupplyRatioX96) /
         FixedPoint96.Q96;
     }
     uint256 _feeTokens = _canWrapFeeFree(_user)
       ? 0
       : (_tokensMinted * fees.bond) / DEN;
     require(_tokensMinted - _feeTokens >= _amountMintMin, 'M');
+    _totalSupply += _tokensMinted;
     _mint(_user, _tokensMinted - _feeTokens);
     if (_feeTokens > 0) {
       _mint(address(this), _feeTokens);
@@ -212,8 +223,9 @@ contract WeightedIndex is DecentralizedIndex {
     for (uint256 _i; _i < _il; _i++) {
       uint256 _transferAmt = _firstIn
         ? getInitialAmount(_token, _amount, indexTokens[_i].token)
-        : (IERC20(indexTokens[_i].token).balanceOf(address(this)) *
-          _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+        : (_totalAssets[indexTokens[_i].token] * _tokenAmtSupplyRatioX96) /
+          FixedPoint96.Q96;
+      _totalAssets[indexTokens[_i].token] += _transferAmt;
       _transferFromAndValidate(
         IERC20(indexTokens[_i].token),
         _user,
@@ -235,18 +247,17 @@ contract WeightedIndex is DecentralizedIndex {
       ? _amount
       : (_amount * (DEN - fees.debond)) / DEN;
     uint256 _percAfterFeeX96 = (_amountAfterFee * FixedPoint96.Q96) /
-      totalSupply();
+      _totalSupply;
     super._transfer(_msgSender(), address(this), _amount);
+    _totalSupply -= _amountAfterFee;
     _burn(address(this), _amountAfterFee);
     _processBurnFee(_amount - _amountAfterFee);
     uint256 _il = indexTokens.length;
     for (uint256 _i; _i < _il; _i++) {
-      uint256 _tokenSupply = IERC20(indexTokens[_i].token).balanceOf(
-        address(this)
-      );
-      uint256 _debondAmount = (_tokenSupply * _percAfterFeeX96) /
-        FixedPoint96.Q96;
+      uint256 _debondAmount = (_totalAssets[indexTokens[_i].token] *
+        _percAfterFeeX96) / FixedPoint96.Q96;
       if (_debondAmount > 0) {
+        _totalAssets[indexTokens[_i].token] -= _debondAmount;
         IERC20(indexTokens[_i].token).safeTransfer(_msgSender(), _debondAmount);
       }
     }
@@ -285,29 +296,5 @@ contract WeightedIndex is DecentralizedIndex {
     address _token
   ) external view override returns (uint256) {
     return _getTokenPriceUSDX96(_token);
-  }
-
-  /// @notice The ```getIdxPriceUSDX96``` function gets an *unsafe* pTKN price from all TKNs using UniswapV2 pools
-  /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
-  /// @return _priceX96 USD/TKN price scaled by Q96
-  function getIdxPriceUSDX96()
-    external
-    view
-    override
-    returns (uint256, uint256)
-  {
-    uint256 _priceX96;
-    uint256 _X96_2 = 2 ** (96 / 2);
-    uint256 _il = indexTokens.length;
-    for (uint256 _i; _i < _il; _i++) {
-      uint256 _tokenPriceUSDX96_2 = _getTokenPriceUSDX96(
-        indexTokens[_i].token
-      ) / _X96_2;
-      _priceX96 +=
-        (_tokenPriceUSDX96_2 * indexTokens[_i].q1) /
-        10 ** IERC20Metadata(indexTokens[_i].token).decimals() /
-        _X96_2;
-    }
-    return (0, _priceX96);
   }
 }

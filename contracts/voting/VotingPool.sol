@@ -18,25 +18,9 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
   // user => asset => State
   mapping(address => mapping(address => Stake)) public stakes;
 
-  constructor(
-    address _pairedLpToken,
-    address _rewardsToken,
-    IProtocolFeeRouter _feeRouter,
-    IRewardsWhitelister _rewardsWhitelist,
-    IDexAdapter _dexHandler,
-    IV3TwapUtilities _v3TwapUtilities
-  ) ERC20('Peapods Voting', 'vlPEAS') {
+  constructor(bytes memory _immutables) ERC20('Peapods Voting', 'vlPEAS') {
     REWARDS = address(
-      new TokenRewards(
-        _feeRouter,
-        _rewardsWhitelist,
-        _dexHandler,
-        _v3TwapUtilities,
-        address(this),
-        _pairedLpToken,
-        address(this),
-        _rewardsToken
-      )
+      new TokenRewards(address(this), address(this), false, _immutables)
     );
   }
 
@@ -48,6 +32,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     require(_amount > 0, 'A');
     IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _amount);
     stakes[_msgSender()][_asset].lastStaked = block.timestamp;
+    stakes[_msgSender()][_asset].lockupPeriod = lockupPeriod;
     _update(_msgSender(), _asset, _amount);
     emit AddStake(_msgSender(), _asset, _amount);
   }
@@ -55,7 +40,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
   function unstake(address _asset, uint256 _amount) external override {
     require(_amount > 0, 'R');
     Stake storage _stake = stakes[_msgSender()][_asset];
-    require(block.timestamp > _stake.lastStaked + lockupPeriod, 'LU');
+    require(block.timestamp > _stake.lastStaked + _stake.lockupPeriod, 'LU');
     uint256 _amtStakeToRemove = (_amount * _stake.stakedToOutputDenomenator) /
       _stake.stakedToOutputFactor;
     _stake.amtStaked -= _amtStakeToRemove;
@@ -65,10 +50,9 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
   }
 
   function update(
-    address _user,
     address _asset
   ) external returns (uint256 _convFctr, uint256 _convDenom) {
-    return _update(_user, _asset, 0);
+    return _update(_msgSender(), _asset, 0);
   }
 
   function _update(
@@ -79,10 +63,11 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     require(assets[_asset].enabled, 'E');
     (_convFctr, _convDenom) = _getConversionFactorAndDenom(_asset);
     Stake storage _stake = stakes[_user][_asset];
-    uint256 _mintedAmtBefore = _stake.amtStaked == 0
-      ? 0
-      : (_stake.amtStaked * _stake.stakedToOutputFactor) /
-        _stake.stakedToOutputDenomenator;
+    uint256 _den = _stake.stakedToOutputDenomenator > 0
+      ? _stake.stakedToOutputDenomenator
+      : 1;
+    uint256 _mintedAmtBefore = (_stake.amtStaked *
+      _stake.stakedToOutputFactor) / _den;
     _stake.amtStaked += _addAmt;
     _stake.stakedToOutputFactor = _convFctr;
     _stake.stakedToOutputDenomenator = _convDenom;
@@ -138,7 +123,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     uint256 _amount
   ) internal virtual override {
     require(_from == address(0) || _to == address(0), 'NT');
-    if (_from != address(0) && _from != address(0xdead)) {
+    if (_from != address(0)) {
       TokenRewards(REWARDS).setShares(_from, _amount, true);
     }
     if (_to != address(0) && _to != address(0xdead)) {

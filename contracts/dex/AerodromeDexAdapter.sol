@@ -7,6 +7,7 @@ import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol'
 import '../interfaces/IAerodromeLpSugar.sol';
 import '../interfaces/IAerodromeVoter.sol';
 import '../interfaces/IAerodromePoolFactory.sol';
+import '../interfaces/IAerodromePool.sol';
 import '../interfaces/IAerodromeRouter.sol';
 import '../interfaces/IAerodromeUniversalRouter.sol';
 import '../interfaces/IV3TwapUtilities.sol';
@@ -16,9 +17,7 @@ import { AerodromeCommands } from '../libraries/AerodromeCommands.sol';
 contract AerodromeDexAdapter is UniswapDexAdapter {
   using SafeERC20 for IERC20;
 
-  address constant AERO = 0x940181a94A35A4569E4529A3CDfB74e38FD98631;
   address constant CL_FACTORY = 0x5e7BB104d84c7CB9B682AaC2F3d509f5F406809A;
-  address constant LP_SUGAR = 0xf739E2BC37fD5C1D3614dA67756dEEaEE0025667;
   int24 constant TICK_SPACING = 200;
 
   constructor(
@@ -55,6 +54,21 @@ contract AerodromeDexAdapter is UniswapDexAdapter {
     return
       IAerodromePoolFactory(IAerodromeRouter(V2_ROUTER).defaultFactory())
         .getPool(_token0, _token1, 0);
+  }
+
+  function getReserves(
+    address _pool
+  )
+    external
+    view
+    virtual
+    override
+    returns (uint112 _reserve0, uint112 _reserve1)
+  {
+    (uint256 __reserve0, uint256 __reserve1, ) = IAerodromePool(_pool)
+      .getReserves();
+    _reserve0 = uint112(__reserve0);
+    _reserve1 = uint112(__reserve1);
   }
 
   function createV2Pool(
@@ -209,25 +223,5 @@ contract AerodromeDexAdapter is UniswapDexAdapter {
         IERC20(_pool).balanceOf(address(this)) - _lpBefore
       );
     }
-  }
-
-  function extraRewardsHook(
-    address _token0,
-    address _token1
-  )
-    external
-    override
-    returns (address[] memory _tokens, uint256[] memory _amounts)
-  {
-    _tokens[0] = AERO;
-    uint256 _aeroBefore = IERC20(AERO).balanceOf(address(this));
-    address _pool = getV2Pool(_token0, _token1);
-    IAerodromeVoter _voter = IAerodromeVoter(
-      IAerodromeLpSugar(LP_SUGAR).voter()
-    );
-    address[] memory _gauges = new address[](1);
-    _gauges[0] = _voter.gauges(_pool);
-    _voter.claimRewards(_gauges);
-    _amounts[0] = IERC20(AERO).balanceOf(address(this)) - _aeroBefore;
   }
 }

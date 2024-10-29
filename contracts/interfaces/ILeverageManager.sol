@@ -11,39 +11,54 @@ interface ILeverageManager {
     FlashCallbackMethod method;
     uint256 positionId;
     address user;
-    address pod;
-    uint256 podAmount;
+    uint256 pTknAmt;
     uint256 pairedLpDesired;
     uint256 pairedLpAmtMin;
-    uint256 overrideBorrowAmt;
-    uint256 slippage;
-    uint256 deadline;
-    address selfLendingPairPod;
+    bytes config;
   }
 
   struct LeveragePositionProps {
     address pod;
     address lendingPair;
     address custodian;
+    bool isSelfLending;
     address selfLendingPod;
   }
+
+  event AddLeverage(
+    uint256 indexed positionId,
+    address indexed user,
+    uint256 collateralAmt,
+    uint256 borrowAmt
+  );
+
+  event RemoveLeverage(
+    uint256 indexed positionId,
+    address indexed user,
+    uint256 collateralAmt
+  );
+
+  event SetIndexUtils(address oldIdxUtils, address newIdxUtils);
+
+  event SetOpenFeePerc(uint16 oldFee, uint16 newFee);
+
+  event SetCloseFeePerc(uint16 oldFee, uint16 newFee);
 
   function initializePosition(
     address _pod,
     address _recipient,
+    address _overrideLendingPair,
     address _selfLendingPairPod
-  ) external;
+  ) external returns (uint256 _positionId);
 
   function addLeverage(
     uint256 _positionId,
     address _pod,
-    uint256 _podAmount,
+    uint256 _pTknAmt,
     uint256 _pairedLpDesired,
     uint256 _pairedLpAmtMin,
-    uint256 _overrideBorrowAmt,
-    uint256 _slippage,
-    uint256 _deadline,
-    address _selfLendingPairPod
+    address _selfLendingPairPod,
+    bytes memory _config
   ) external;
 
   function removeLeverage(
@@ -52,7 +67,6 @@ interface ILeverageManager {
     uint256 _collateralAssetAmtRemove,
     uint256 _podAmtMin,
     uint256 _pairedAssetAmtMin,
-    address _dexAdapter,
     uint256 _userProvidedDebtAmtMax
   ) external;
 }

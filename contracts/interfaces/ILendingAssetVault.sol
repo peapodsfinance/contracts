@@ -2,15 +2,19 @@
 pragma solidity ^0.8.19;
 
 interface ILendingAssetVault {
-  event DonateAssets(address indexed user, uint256 amount);
+  event DonateAssets(address indexed user, uint256 amount, uint256 newShares);
 
   event PayBackUsedAssets(address indexed user, uint256 amount);
 
   event RedeemFromVault(address indexed vault, uint256 shares, uint256 assets);
 
+  event SetMaxVaults(uint8 oldMax, uint8 newMax);
+
   event SetVaultWhitelist(address indexed vault, bool isWhitelisted);
 
   event SetVaultMaxAlloPercentage(address indexed vault, uint256 percentage);
+
+  event UpdateAssetMetadataFromVault(address indexed vault);
 
   event WhitelistDeposit(address indexed user, uint256 amount);
 

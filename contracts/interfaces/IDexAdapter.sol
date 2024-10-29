@@ -32,6 +32,8 @@ interface IDexAdapter {
     address _token1
   ) external returns (address _pool);
 
+  function getReserves(address _pool) external view returns (uint112, uint112);
+
   function swapV2Single(
     address _tokenIn,
     address _tokenOut,
@@ -77,9 +79,4 @@ interface IDexAdapter {
     address to,
     uint256 deadline
   ) external;
-
-  function extraRewardsHook(
-    address _token0,
-    address _token1
-  ) external returns (address[] memory tokens, uint256[] memory amounts);
 }

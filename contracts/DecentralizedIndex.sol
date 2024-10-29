@@ -22,19 +22,17 @@ abstract contract DecentralizedIndex is
 
   uint16 constant DEN = 10000;
   uint8 constant SWAP_DELAY = 20; // seconds
-  address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-  IProtocolFeeRouter constant PROTOCOL_FEE_ROUTER =
-    IProtocolFeeRouter(0x7d544DD34ABbE24C8832db27820Ff53C151e949b);
-  IRewardsWhitelister constant REWARDS_WHITELIST =
-    IRewardsWhitelister(0xEc0Eb48d2D638f241c1a7F109e38ef2901E9450F);
-  IV3TwapUtilities constant V3_TWAP_UTILS =
-    IV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D);
+
+  IProtocolFeeRouter immutable PROTOCOL_FEE_ROUTER;
+  IRewardsWhitelister immutable REWARDS_WHITELIST;
+  IDexAdapter public immutable override DEX_HANDLER;
+  IV3TwapUtilities immutable V3_TWAP_UTILS;
 
   uint256 public immutable override FLASH_FEE_AMOUNT_DAI; // 10 DAI
   address public immutable override PAIRED_LP_TOKEN;
-  IDexAdapter public immutable DEX_HANDLER;
   address immutable V2_ROUTER;
   address immutable V3_ROUTER;
+  address immutable DAI;
   address immutable WETH;
   address V2_POOL;
 
@@ -50,18 +48,25 @@ abstract contract DecentralizedIndex is
   mapping(address => bool) _isTokenInIndex;
   mapping(address => uint8) _fundTokenIdx;
   mapping(address => bool) _blacklist;
-
+  mapping(address => uint256) _totalAssets;
+  uint256 _totalSupply;
   uint64 _partnerFirstWrapped;
-
   uint64 _lastSwap;
   uint8 _swapping;
   uint8 _swapAndFeeOn = 1;
+  uint8 _shortCircuitRewards;
   bool _initialized;
 
   event FlashLoan(
     address indexed executor,
     address indexed recipient,
     address token,
+    uint256 amount
+  );
+
+  event FlashMint(
+    address indexed executor,
+    address indexed recipient,
     uint256 amount
   );
 
@@ -89,10 +94,9 @@ abstract contract DecentralizedIndex is
     IndexType _idxType,
     Config memory _config,
     Fees memory _fees,
-    address _pairedLpToken,
-    address _lpRewardsToken,
-    address _dexHandler,
-    bool _stakeRestriction
+    bool _stakeRestriction,
+    bool _leaveRewardsAsPairedLp,
+    bytes memory _immutables
   ) ERC20(_name, _symbol) ERC20Permit(_name) {
     require(_fees.buy <= (uint256(DEN) * 20) / 100);
     require(_fees.sell <= (uint256(DEN) * 20) / 100);
@@ -105,38 +109,54 @@ abstract contract DecentralizedIndex is
     created = block.timestamp;
     fees = _fees;
     config = _config;
+
+    (
+      address _pairedLpToken,
+      address _lpRewardsToken,
+      address _dai,
+      address _feeRouter,
+      address _rewardsWhitelister,
+      address _v3TwapUtils,
+      address _dexAdapter
+    ) = abi.decode(
+        _immutables,
+        (address, address, address, address, address, address, address)
+      );
+    require(_pairedLpToken != address(0), 'PLP');
     lpRewardsToken = _lpRewardsToken;
-    DEX_HANDLER = IDexAdapter(_dexHandler);
-    address _v2Router = DEX_HANDLER.V2_ROUTER();
-    V2_ROUTER = _v2Router;
+    DAI = _dai;
+    PROTOCOL_FEE_ROUTER = IProtocolFeeRouter(_feeRouter);
+    REWARDS_WHITELIST = IRewardsWhitelister(_rewardsWhitelister);
+    V3_TWAP_UTILS = IV3TwapUtilities(_v3TwapUtils);
+    DEX_HANDLER = IDexAdapter(_dexAdapter);
+    V2_ROUTER = DEX_HANDLER.V2_ROUTER();
     V3_ROUTER = DEX_HANDLER.V3_ROUTER();
-    address _finalPairedLpToken = _pairedLpToken == address(0)
-      ? DAI
-      : _pairedLpToken;
-    PAIRED_LP_TOKEN = _finalPairedLpToken;
-    FLASH_FEE_AMOUNT_DAI = 10 * 10 ** IERC20Metadata(DAI).decimals(); // 10 DAI
+    PAIRED_LP_TOKEN = _pairedLpToken;
+    FLASH_FEE_AMOUNT_DAI = 10 * 10 ** IERC20Metadata(_dai).decimals(); // 10 DAI
     lpStakingPool = address(
       new StakingPoolToken(
         string.concat('Staked ', _name),
         string.concat('s', _symbol),
-        _finalPairedLpToken,
-        lpRewardsToken,
         _stakeRestriction ? _msgSender() : address(0),
-        PROTOCOL_FEE_ROUTER,
-        REWARDS_WHITELIST,
-        DEX_HANDLER,
-        V3_TWAP_UTILS
+        _leaveRewardsAsPairedLp,
+        _immutables
       )
     );
     if (!DEX_HANDLER.ASYNC_INITIALIZE()) {
       _initialize();
     }
-    WETH = IDexAdapter(_dexHandler).WETH();
+    WETH = IDexAdapter(_dexAdapter).WETH();
     emit Create(address(this), _msgSender());
   }
 
   function initialize() external {
     _initialize();
+  }
+
+  /// @notice The ```totalSupply``` function returns the total pTKN supply minted, excluding any used for _flashMint
+  /// @return _totalSupply Valid supply of pTKN excluding flashMinted pTKNs
+  function totalSupply() public view override(IERC20, ERC20) returns (uint256) {
+    return _totalSupply;
   }
 
   /// @notice The ```_initialize``` function initialized a new LP pair for the pod + pairedLpAsset
@@ -173,12 +193,10 @@ abstract contract DecentralizedIndex is
       if (_buy && fees.buy > 0) {
         _fee = (_amount * fees.buy) / DEN;
         super._transfer(_from, address(this), _fee);
-      }
-      if (_sell && fees.sell > 0) {
+      } else if (_sell && fees.sell > 0) {
         _fee = (_amount * fees.sell) / DEN;
         super._transfer(_from, address(this), _fee);
-      }
-      if (!_buy && !_sell && config.hasTransferTax) {
+      } else if (!_buy && !_sell && config.hasTransferTax) {
         _fee = _amount / 10000; // 0.01%
         _fee = _fee == 0 && _amount > 0 ? 1 : _fee;
         super._transfer(_from, address(this), _fee);
@@ -190,6 +208,9 @@ abstract contract DecentralizedIndex is
 
   /// @notice The ```_processPreSwapFeesAndSwap``` function processes fees that could be pending for a pod
   function _processPreSwapFeesAndSwap() internal {
+    if (_shortCircuitRewards == 1) {
+      return;
+    }
     bool _passesSwapDelay = block.timestamp > _lastSwap + SWAP_DELAY;
     if (!_passesSwapDelay) {
       return;
@@ -295,14 +316,14 @@ abstract contract DecentralizedIndex is
   /// @notice The ```_isFirstIn``` function confirms if the user is the first to wrap
   /// @return bool Whether the user is the first one in
   function _isFirstIn() internal view returns (bool) {
-    return totalSupply() == 0;
+    return _totalSupply == 0;
   }
 
   /// @notice The ```_isLastOut``` function checks if the user is the last one out
   /// @param _debondAmount Number of pTKN being unwrapped
   /// @return bool Whether the user is the last one out
   function _isLastOut(uint256 _debondAmount) internal view returns (bool) {
-    return _debondAmount >= (totalSupply() * 98) / 100;
+    return _debondAmount >= (_totalSupply * 99) / 100;
   }
 
   /// @notice The ```processPreSwapFeesAndSwap``` function allows the rewards CA for the pod to process fees as needed
@@ -443,7 +464,7 @@ abstract contract DecentralizedIndex is
   /// @param _recipient User to receive underlying TKN for the flash loan
   /// @param _token TKN to borrow
   /// @param _amount Number of underying TKN to borrow
-  /// @param _data Any data the recipient wants to be passed on the flash loan callback callback
+  /// @param _data Any data the recipient wants to be passed on the flash loan callback
   function flash(
     address _recipient,
     address _token,
@@ -465,12 +486,34 @@ abstract contract DecentralizedIndex is
     if (lpRewardsToken == DAI) {
       IERC20(DAI).safeIncreaseAllowance(_rewards, FLASH_FEE_AMOUNT_DAI);
       ITokenRewards(_rewards).depositRewards(DAI, FLASH_FEE_AMOUNT_DAI);
+    } else if (PAIRED_LP_TOKEN == DAI) {
+      ITokenRewards(_rewards).depositFromPairedLpToken(0);
     }
     uint256 _balance = IERC20(_token).balanceOf(address(this));
     IERC20(_token).safeTransfer(_recipient, _amount);
     IFlashLoanRecipient(_recipient).callback(_data);
     require(IERC20(_token).balanceOf(address(this)) >= _balance, 'FA');
     emit FlashLoan(_msgSender(), _recipient, _token, _amount);
+  }
+
+  /// @notice The ```flashMint``` function allows to flash mint pTKN and burn it + 0.1% at the end of the transaction
+  /// @param _recipient User to receive pTKN for the flash mint
+  /// @param _amount Number of pTKN to receive/mint
+  /// @param _data Any data the recipient wants to be passed on the flash mint callback
+  function flashMint(
+    address _recipient,
+    uint256 _amount,
+    bytes calldata _data
+  ) external override lock {
+    _shortCircuitRewards = 1;
+    uint256 _fee = _amount / 1000;
+    _mint(_recipient, _amount);
+    IFlashLoanRecipient(_recipient).callback(_data);
+    // Make sure the calling user pays fee of 0.1% more than they flash minted to recipient
+    _burn(_recipient, _amount);
+    _burn(_msgSender(), _fee == 0 ? 1 : _fee);
+    _shortCircuitRewards = 0;
+    emit FlashMint(_msgSender(), _recipient, _amount);
   }
 
   function setPartner(address _partner) external onlyPartner {

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import './IDexAdapter.sol';
 
 interface IDecentralizedIndex is IERC20 {
   enum IndexType {
@@ -84,6 +85,8 @@ interface IDecentralizedIndex is IERC20 {
 
   function DEBOND_FEE() external view returns (uint16);
 
+  function DEX_HANDLER() external view returns (IDexAdapter);
+
   function FLASH_FEE_AMOUNT_DAI() external view returns (uint256);
 
   function PAIRED_LP_TOKEN() external view returns (address);
@@ -100,8 +103,6 @@ interface IDecentralizedIndex is IERC20 {
 
   function partner() external view returns (address);
 
-  function getIdxPriceUSDX96() external view returns (uint256, uint256);
-
   function isAsset(address token) external view returns (bool);
 
   function getAllAssets() external view returns (IndexAssetInfo[] memory);
@@ -117,6 +118,10 @@ interface IDecentralizedIndex is IERC20 {
   function processPreSwapFeesAndSwap() external;
 
   function totalAssets() external view returns (uint256 totalManagedAssets);
+
+  function totalAssets(
+    address asset
+  ) external view returns (uint256 totalManagedAssets);
 
   function convertToShares(
     uint256 assets
@@ -151,6 +156,12 @@ interface IDecentralizedIndex is IERC20 {
   function flash(
     address recipient,
     address token,
+    uint256 amount,
+    bytes calldata data
+  ) external;
+
+  function flashMint(
+    address recipient,
     uint256 amount,
     bytes calldata data
   ) external;

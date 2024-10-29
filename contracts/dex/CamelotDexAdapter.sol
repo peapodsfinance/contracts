@@ -5,6 +5,7 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol';
+import '../interfaces/ICamelotPair.sol';
 import '../interfaces/ICamelotRouter.sol';
 import '../interfaces/ISwapRouterAlgebra.sol';
 import '../interfaces/IUniswapV2Factory.sol';
@@ -31,6 +32,18 @@ contract CamelotDexAdapter is UniswapDexAdapter {
         _token0,
         _token1
       );
+  }
+
+  function getReserves(
+    address _pool
+  )
+    external
+    view
+    virtual
+    override
+    returns (uint112 _reserve0, uint112 _reserve1)
+  {
+    (_reserve0, _reserve1, , ) = ICamelotPair(_pool).getReserves();
   }
 
   function swapV2Single(

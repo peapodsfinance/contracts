@@ -21,6 +21,7 @@ contract ConversionFactorPTKN is IStakingConversionFactor {
   function _calculateCbrWithDen(
     address _pTKN
   ) internal view returns (uint256, uint256) {
+    require(IDecentralizedIndex(_pTKN).unlocked() == 1, 'OU');
     uint256 _den = 10 ** 18;
     IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(
       _pTKN

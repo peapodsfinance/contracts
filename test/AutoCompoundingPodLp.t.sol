@@ -1,25 +1,27 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.4;
 
 import 'forge-std/Test.sol';
+import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '../contracts/AutoCompoundingPodLp.sol';
 import '../contracts/interfaces/IDecentralizedIndex.sol';
 import '../contracts/interfaces/IDexAdapter.sol';
+import '../contracts/interfaces/IFraxlendPair.sol';
 import '../contracts/interfaces/IIndexUtils.sol';
-import '../contracts/interfaces/IRewardsWhitelister.sol';
-import '../contracts/interfaces/IV3TwapUtilities.sol';
-import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
+import '../contracts/interfaces/IStakingPoolToken.sol';
+import '../contracts/interfaces/ITokenRewards.sol';
 
 contract AutoCompoundingPodLpTest is Test {
   AutoCompoundingPodLp public autoCompoundingPodLp;
   MockDecentralizedIndex public mockPod;
   MockDexAdapter public mockDexAdapter;
   MockIndexUtils public mockIndexUtils;
-  MockRewardsWhitelister public mockRewardsWhitelister;
-  MockV3TwapUtilities public mockV3TwapUtilities;
+  MockStakingPoolToken public mockStakingPoolToken;
+  MockTokenRewards public mockTokenRewards;
   MockERC20 public mockAsset;
   MockERC20 public rewardToken1;
   MockERC20 public rewardToken2;
+  MockERC20 public rewardToken3;
   MockERC20 public pairedLpToken;
   address public owner;
   address public user;
@@ -28,29 +30,70 @@ contract AutoCompoundingPodLpTest is Test {
     owner = address(this);
     user = address(0x1);
 
+    mockTokenRewards = new MockTokenRewards();
+    mockStakingPoolToken = new MockStakingPoolToken();
+    mockStakingPoolToken.setPoolRewards(address(mockTokenRewards));
+
     mockPod = new MockDecentralizedIndex();
     mockDexAdapter = new MockDexAdapter();
     mockIndexUtils = new MockIndexUtils();
-    mockRewardsWhitelister = new MockRewardsWhitelister();
-    mockV3TwapUtilities = new MockV3TwapUtilities();
     mockAsset = new MockERC20('Mock LP Token', 'MLT');
     rewardToken1 = new MockERC20('Reward Token 1', 'RT1');
     rewardToken2 = new MockERC20('Reward Token 2', 'RT2');
+    rewardToken3 = new MockERC20('Reward Token 3', 'RT3');
     pairedLpToken = new MockERC20('Paired LP Token', 'PLT');
+
+    mockPod.setLpStakingPool(address(mockStakingPoolToken));
+    mockPod.setPairedLpToken(address(pairedLpToken));
+    mockPod.setLpRewardsToken(address(rewardToken3));
 
     autoCompoundingPodLp = new AutoCompoundingPodLp(
       'Auto Compounding Pod LP',
       'acPodLP',
+      false,
       IDecentralizedIndex(address(mockPod)),
       IDexAdapter(address(mockDexAdapter)),
-      IIndexUtils(address(mockIndexUtils)),
-      IRewardsWhitelister(address(mockRewardsWhitelister)),
-      IV3TwapUtilities(address(mockV3TwapUtilities))
+      IIndexUtils(address(mockIndexUtils))
     );
+  }
 
-    mockPod.setLpStakingPool(address(mockAsset));
-    mockPod.setPairedLpToken(address(pairedLpToken));
-    mockPod.setLpRewardsToken(address(rewardToken1));
+  function testConvertToShares() public view {
+    uint256 assets = 1000 * 1e18;
+    uint256 shares = autoCompoundingPodLp.convertToShares(assets);
+    assertEq(shares, assets);
+  }
+
+  function testConvertToAssets() public view {
+    uint256 shares = 1000 * 1e18;
+    uint256 assets = autoCompoundingPodLp.convertToAssets(shares);
+    assertEq(assets, shares);
+  }
+
+  function testSetYieldConvEnabled() public {
+    assertEq(autoCompoundingPodLp.yieldConvEnabled(), true);
+
+    autoCompoundingPodLp.setYieldConvEnabled(false);
+    assertEq(autoCompoundingPodLp.yieldConvEnabled(), false);
+
+    autoCompoundingPodLp.setYieldConvEnabled(true);
+    assertEq(autoCompoundingPodLp.yieldConvEnabled(), true);
+  }
+
+  function testSetProtocolFee() public {
+    // Mock the necessary functions and set up the test scenario
+    address[] memory rewardTokens = new address[](2);
+    rewardTokens[0] = address(rewardToken1);
+    rewardTokens[1] = address(rewardToken2);
+
+    mockTokenRewards.setProcessedRewardTokens(rewardTokens);
+
+    assertEq(autoCompoundingPodLp.protocolFee(), 50);
+
+    autoCompoundingPodLp.setProtocolFee(100, 0, block.timestamp);
+    assertEq(autoCompoundingPodLp.protocolFee(), 100);
+
+    vm.expectRevert(bytes('MAX'));
+    autoCompoundingPodLp.setProtocolFee(1001, 0, block.timestamp);
   }
 
   function testProcessAllRewardsTokensToPodLp() public {
@@ -59,7 +102,7 @@ contract AutoCompoundingPodLpTest is Test {
     rewardTokens[0] = address(rewardToken1);
     rewardTokens[1] = address(rewardToken2);
 
-    mockRewardsWhitelister.setFullWhitelist(rewardTokens);
+    mockTokenRewards.setProcessedRewardTokens(rewardTokens);
 
     uint256 lpAmountOut = 50 * 1e18;
     mockDexAdapter.setSwapV3SingleReturn(lpAmountOut);
@@ -72,8 +115,15 @@ contract AutoCompoundingPodLpTest is Test {
 
     // Set initial totalAssets
     uint256 initialTotalAssets = 1000 * 1e18;
-    deal(address(mockAsset), address(this), initialTotalAssets);
-    mockAsset.approve(address(autoCompoundingPodLp), initialTotalAssets);
+    deal(
+      address(autoCompoundingPodLp.asset()),
+      address(this),
+      initialTotalAssets
+    );
+    IERC20(autoCompoundingPodLp.asset()).approve(
+      address(autoCompoundingPodLp),
+      initialTotalAssets
+    );
     autoCompoundingPodLp.deposit(initialTotalAssets, address(this));
 
     uint256 rewardAmount = 100 * 1e18;
@@ -125,6 +175,10 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
     return _lpRewardsToken;
   }
 
+  function DEX_HANDLER() external pure override returns (IDexAdapter) {
+    return IDexAdapter(address(0));
+  }
+
   // Implement other required functions with default values
   function BOND_FEE() external pure override returns (uint16) {
     return 0;
@@ -143,32 +197,34 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
   ) external pure override returns (uint256) {
     return 0;
   }
-  function totalAssets() external view returns (uint256 totalManagedAssets) {}
-  function convertToShares(
-    uint256 assets
-  ) external view returns (uint256 shares) {}
-  function convertToAssets(
-    uint256 shares
-  ) external view returns (uint256 assets) {}
-  function bond(
-    address token,
-    uint256 amount,
-    uint256 amountMintMin
-  ) external pure override {}
+  function totalAssets() external pure returns (uint256) {
+    return 0;
+  }
+  function totalAssets(address) external pure returns (uint256) {
+    return 0;
+  }
+  function convertToShares(uint256 assets) external pure returns (uint256) {
+    return assets;
+  }
+  function convertToAssets(uint256 shares) external pure returns (uint256) {
+    return shares;
+  }
+  function bond(address, uint256, uint256) external pure override {}
   function created() external pure override returns (uint256) {
     return 0;
   }
   function debond(
-    uint256 amount,
-    address[] memory token,
-    uint8[] memory percentage
+    uint256,
+    address[] memory,
+    uint8[] memory
   ) external pure override {}
   function flash(
-    address recipient,
-    address token,
-    uint256 amount,
-    bytes calldata data
+    address,
+    address,
+    uint256,
+    bytes calldata
   ) external pure override {}
+  function flashMint(address, uint256, bytes calldata) external pure override {}
   function getAllAssets()
     external
     pure
@@ -176,14 +232,6 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
     returns (IndexAssetInfo[] memory)
   {
     return new IndexAssetInfo[](0);
-  }
-  function getIdxPriceUSDX96()
-    external
-    pure
-    override
-    returns (uint256, uint256)
-  {
-    return (0, 0);
   }
   function getInitialAmount(
     address,
@@ -213,10 +261,10 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
   }
   function processPreSwapFeesAndSwap() external pure override {}
   function removeLiquidityV2(
-    uint256 liquidity,
-    uint256 amountTokenMin,
-    uint256 amountPairedTokenMin,
-    uint256 deadline
+    uint256,
+    uint256,
+    uint256,
+    uint256
   ) external pure override {}
   function unlocked() external pure override returns (uint8) {
     return 0;
@@ -281,6 +329,12 @@ contract MockDexAdapter is IDexAdapter, Test {
     return address(0x7);
   }
 
+  function getReserves(
+    address
+  ) external pure override returns (uint112, uint112) {
+    return (uint112(0), uint112(0));
+  }
+
   // Implement other required functions with default values
   function ASYNC_INITIALIZE() external pure returns (bool) {
     return false;
@@ -295,33 +349,29 @@ contract MockDexAdapter is IDexAdapter, Test {
     return address(0);
   }
   function addLiquidity(
-    address tokenA,
-    address tokenB,
-    uint256 amountADesired,
-    uint256 amountBDesired,
-    uint256 amountAMin,
-    uint256 amountBMin,
-    address to,
-    uint256 deadline
-  ) external {}
+    address,
+    address,
+    uint256,
+    uint256,
+    uint256,
+    uint256,
+    address,
+    uint256
+  ) external pure {}
   function createV2Pool(address, address) external pure returns (address) {
     return address(0);
   }
-  function extraRewardsHook(
-    address _token0,
-    address _token1
-  ) external returns (address[] memory tokens, uint256[] memory amounts) {}
-  function getV2Pool(address, address) external pure returns (address pool) {
+  function getV2Pool(address, address) external pure returns (address) {
     return address(0);
   }
   function removeLiquidity(
-    address tokenA,
-    address tokenB,
-    uint256 liquidity,
-    uint256 amountAMin,
-    uint256 amountBMin,
-    address to,
-    uint256 deadline
+    address,
+    address,
+    uint256,
+    uint256,
+    uint256,
+    address,
+    uint256
   ) external pure {}
   function swapV2SingleExactOut(
     address,
@@ -355,92 +405,12 @@ contract MockIndexUtils is IIndexUtils {
 
   // Implement other required functions with default values
   function unstakeAndRemoveLP(
-    IDecentralizedIndex idx,
-    uint256 liquidity,
-    uint256 amountTokenMin,
-    uint256 amountPairedTokenMin,
-    uint256 deadline
+    IDecentralizedIndex,
+    uint256,
+    uint256,
+    uint256,
+    uint256
   ) external pure {}
-}
-
-contract MockRewardsWhitelister is IRewardsWhitelister {
-  address[] private _fullWhitelist;
-
-  function setFullWhitelist(address[] memory wl) external {
-    _fullWhitelist = wl;
-  }
-
-  function getFullWhitelist()
-    external
-    view
-    override
-    returns (address[] memory)
-  {
-    return _fullWhitelist;
-  }
-
-  function whitelist(address) external pure returns (bool) {
-    return false;
-  }
-}
-
-contract MockV3TwapUtilities is IV3TwapUtilities {
-  uint160 private _sqrtPriceX96FromPoolAndIntervalReturn;
-  uint256 private constant _priceX96FromSqrtPriceX96Return = 1e18;
-
-  function setSqrtPriceX96FromPoolAndIntervalReturn(uint160 value) external {
-    _sqrtPriceX96FromPoolAndIntervalReturn = value;
-  }
-
-  function sqrtPriceX96FromPoolAndInterval(
-    address
-  ) external view override returns (uint160) {
-    return _sqrtPriceX96FromPoolAndIntervalReturn;
-  }
-
-  function priceX96FromSqrtPriceX96(
-    uint160
-  ) external pure override returns (uint256) {
-    return _priceX96FromSqrtPriceX96Return;
-  }
-
-  // Implement other required functions with default values
-  function getPoolPriceUSDX96(
-    address,
-    address,
-    address
-  ) external pure returns (uint256) {
-    return 0;
-  }
-  function getV3Pool(
-    address,
-    address,
-    address
-  ) external pure returns (address pool) {
-    return address(0);
-  }
-  function getV3Pool(
-    address,
-    address,
-    address,
-    uint24
-  ) external pure returns (address pool) {
-    return address(0);
-  }
-  function getV3Pool(
-    address,
-    address,
-    address,
-    int24
-  ) external pure returns (address pool) {
-    return address(0);
-  }
-  function sqrtPriceX96FromPoolAndPassedInterval(
-    address,
-    uint32
-  ) external pure returns (uint160 sqrtPriceX96) {
-    return 0;
-  }
 }
 
 contract MockERC20 is ERC20 {
@@ -453,4 +423,96 @@ contract MockERC20 is ERC20 {
   function burn(address from, uint256 amount) external {
     _burn(from, amount);
   }
+}
+
+contract MockStakingPoolToken is ERC20, IStakingPoolToken {
+  address private _poolRewards;
+  uint256 private constant _CONVERSION_FACTOR = 1e18;
+  uint256 private constant _REWARDS_DURATION = 7 days;
+  address private constant _REWARDS_TOKEN = address(0);
+  address private constant _STAKING_TOKEN = address(0);
+
+  constructor() ERC20('Mock Staking Pool Token', 'MSPT') {}
+
+  function setPoolRewards(address newPoolRewards) external {
+    _poolRewards = newPoolRewards;
+  }
+
+  function INDEX_FUND() external pure override returns (address) {
+    return address(0);
+  }
+
+  function indexFund() external pure override returns (address) {
+    return address(0);
+  }
+
+  function POOL_REWARDS() external view override returns (address) {
+    return _poolRewards;
+  }
+
+  function poolRewards() external view override returns (address) {
+    return _poolRewards;
+  }
+
+  function stakingToken() external pure override returns (address) {
+    return address(0);
+  }
+
+  function stakeUserRestriction() external pure override returns (address) {
+    return address(0);
+  }
+
+  function stake(address user, uint256 amount) external override {
+    _mint(user, amount);
+  }
+
+  function unstake(uint256 amount) external override {
+    _burn(msg.sender, amount);
+  }
+}
+
+contract MockTokenRewards is ITokenRewards {
+  address[] private _processedRewardTokens;
+
+  function setProcessedRewardTokens(address[] memory tokens) external {
+    _processedRewardTokens = tokens;
+  }
+
+  function getProcessedRewardTokens() external view returns (address[] memory) {
+    return _processedRewardTokens;
+  }
+
+  function totalShares() external pure returns (uint256) {
+    return 0;
+  }
+
+  function totalStakers() external pure returns (uint256) {
+    return 0;
+  }
+
+  function rewardsToken() external pure returns (address) {
+    return address(0);
+  }
+
+  function trackingToken() external pure returns (address) {
+    return address(0);
+  }
+
+  function depositFromPairedLpToken(uint256 amount) external {}
+
+  function depositRewards(address token, uint256 amount) external {}
+
+  function depositRewardsNoTransfer(address token, uint256 amount) external {}
+
+  function claimReward(address wallet) external {}
+
+  function getAllRewardsTokens() external view returns (address[] memory) {
+    return _processedRewardTokens;
+  }
+
+  function setShares(
+    address wallet,
+    uint256 amount,
+    bool sharesRemoving
+  ) external {}
 }

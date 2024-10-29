@@ -27,7 +27,7 @@ contract ConversionFactorSPTKN is ConversionFactorPTKN {
     address _spTKN
   ) external view override returns (uint256 _factor, uint256 _denomenator) {
     (uint256 _pFactor, uint256 _pDenomenator) = _calculateCbrWithDen(
-      IStakingPoolToken(_spTKN).INDEX_FUND()
+      IStakingPoolToken(_spTKN).indexFund()
     );
     address _lpTkn = IStakingPoolToken(_spTKN).stakingToken();
     address _token1 = IUniswapV3Pool(PEAS_STABLE_CL_POOL).token1();

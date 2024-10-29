@@ -5,6 +5,16 @@ import '@openzeppelin/contracts/interfaces/IERC20.sol';
 import { VaultAccount } from '../libraries/VaultAccount.sol';
 
 interface IFraxlendPair is IERC20 {
+  struct ExchangeRateInfo {
+    address oracle;
+    uint32 maxOracleDeviation; // % of larger number, 1e5 precision
+    uint184 lastTimestamp;
+    uint256 lowExchangeRate;
+    uint256 highExchangeRate;
+  }
+
+  function exchangeRateInfo() external view returns (ExchangeRateInfo memory);
+
   function totalBorrow() external view returns (VaultAccount memory);
 
   function asset() external view returns (address);
@@ -14,6 +24,10 @@ interface IFraxlendPair is IERC20 {
   function userCollateralBalance(address user) external view returns (uint256); // amount of collateral each user is backed
 
   function userBorrowShares(address user) external view returns (uint256); // represents the shares held by individuals
+
+  function addInterest(
+    bool _returnAccounting
+  ) external returns (uint256, uint256, uint256, uint64);
 
   function deposit(
     uint256 _amount,

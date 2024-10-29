@@ -7,9 +7,12 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './interfaces/ILendingAssetVault.sol';
+import 'forge-std/console.sol';
 
 interface IVaultInterestUpdate {
-  function addInterest() external;
+  function addInterest(
+    bool
+  ) external returns (uint256, uint256, uint256, uint64);
 }
 
 contract LendingAssetVault is
@@ -24,13 +27,11 @@ contract LendingAssetVault is
   uint16 constant PERCENTAGE_PRECISION = 10000;
   uint256 constant PRECISION = 10 ** 27;
 
-  address _asset;
+  address immutable _asset;
   uint256 _totalAssets;
   uint256 _totalAssetsUtilized;
-  bool _updateInterestOnVaults = true;
 
   uint8 public maxVaults = 12;
-  uint256 public lastAssetChange;
   mapping(address => bool) public vaultWhitelist;
   mapping(address => uint256) public override vaultUtilization;
   mapping(address => uint256) _vaultMaxPerc;
@@ -71,21 +72,19 @@ contract LendingAssetVault is
 
   function totalAvailableAssetsForVault(
     address _vault
-  ) public view override returns (uint256) {
+  ) public view override returns (uint256 _totalVaultAvailable) {
     uint256 _overallAvailable = totalAvailableAssets();
-    uint256 _totalVaultAvailable = (_totalAssets * _vaultMaxPerc[_vault]) /
-      PERCENTAGE_PRECISION;
 
-    // If what's available in the vault is less than the calculated vault available based
-    // on max allocation against overall total we should override with what's currently available overall
+    uint256 _vaultMax = ((_totalAssets * _vaultMaxPerc[_vault]) /
+      PERCENTAGE_PRECISION);
+
+    _totalVaultAvailable = _vaultMax > vaultUtilization[_vault]
+      ? _vaultMax - vaultUtilization[_vault]
+      : 0;
+
     _totalVaultAvailable = _overallAvailable < _totalVaultAvailable
       ? _overallAvailable
       : _totalVaultAvailable;
-
-    return
-      _totalVaultAvailable > vaultUtilization[_vault]
-        ? _totalVaultAvailable - vaultUtilization[_vault]
-        : 0;
   }
 
   function convertToShares(
@@ -103,7 +102,7 @@ contract LendingAssetVault is
   function maxDeposit(
     address
   ) external pure override returns (uint256 maxAssets) {
-    maxAssets = type(uint256).max - 1;
+    maxAssets = type(uint256).max;
   }
 
   function previewDeposit(
@@ -127,9 +126,11 @@ contract LendingAssetVault is
     uint256 _assets,
     address _receiver
   ) internal returns (uint256 _shares) {
+    require(_assets != 0, 'M');
+
     _updateInterestAndMdInAllVaults(address(0));
-    lastAssetChange = block.timestamp;
     _shares = convertToShares(_assets);
+    require(_shares != 0, 'MS');
     _totalAssets += _assets;
     _mint(_receiver, _shares);
     IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _assets);
@@ -137,7 +138,7 @@ contract LendingAssetVault is
   }
 
   function maxMint(address) external pure override returns (uint256 maxShares) {
-    maxShares = type(uint256).max - 1;
+    maxShares = type(uint256).max;
   }
 
   function previewMint(
@@ -157,7 +158,9 @@ contract LendingAssetVault is
   function maxWithdraw(
     address _owner
   ) external view override returns (uint256 _maxAssets) {
-    _maxAssets = (balanceOf(_owner) * _cbr()) / PRECISION;
+    uint256 _totalAvailable = totalAvailableAssets();
+    uint256 _ownerMax = (balanceOf(_owner) * _cbr()) / PRECISION;
+    _maxAssets = _ownerMax > _totalAvailable ? _totalAvailable : _ownerMax;
   }
 
   function previewWithdraw(
@@ -169,16 +172,21 @@ contract LendingAssetVault is
   function withdraw(
     uint256 _assets,
     address _receiver,
-    address
+    address _owner
   ) external override returns (uint256 _shares) {
+    _updateInterestAndMdInAllVaults(address(0));
     _shares = convertToShares(_assets);
-    _withdraw(_shares, _receiver);
+    _withdraw(_shares, _assets, _owner, _msgSender(), _receiver);
   }
 
   function maxRedeem(
     address _owner
   ) external view override returns (uint256 _maxShares) {
-    _maxShares = balanceOf(_owner);
+    uint256 _totalAvailableShares = convertToShares(totalAvailableAssets());
+    uint256 _ownerMax = balanceOf(_owner);
+    _maxShares = _ownerMax > _totalAvailableShares
+      ? _totalAvailableShares
+      : _ownerMax;
   }
 
   function previewRedeem(
@@ -190,35 +198,44 @@ contract LendingAssetVault is
   function redeem(
     uint256 _shares,
     address _receiver,
-    address
+    address _owner
   ) external override returns (uint256 _assets) {
-    _assets = _withdraw(_shares, _receiver);
+    _updateInterestAndMdInAllVaults(address(0));
+    _assets = convertToAssets(_shares);
+    _withdraw(_shares, _assets, _owner, _msgSender(), _receiver);
   }
 
   /// @notice Donate assets to the vault without receiving shares
   /// @param _assetAmt The amount of assets to donate
   function donate(uint256 _assetAmt) external {
-    _deposit(_assetAmt, address(this));
-    _burn(address(this), convertToShares(_assetAmt));
-    emit DonateAssets(_msgSender(), _assetAmt);
+    uint256 _newShares = _deposit(_assetAmt, address(this));
+    _burn(address(this), _newShares);
+    emit DonateAssets(_msgSender(), _assetAmt, _newShares);
   }
 
   /// @notice Internal function to handle share withdrawals
   /// @param _shares The amount of shares to withdraw
+  /// @param _assets The amount of assets to withdraw
+  /// @param _owner The owner of the shares being withdrawn
+  /// @param _caller The address who initiated withdrawing
   /// @param _receiver The address that will receive the assets
-  /// @return _assets The amount of assets withdrawn
   function _withdraw(
     uint256 _shares,
+    uint256 _assets,
+    address _owner,
+    address _caller,
     address _receiver
-  ) internal returns (uint256 _assets) {
-    _updateInterestAndMdInAllVaults(address(0));
-    lastAssetChange = block.timestamp;
-    _assets = convertToAssets(_shares);
-    require(totalAvailableAssets() >= _assets, 'AV');
-    _burn(_msgSender(), _shares);
-    IERC20(_asset).safeTransfer(_receiver, _assets);
+  ) internal {
+    if (_caller != _owner) {
+      _spendAllowance(_owner, _caller, _shares);
+    }
+    uint256 _totalAvailable = totalAvailableAssets();
     _totalAssets -= _assets;
-    emit Withdraw(_msgSender(), _receiver, _receiver, _assets, _shares);
+
+    require(_totalAvailable >= _assets, 'AV');
+    _burn(_owner, _shares);
+    IERC20(_asset).safeTransfer(_receiver, _assets);
+    emit Withdraw(_owner, _receiver, _receiver, _assets, _shares);
   }
 
   /// @notice Assumes underlying vault asset has decimals == 18
@@ -227,22 +244,16 @@ contract LendingAssetVault is
     return _supply == 0 ? PRECISION : (PRECISION * _totalAssets) / _supply;
   }
 
-  function _assetDecimals() internal view returns (uint8) {
-    return IERC20Metadata(_asset).decimals();
-  }
-
   /// @notice Updates interest and metadata for all whitelisted vaults
   /// @param _vaultToExclude Address of the vault to exclude from the update
   function _updateInterestAndMdInAllVaults(address _vaultToExclude) internal {
-    if (!_updateInterestOnVaults) {
-      return;
-    }
-    for (uint256 _i; _i < _vaultWhitelistAry.length; _i++) {
+    uint256 _l = _vaultWhitelistAry.length;
+    for (uint256 _i; _i < _l; _i++) {
       address _vault = _vaultWhitelistAry[_i];
       if (_vault == _vaultToExclude) {
         continue;
       }
-      IVaultInterestUpdate(_vault).addInterest();
+      IVaultInterestUpdate(_vault).addInterest(false);
       _updateAssetMetadataFromVault(_vault);
     }
   }
@@ -301,13 +312,13 @@ contract LendingAssetVault is
       : ((PRECISION * _vaultWhitelistCbr[_vault]) / _prevVaultCbr) - PRECISION;
 
     uint256 _currentAssetsUtilized = vaultUtilization[_vault];
+    uint256 _changeUtilizedState = (_currentAssetsUtilized *
+      _vaultAssetRatioChange) / PRECISION;
     vaultUtilization[_vault] = _prevVaultCbr > _vaultWhitelistCbr[_vault]
-      ? _currentAssetsUtilized -
-        (_currentAssetsUtilized * _vaultAssetRatioChange) /
-        PRECISION
-      : _currentAssetsUtilized +
-        (_currentAssetsUtilized * _vaultAssetRatioChange) /
-        PRECISION;
+      ? _currentAssetsUtilized < _changeUtilizedState
+        ? _currentAssetsUtilized
+        : _currentAssetsUtilized - _changeUtilizedState
+      : _currentAssetsUtilized + _changeUtilizedState;
     _totalAssetsUtilized =
       _totalAssetsUtilized -
       _currentAssetsUtilized +
@@ -316,12 +327,16 @@ contract LendingAssetVault is
       _totalAssets -
       _currentAssetsUtilized +
       vaultUtilization[_vault];
+    emit UpdateAssetMetadataFromVault(_vault);
   }
 
   /// @notice The ```redeemFromVault``` function redeems shares from a specific vault
   /// @param _vault The address of the vault to redeem from
   /// @param _amountShares The amount of shares to redeem (0 for all)
-  function redeemFromVault(address _vault, uint256 _amountShares) external {
+  function redeemFromVault(
+    address _vault,
+    uint256 _amountShares
+  ) external onlyOwner {
     _updateAssetMetadataFromVault(_vault);
     _amountShares = _amountShares == 0
       ? IERC20(_vault).balanceOf(address(this))
@@ -331,23 +346,21 @@ contract LendingAssetVault is
       address(this),
       address(this)
     );
-    vaultUtilization[_vault] -= _amountAssets;
-    _totalAssetsUtilized -= _amountAssets;
-    emit RedeemFromVault(_vault, _amountShares, _amountAssets);
+    uint256 _redeemAmt = vaultUtilization[_vault] < _amountAssets
+      ? vaultUtilization[_vault]
+      : _amountAssets;
+    vaultUtilization[_vault] -= _redeemAmt;
+    _totalAssetsUtilized -= _redeemAmt;
+    emit RedeemFromVault(_vault, _amountShares, _redeemAmt);
   }
 
   /// @notice Set the maximum number of vaults allowed
   /// @param _newMax The new maximum number of vaults (must be <= 20)
   function setMaxVaults(uint8 _newMax) external onlyOwner {
     require(_newMax <= 20, 'M');
+    uint8 _oldMax = maxVaults;
     maxVaults = _newMax;
-  }
-
-  /// @notice Set whether to update interest on vaults
-  /// @param _exec True to enable interest updates, false to disable
-  function setUpdateInterestOnVaults(bool _exec) external onlyOwner {
-    require(_updateInterestOnVaults != _exec, 'T');
-    _updateInterestOnVaults = _exec;
+    emit SetMaxVaults(_oldMax, _newMax);
   }
 
   /// @notice Add or remove a vault from the whitelist
@@ -357,7 +370,7 @@ contract LendingAssetVault is
     require(vaultWhitelist[_vault] != _allowed, 'T');
     vaultWhitelist[_vault] = _allowed;
     if (_allowed) {
-      require(_vaultWhitelistAry.length <= maxVaults, 'M');
+      require(_vaultWhitelistAry.length < maxVaults, 'M');
       _vaultWhitelistAryIdx[_vault] = _vaultWhitelistAry.length;
       _vaultWhitelistAry.push(_vault);
     } else {
@@ -365,7 +378,11 @@ contract LendingAssetVault is
       address _movingVault = _vaultWhitelistAry[_vaultWhitelistAry.length - 1];
       _vaultWhitelistAry[_idx] = _movingVault;
       _vaultWhitelistAryIdx[_movingVault] = _idx;
+
+      // clean up state
       _vaultWhitelistAry.pop();
+      delete _vaultMaxPerc[_vault];
+      delete _vaultWhitelistAryIdx[_vault];
     }
     emit SetVaultWhitelist(_vault, _allowed);
   }

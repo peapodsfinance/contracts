@@ -30,28 +30,24 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
   constructor(
     string memory _name,
     string memory _symbol,
-    address _pairedLpToken,
-    address _rewardsToken,
     address _stakeUserRestriction,
-    IProtocolFeeRouter _feeRouter,
-    IRewardsWhitelister _rewardsWhitelist,
-    IDexAdapter _dexAdapter,
-    IV3TwapUtilities _v3TwapUtilities
+    bool _leaveRewardsAsPairedLp,
+    bytes memory _immutables
   ) ERC20(_name, _symbol) {
     stakeUserRestriction = _stakeUserRestriction;
     INDEX_FUND = _msgSender();
-    DEX_ADAPTER = _dexAdapter;
-    V3_TWAP_UTILS = _v3TwapUtilities;
+    (, , , , , address _v3TwapUtilities, address _dexAdapter) = abi.decode(
+      _immutables,
+      (address, address, address, address, address, address, address)
+    );
+    DEX_ADAPTER = IDexAdapter(_dexAdapter);
+    V3_TWAP_UTILS = IV3TwapUtilities(_v3TwapUtilities);
     POOL_REWARDS = address(
       new TokenRewards(
-        _feeRouter,
-        _rewardsWhitelist,
-        _dexAdapter,
-        _v3TwapUtilities,
         INDEX_FUND,
-        _pairedLpToken,
         address(this),
-        _rewardsToken
+        _leaveRewardsAsPairedLp,
+        _immutables
       )
     );
   }
@@ -82,33 +78,6 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
     emit Unstake(_msgSender(), _amount);
   }
 
-  function externalRewardHook(
-    address _token0,
-    address _token1
-  ) external override {
-    (bool _success, bytes memory _data) = address(DEX_ADAPTER).delegatecall(
-      abi.encodeWithSignature(
-        'extraRewardsHook(address,address)',
-        _token0,
-        _token1
-      )
-    );
-    require(_success, 'UNS');
-    (address[] memory _tokens, uint256[] memory _amounts) = abi.decode(
-      _data,
-      (address[], uint256[])
-    );
-    address _receiver = Ownable(address(V3_TWAP_UTILS)).owner();
-    for (uint256 _i; _i < _tokens.length; _i++) {
-      if (_tokens[_i] == address(0)) {
-        (bool _s, ) = payable(_receiver).call{ value: _amounts[_i] }('');
-        require(_s, 'ES');
-      } else {
-        IERC20(_tokens[_i]).safeTransfer(_receiver, _amounts[_i]);
-      }
-    }
-  }
-
   function setStakingToken(address _stakingToken) external onlyOwner {
     require(stakingToken == address(0), 'S');
     stakingToken = _stakingToken;
@@ -127,7 +96,7 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
     address _to,
     uint256 _amount
   ) internal override {
-    if (_from != address(0) && _from != address(0xdead)) {
+    if (_from != address(0)) {
       TokenRewards(POOL_REWARDS).setShares(_from, _amount, true);
     }
     if (_to != address(0) && _to != address(0xdead)) {

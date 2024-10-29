@@ -9,7 +9,7 @@ contract ChainlinkSinglePriceOracleTest is Test {
   ChainlinkSinglePriceOracle public oracle;
 
   function setUp() public {
-    oracle = new ChainlinkSinglePriceOracle();
+    oracle = new ChainlinkSinglePriceOracle(address(0));
   }
 
   function test_getPriceUSD18_quoteOnly() public view {

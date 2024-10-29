@@ -10,8 +10,8 @@ import './FlashSourceBase.sol';
 contract PodFlashSource is FlashSourceBase, IFlashLoanRecipient {
   using SafeERC20 for IERC20;
 
-  address public override source;
-  address public override paymentToken;
+  address public immutable override source;
+  address public immutable override paymentToken;
 
   constructor(
     address _pod,

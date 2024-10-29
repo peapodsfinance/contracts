@@ -38,6 +38,8 @@ interface ITokenRewards {
 
   function claimReward(address wallet) external;
 
+  function getAllRewardsTokens() external view returns (address[] memory);
+
   function setShares(
     address wallet,
     uint256 amount,

@@ -12,7 +12,7 @@ import './FlashSourceBase.sol';
 contract UniswapV3FlashSource is FlashSourceBase, IUniswapV3FlashCallback {
   using SafeERC20 for IERC20;
 
-  address public override source;
+  address public immutable override source;
   address public override paymentToken;
   uint256 public override paymentAmount;
 
