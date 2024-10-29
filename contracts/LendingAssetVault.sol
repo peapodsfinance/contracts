@@ -9,6 +9,8 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './interfaces/ILendingAssetVault.sol';
 import 'forge-std/console.sol';
 
+import '../test/invariant/modules/fraxlend/interfaces/IFraxlendPair.sol';
+
 interface IVaultInterestUpdate {
   function addInterest(
     bool
@@ -279,10 +281,14 @@ contract LendingAssetVault is
     // validate max after doing vault accounting above
     require(totalAvailableAssetsForVault(_vault) >= _assetAmt, 'MAX');
     vaultUtilization[_vault] += _assetAmt;
+    emit DebugUint("Vault Utilization withdraw", vaultUtilization[_vault]);
     _totalAssetsUtilized += _assetAmt;
+    emit DebugUint("_totalAssetsUtilized withdraw", _totalAssetsUtilized);
     IERC20(_asset).safeTransfer(_vault, _assetAmt);
     emit WhitelistWithdraw(_vault, _assetAmt);
   }
+
+  event DebugUint(string a, uint256 b);
 
   /// @notice The ```whitelistDeposit``` function is called by any whitelisted target vault to deposit assets back into this vault.
   /// @notice need this instead of direct depositing in order to handle accounting for used assets and validation
@@ -291,7 +297,9 @@ contract LendingAssetVault is
     address _vault = _msgSender();
     _updateAssetMetadataFromVault(_vault);
     vaultUtilization[_vault] -= _assetAmt;
+    emit DebugUint("Vault Utilization deposit", vaultUtilization[_vault]);
     _totalAssetsUtilized -= _assetAmt;
+    emit DebugUint("_totalAssetsUtilized deposit", _totalAssetsUtilized);
     IERC20(_asset).safeTransferFrom(_vault, address(this), _assetAmt);
     emit WhitelistDeposit(_vault, _assetAmt);
   }
