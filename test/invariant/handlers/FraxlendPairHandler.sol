@@ -241,7 +241,7 @@ contract FraxlendPairHandler is Properties {
         __afterLM(address(cache.fraxPair), cache.pod, address(cache.fraxCollateral), address(0));
         _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV; 
 
-        // invariant_POD_4(cache.fraxPair);
+        invariant_POD_4(cache.fraxPair);
     }
 
     // addCollateral
@@ -425,7 +425,7 @@ contract FraxlendPairHandler is Properties {
         cache.positionNFT = _leverageManager.positionNFT();
         cache.positionId = fl.clamp(positionIdSeed, 0, cache.positionNFT.totalSupply());
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
-        (cache.podAddress, cache.lendingPair, cache.custodian,) = _leverageManager.positionProps(cache.positionId);
+        (cache.podAddress, cache.lendingPair, cache.custodian, , ) = _leverageManager.positionProps(cache.positionId);
         cache.fraxPair = FraxlendPair(cache.lendingPair);
 
         __beforeLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);

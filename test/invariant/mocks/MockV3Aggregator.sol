@@ -64,6 +64,22 @@ contract MockV3Aggregator {
         );
     }
 
+    function aggregator()
+    external
+    view
+    returns (address)
+  {
+    return address(this);
+  }
+
+  function minAnswer() external view returns (int192) {
+    return 0;
+  }
+
+  function maxAnswer() external view returns (int192) {
+    return int192(type(uint192).max);
+  }
+
     function description() external pure returns (string memory) {
         return "v0.6/tests/MockV3Aggregator.sol";
     }

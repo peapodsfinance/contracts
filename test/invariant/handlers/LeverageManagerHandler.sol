@@ -42,7 +42,8 @@ contract LeverageManagerHandler is Properties {
         try _leverageManager.initializePosition(
             address(cache.pod),
             cache.user,
-            address(0)
+            address(0), // change for self-lending
+            address(0) // change for self-lending
         ) {} catch {
             fl.t(false, "INIT POSITION FAILED");
         }
@@ -71,7 +72,7 @@ contract LeverageManagerHandler is Properties {
         cache.positionNFT = _leverageManager.positionNFT();
         cache.positionId = fl.clamp(positionIdSeed, 0, cache.positionNFT.totalSupply());
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
-        (cache.podAddress, cache.lendingPair, cache.custodian,) = _leverageManager.positionProps(cache.positionId);
+        (cache.podAddress, cache.lendingPair, cache.custodian, , ) = _leverageManager.positionProps(cache.positionId);
         cache.pod = WeightedIndex(payable(cache.podAddress));
         cache.flashSource = _leverageManager.flashSource(cache.podAddress);
         cache.aspTKN = AutoCompoundingPodLp(IFraxlendPair(cache.lendingPair).collateralContract());
@@ -105,18 +106,19 @@ contract LeverageManagerHandler is Properties {
             podAmount,
             pairedLpAmount,
             pairedLpAmount,
-            pairedLpAmount + feeAmount,
-            1000,
-            block.timestamp,
-            address(0)
-        ) {
+            address(0),
+            abi.encode(
+                0, // pairedLpAmount + feeAmount,
+                1000,
+                block.timestamp
+            )) {
             
             // POST-CONDITIONS
             __afterLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
             (uint256 fraxAssetsLessVault, ) = FraxlendPair(cache.lendingPair).totalAsset();
             _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV;
 
-            // invariant_POD_4(FraxlendPair(cache.lendingPair));
+            invariant_POD_4(FraxlendPair(cache.lendingPair));
             invariant_POD_17();
             invariant_POD_18();
             invariant_POD_20();
@@ -192,7 +194,7 @@ contract LeverageManagerHandler is Properties {
         cache.positionNFT = _leverageManager.positionNFT();
         cache.positionId = fl.clamp(positionIdSeed, 0, cache.positionNFT.totalSupply());
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
-        (cache.podAddress, cache.lendingPair, cache.custodian, cache.selfLendingPod) = _leverageManager.positionProps(cache.positionId);
+        (cache.podAddress, cache.lendingPair, cache.custodian, , cache.selfLendingPod) = _leverageManager.positionProps(cache.positionId);
 
         // I don't think flash is accounting for interest to be added???
         FraxlendPair(cache.lendingPair).addInterest(false);
@@ -248,7 +250,6 @@ contract LeverageManagerHandler is Properties {
             collateralAmount,
             0,
             0,
-            address(_dexAdapter),
             userDebtRepay
         ) {
 
@@ -257,18 +258,18 @@ contract LeverageManagerHandler is Properties {
             
             _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV; 
 
-            // invariant_POD_4(FraxlendPair(cache.lendingPair));
+            invariant_POD_4(FraxlendPair(cache.lendingPair));
             invariant_POD_16();
             invariant_POD_19();
-            // invariant_POD_23();
+            invariant_POD_23();
             invariant_POD_24();
             invariant_POD_25();
             invariant_POD_42(cache.lendingPair);
 
             if (_beforeLM.vaultUtilization > 0) {
                 invariant_POD_6();
-                // invariant_POD_7(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization);
-                // invariant_POD_8(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization);
+                invariant_POD_7(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization);
+                invariant_POD_8(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization);
             }
 
         } catch Error(string memory reason) {
@@ -284,7 +285,7 @@ contract LeverageManagerHandler is Properties {
                 if (compareStrings(stringErrors[i], reason)) {
                     expected = true;    
                 } else if (compareStrings(reason, stringErrors[2])) {
-                    // invariant_POD_1();
+                    invariant_POD_1();
                 }
             }
             fl.t(expected, reason);

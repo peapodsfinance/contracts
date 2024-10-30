@@ -232,6 +232,8 @@ contract FraxlendPairDeployer is Ownable {
     // Functions: Internal Methods
     // ============================================================================================
 
+    event Debug(string a);
+
     /// @notice The ```_deploy``` function is an internal function with deploys the pair
     /// @param _configData abi.encode(address _asset, address _collateral, address _oracle, uint32 _maxOracleDeviation, address _rateContract, uint64 _fullUtilizationRate, uint256 _maxLTV, uint256 _cleanLiquidationFee, uint256 _dirtyLiquidationFee, uint256 _protocolLiquidationFee)
     /// @param _immutables abi.encode(address _circuitBreakerAddress, address _comptrollerAddress, address _timelockAddress)
@@ -242,22 +244,28 @@ contract FraxlendPairDeployer is Ownable {
         bytes memory _immutables,
         bytes memory _customConfigData
     ) private returns (address _pairAddress) {
+        emit Debug("1a");
         // Get creation code
         bytes memory _creationCode = BytesLib.concat(SSTORE2.read(contractAddress1), SSTORE2.read(contractAddress2));
-
+        emit Debug("2a");
         // Get bytecode
         bytes memory bytecode = abi.encodePacked(
             _creationCode,
             abi.encode(_configData, _immutables, _customConfigData)
         );
 
+        emit Debug("3a");
+
         // Generate salt using constructor params
         bytes32 salt = keccak256(abi.encodePacked(_configData, _immutables, _customConfigData));
 
+        emit Debug("4a");
         /// @solidity memory-safe-assembly
         assembly {
             _pairAddress := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
+        emit Debug("5a");
+        emit DebugAddress("PAIR ADDRESS", _pairAddress);
         if (_pairAddress == address(0)) revert Create2Failed();
 
         deployedPairsArray.push(_pairAddress);
@@ -275,11 +283,14 @@ contract FraxlendPairDeployer is Ownable {
     // ============================================================================================
     // Functions: External Deploy Methods
     // ============================================================================================
+    
+    event DebugAddress(string a, address b);
 
     /// @notice The ```deploy``` function allows the deployment of a FraxlendPair with default values
     /// @param _configData abi.encode(address _asset, address _collateral, address _oracle, uint32 _maxOracleDeviation, address _rateContract, uint64 _fullUtilizationRate, uint256 _maxLTV, uint256 _cleanLiquidationFee, uint256 _dirtyLiquidationFee, uint256 _protocolLiquidationFee)
     /// @return _pairAddress The address to which the Pair was deployed
     function deploy(bytes memory _configData) external returns (address _pairAddress) {
+        emit DebugAddress("fraxwhitelist", fraxlendWhitelistAddress);
         if (!IFraxlendWhitelist(fraxlendWhitelistAddress).fraxlendDeployerWhitelist(msg.sender)) {
             revert WhitelistedDeployersOnly();
         }

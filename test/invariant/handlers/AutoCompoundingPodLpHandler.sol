@@ -82,7 +82,7 @@ contract AutoCompoundingPodLpHandler is Properties {
                 compareStrings(reason, stringErrors[2]) || 
                 compareStrings(reason, stringErrors[3])
                 ) {
-                    // invariant_POD_39();
+                    invariant_POD_39();
                 } else if (compareStrings(reason, stringErrors[4])) {
                     invariant_POD_40();
                 }
@@ -128,7 +128,7 @@ contract AutoCompoundingPodLpHandler is Properties {
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
-            // invariant_POD_34(shares);
+            invariant_POD_34(shares);
             invariant_POD_38();
 
         } catch Error(string memory reason) {
@@ -156,7 +156,7 @@ contract AutoCompoundingPodLpHandler is Properties {
                 compareStrings(reason, stringErrors[2]) || 
                 compareStrings(reason, stringErrors[3])
                 ) {
-                    // invariant_POD_39();
+                    invariant_POD_39();
                 } else if (compareStrings(reason, stringErrors[4])) {
                     invariant_POD_40();
                 }
@@ -193,12 +193,12 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try cache.aspTKN.withdraw(assets, cache.receiver, address(0)) {
+        try cache.aspTKN.withdraw(assets, cache.receiver, cache.user) {
 
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
-            // invariant_POD_37(assets);
+            invariant_POD_37(assets);
             invariant_POD_38();
 
         } catch Error(string memory reason) {
@@ -226,7 +226,7 @@ contract AutoCompoundingPodLpHandler is Properties {
                 compareStrings(reason, stringErrors[2]) || 
                 compareStrings(reason, stringErrors[3])
                 ) {
-                    // invariant_POD_39();
+                    invariant_POD_39();
                 } else if (compareStrings(reason, stringErrors[4])) {
                     invariant_POD_40();
                 } else if (compareStrings(reason, stringErrors[5])) {
@@ -265,7 +265,7 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try cache.aspTKN.redeem(shares, cache.receiver, address(0)) {
+        try cache.aspTKN.redeem(shares, cache.receiver, cache.user) {
 
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
@@ -298,7 +298,7 @@ contract AutoCompoundingPodLpHandler is Properties {
                 compareStrings(reason, stringErrors[2]) || 
                 compareStrings(reason, stringErrors[3])
                 ) {
-                    // invariant_POD_39();
+                    invariant_POD_39();
                 } else if (compareStrings(reason, stringErrors[4])) {
                     invariant_POD_40();
                 } else if (compareStrings(reason, stringErrors[5])) {

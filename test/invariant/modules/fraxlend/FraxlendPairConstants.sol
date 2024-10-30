@@ -57,4 +57,5 @@ abstract contract FraxlendPairConstants {
     error ExceedsMaxOracleDeviation();
     error InvalidReceiver();
     error ExternalAssetVaultOnly();
+    error BadDirtyLiquidation();
 }

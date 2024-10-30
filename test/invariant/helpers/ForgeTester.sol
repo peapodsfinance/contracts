@@ -23,6 +23,10 @@ UniswapV2Handler
         setup();
     }
 
+    function test_setup() public {
+        assert(true);
+    }
+
     function test_insufficient_liquidity() public {
     try this.pod_bond(1546215,3751138031097922591875504541930489760974186007970478629090182390041705798454,10389715181971971589987917242974767333182130613069703617938276247980917504,420) {} catch {}
 

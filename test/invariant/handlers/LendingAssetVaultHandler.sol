@@ -51,6 +51,7 @@ contract LendingAssetVaultHandler is Properties {
         lavDeposits += (_lendingAssetVault.totalAssets() - _beforeLav.totalAssets);
 
         amount = fl.clamp(amount, 0, IERC20(cache.vaultAsset).balanceOf(cache.user));
+        if (amount == 0 || _lendingAssetVault.convertToShares(amount) == 0) return;
 
         vm.prank(cache.user);
         IERC20(cache.vaultAsset).approve(address(_lendingAssetVault), amount);
@@ -103,6 +104,7 @@ contract LendingAssetVaultHandler is Properties {
 
         shares = fl.clamp(shares, 0, _lendingAssetVault.convertToShares(IERC20(cache.vaultAsset).balanceOf(cache.user)));
         cache.assets = _lendingAssetVault.convertToAssets(shares);
+        if (cache.assets == 0 || _lendingAssetVault.convertToShares(cache.assets) == 0) return;
 
         vm.prank(cache.user);
         IERC20(cache.vaultAsset).approve(address(_lendingAssetVault), cache.assets);
@@ -120,7 +122,7 @@ contract LendingAssetVaultHandler is Properties {
             cache.sharesMinted = _lendingAssetVault.convertToShares(assetsMinted);
             fl.log("Doanted amount", donatedAmount);
             fl.log("Doanted amount shares", _lendingAssetVault.convertToShares(donatedAmount));
-            // invariant_POD_2(cache.sharesMinted);
+            invariant_POD_2(cache.sharesMinted);
 
             lavDeposits += assetsMinted;
             fl.log("LAV DEPOSITS", lavDeposits);
@@ -170,7 +172,7 @@ contract LendingAssetVaultHandler is Properties {
         try _lendingAssetVault.withdraw(
             assets,
             cache.receiver,
-            address(0)
+            cache.user
         ) returns (uint256 sharesWithdrawn) {
 
             // POST-CONDITIONS
@@ -225,14 +227,14 @@ contract LendingAssetVaultHandler is Properties {
         try _lendingAssetVault.redeem(
             shares,
             cache.receiver,
-            address(0)
+            cache.user
         ) returns (uint256 assetsWithdrawn) {
 
             // POST-CONDITIONS
             __afterLav(cache.user, cache.receiver, address(0));
 
             invariant_POD_3(shares);
-            // invariant_POD_13(assetsWithdrawn, cache.maxAssets);
+            invariant_POD_13(assetsWithdrawn, cache.maxAssets);
 
             lavDeposits -= assetsWithdrawn;
             fl.log("LAV DEPOSITS", lavDeposits);
@@ -266,6 +268,7 @@ contract LendingAssetVaultHandler is Properties {
         lavDeposits += (_lendingAssetVault.totalAssets() - _beforeLav.totalAssets);
 
         amount = fl.clamp(amount, 0, IERC20(cache.vaultAsset).balanceOf(cache.user));
+        if (amount == 0 || _lendingAssetVault.convertToShares(amount) == 0) return;
 
         vm.prank(cache.user);
         IERC20(cache.vaultAsset).approve(address(_lendingAssetVault), amount);

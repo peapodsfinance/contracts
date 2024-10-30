@@ -16,10 +16,10 @@ interface IFraxlendPair {
 
     function addCollateral(uint256 _collateralAmount, address _borrower) external;
 
-    function addInterest()
+    function addInterest(bool _returnAccounting)
         external
         returns (uint256 _interestEarned, uint256 _feesAmount, uint256 _feesShare, uint64 _newRate);
-
+        
     function allowance(address owner, address spender) external view returns (uint256);
 
     function approve(address spender, uint256 amount) external returns (bool);

@@ -456,6 +456,12 @@ contract FuzzSetup is Test, FuzzBase {
             bytes memory code = address(_twapUtils).code;
             vm.etch(0x024ff47D552cB222b265D68C7aeB26E586D5229D, code);
 
+            // fl.log("TWAP UTILS CODE", code);
+            // fl.log("TWAP UTILS CREATION CODE", type(MockV3TwapUtilities).creationCode);
+            // // abi.encodePacked(bytecode, abi.encode(arg1, arg2))
+
+            // fl.t(false, "TEST");
+
             _twapUtils = MockV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D);
         } else {
             _twapUtils = MockV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D);
@@ -500,7 +506,24 @@ contract FuzzSetup is Test, FuzzBase {
         _t1[0] = address(_peas);
         uint256[] memory _w1 = new uint256[](1);
         _w1[0] = 100;
-        _pod1Peas = new WeightedIndex('Weth Pod', 'pPeas', _c, _f, _t1, _w1, address(0), address(_peas), address(_dexAdapter), false);
+        _pod1Peas = new WeightedIndex(
+            'Weth Pod',
+            'pPeas',
+            _c,
+            _f,
+            _t1,
+            _w1,
+            false,
+            false,
+            abi.encode(
+                address(_mockDai),
+                address(_peas),
+                address(_mockDai),
+                address(_protocolFeeRouter),
+                address(_rewardsWhitelist),
+                address(_twapUtils),
+                address(_dexAdapter)
+                ));
         
         // approve pod asset & pair asset
         _peas.approve(address(_pod1Peas), type(uint256).max);
@@ -527,7 +550,24 @@ contract FuzzSetup is Test, FuzzBase {
         _t1W[0] = address(_weth);
         uint256[] memory _w1W = new uint256[](1);
         _w1W[0] = 100;
-        _pod1Weth = new WeightedIndex('Weth Pod', 'pWeth', _c, _f, _t1W, _w1W, address(0), address(_peas), address(_dexAdapter), false);
+        _pod1Weth = new WeightedIndex(
+            'Weth Pod',
+            'pWeth', 
+            _c, 
+            _f, 
+            _t1W, 
+            _w1W, 
+            false,
+            false,
+            abi.encode(
+                address(_mockDai),
+                address(_peas),
+                address(_mockDai),
+                address(_protocolFeeRouter),
+                address(_rewardsWhitelist),
+                address(_twapUtils),
+                address(_dexAdapter)
+                ));
 
         // approve pod asset & pair asset
         _weth.approve(address(_pod1Weth), type(uint256).max);
@@ -556,7 +596,24 @@ contract FuzzSetup is Test, FuzzBase {
         uint256[] memory _w2 = new uint256[](2);
         _w2[0] = 50;
         _w2[1] = 50;
-        _pod2 = new WeightedIndex('Test2', 'pTEST2', _c, _f, _t2, _w2, address(0), address(_peas), address(_dexAdapter), false);
+        _pod2 = new WeightedIndex(
+            'Test2', 
+            'pTEST2', 
+            _c, 
+            _f, 
+            _t2, 
+            _w2, 
+            false,
+            false,
+            abi.encode(
+                address(_mockDai),
+                address(_peas),
+                address(_mockDai),
+                address(_protocolFeeRouter),
+                address(_rewardsWhitelist),
+                address(_twapUtils),
+                address(_dexAdapter)
+                ));
 
         // approve pod asset & pair asset
         _peas.approve(address(_pod2), type(uint256).max);
@@ -590,7 +647,24 @@ contract FuzzSetup is Test, FuzzBase {
         _w4[1] = 25;
         _w4[2] = 25;
         _w4[3] = 25;
-        _pod4 = new WeightedIndex('Test4', 'pTEST4', _c, _f, _t4, _w4, address(0), address(_peas), address(_dexAdapter), false);
+        _pod4 = new WeightedIndex(
+            'Test4', 
+            'pTEST4', 
+            _c, 
+            _f, 
+            _t4, 
+            _w4,
+            false,
+            false,
+            abi.encode(
+                address(_mockDai),
+                address(_peas),
+                address(_mockDai),
+                address(_protocolFeeRouter),
+                address(_rewardsWhitelist),
+                address(_twapUtils),
+                address(_dexAdapter)
+                ));
 
         // approve pod asset & pair asset
         _weth.approve(address(_pod4), type(uint256).max);
@@ -624,52 +698,48 @@ contract FuzzSetup is Test, FuzzBase {
         _aspTKN1PeasAddress = _aspTKNFactory.getNewCaFromParams(
             "Test aspTKN1Peas",
             "aspTKN1Peas",
+            false,
             _pod1Peas,
             _dexAdapter,
             _indexUtils,
-            _rewardsWhitelist,
-            _twapUtils,
             0
         );
 
         _aspTKN1WethAddress = _aspTKNFactory.getNewCaFromParams(
             "Test aspTKN1Weth",
             "aspTKN1Weth",
+            false,
             _pod1Weth,
             _dexAdapter,
             _indexUtils,
-            _rewardsWhitelist,
-            _twapUtils,
             0
         );
 
         _aspTKN2Address = _aspTKNFactory.getNewCaFromParams(
             "Test aspTKN2",
             "aspTKN2",
+            false,
             _pod2,
             _dexAdapter,
             _indexUtils,
-            _rewardsWhitelist,
-            _twapUtils,
             0
         );
 
         _aspTKN4Address = _aspTKNFactory.getNewCaFromParams(
             "Test aspTKN4",
             "aspTKN4",
+            false,
             _pod4,
             _dexAdapter,
             _indexUtils,
-            _rewardsWhitelist,
-            _twapUtils,
             0
         );
     }
 
     function _deployAspTKNOracles() internal {
         _v2Res = new V2ReservesUniswap();
-        _clOracle = new ChainlinkSinglePriceOracle();
-        _uniOracle = new UniswapV3SinglePriceOracle();
+        _clOracle = new ChainlinkSinglePriceOracle(address(0));
+        _uniOracle = new UniswapV3SinglePriceOracle(address(0));
 
         _aspTKNMinOracle1Peas = new aspTKNMinimalOracle(
             _aspTKN1PeasAddress,
@@ -685,6 +755,8 @@ contract FuzzSetup is Test, FuzzBase {
             address(_uniOracle),
             address(_v2Res)
         );
+
+        emit MessageAddress("aspTkn1", address(_aspTKNMinOracle1Peas));
 
         _aspTKNMinOracle1Weth = new aspTKNMinimalOracle(
             _aspTKN1WethAddress,
@@ -745,11 +817,10 @@ contract FuzzSetup is Test, FuzzBase {
         _aspTKNFactory.create(
             "Test aspTKN1Peas",
             "aspTKN1Peas",
+            false,
             _pod1Peas,
             _dexAdapter,
             _indexUtils,
-            _rewardsWhitelist,
-            _twapUtils,
             0
         );
         _aspTKN1Peas = AutoCompoundingPodLp(_aspTKN1PeasAddress);
@@ -769,11 +840,10 @@ contract FuzzSetup is Test, FuzzBase {
         _aspTKNFactory.create(
             "Test aspTKN1Weth",
             "aspTKN1Weth",
+            false,
             _pod1Weth,
             _dexAdapter,
             _indexUtils,
-            _rewardsWhitelist,
-            _twapUtils,
             0
         );
         _aspTKN1Weth = AutoCompoundingPodLp(_aspTKN1WethAddress);
@@ -793,11 +863,10 @@ contract FuzzSetup is Test, FuzzBase {
         _aspTKNFactory.create(
             "Test aspTKN2",
             "aspTKN2",
+            false,
             _pod2,
             _dexAdapter,
             _indexUtils,
-            _rewardsWhitelist,
-            _twapUtils,
             0
         );
         _aspTKN2 = AutoCompoundingPodLp(_aspTKN2Address);
@@ -817,11 +886,10 @@ contract FuzzSetup is Test, FuzzBase {
         _aspTKNFactory.create(
             "Test aspTKN4",
             "aspTKN4",
+            false,
             _pod4,
             _dexAdapter,
             _indexUtils,
-            _rewardsWhitelist,
-            _twapUtils,
             0
         );
         _aspTKN4 = AutoCompoundingPodLp(_aspTKN4Address);
@@ -886,6 +954,7 @@ contract FuzzSetup is Test, FuzzBase {
             _registryDeployer,
             true
         );
+        emit Message("1");
     }
 
     function _deployFraxPairs() internal {
@@ -893,26 +962,32 @@ contract FuzzSetup is Test, FuzzBase {
         // moving time to help out the twap
         vm.warp(block.timestamp + 1 days);
 
+        emit Message("1aa");
+
         _fraxLPToken1Peas = FraxlendPair(
             _fraxDeployer.deploy(
                 abi.encode(
-                    _pod1Peas.PAIRED_LP_TOKEN(),
-                    _aspTKN1PeasAddress, 
-                    address(_aspTKNMinOracle1Peas), 
-                    5000, 
-                    address(_variableInterestRate), 
-                    1000, 
-                    75000, 
-                    10000, 
-                    9000, 
-                    2000
+                    _pod1Peas.PAIRED_LP_TOKEN(), // asset
+                    _aspTKN1PeasAddress, // collateral
+                    address(_aspTKNMinOracle1Peas), //oracle
+                    5000, // maxOracleDeviation
+                    address(_variableInterestRate), //rateContract
+                    1000, //fullUtilizationRate
+                    75000, // maxLtv
+                    10000, // uint256 _cleanLiquidationFee
+                    9000, // uint256 _dirtyLiquidationFee
+                    2000 //uint256 _protocolLiquidationFee
                 )
             )
         );
 
+        emit Message("1b");
+
         // deposit some asset
         IERC20(_pod1Peas.PAIRED_LP_TOKEN()).approve(address(_fraxLPToken1Peas), type(uint256).max);
         _fraxLPToken1Peas.deposit(100000 ether, address(this));
+
+        emit Message("2");
 
         // add to array for fuzzing
         _fraxPairs.push(_fraxLPToken1Peas);
@@ -1084,10 +1159,10 @@ contract FuzzSetup is Test, FuzzBase {
             address(_leverageManager)
             );
 
-        _leverageManager.setFlashSource(address(_pod1Peas), address(_uniswapV3FlashSourcePeas));
-        _leverageManager.setFlashSource(address(_pod1Weth), address(_uniswapV3FlashSourceWeth));
-        _leverageManager.setFlashSource(address(_pod2), address(_uniswapV3FlashSourcePeas));
-        _leverageManager.setFlashSource(address(_pod4), address(_uniswapV3FlashSourceWeth));
+        _leverageManager.setFlashSource(address(_pod1Peas.PAIRED_LP_TOKEN()), address(_uniswapV3FlashSourcePeas));
+        _leverageManager.setFlashSource(address(_pod1Weth.PAIRED_LP_TOKEN()), address(_uniswapV3FlashSourceWeth));
+        _leverageManager.setFlashSource(address(_pod2.PAIRED_LP_TOKEN()), address(_uniswapV3FlashSourcePeas));
+        _leverageManager.setFlashSource(address(_pod4.PAIRED_LP_TOKEN()), address(_uniswapV3FlashSourceWeth));
     }
 
     /*////////////////////////////////////////////////////////////////
