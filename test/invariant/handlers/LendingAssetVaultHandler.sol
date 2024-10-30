@@ -122,7 +122,9 @@ contract LendingAssetVaultHandler is Properties {
             cache.sharesMinted = _lendingAssetVault.convertToShares(assetsMinted);
             fl.log("Doanted amount", donatedAmount);
             fl.log("Doanted amount shares", _lendingAssetVault.convertToShares(donatedAmount));
-            invariant_POD_2(cache.sharesMinted);
+
+            
+            invariant_POD_2(shares);
 
             lavDeposits += assetsMinted;
             fl.log("LAV DEPOSITS", lavDeposits);
