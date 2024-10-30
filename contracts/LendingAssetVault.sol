@@ -326,6 +326,15 @@ contract LendingAssetVault is
     emit UpdateAssetMetadataFromVault(_vault);
   }
 
+  function _transfer(
+    address _from,
+    address _to,
+    uint256 _amount
+  ) internal override {
+    _lastDeposit[_to] = block.number;
+    super._transfer(_from, _to, _amount);
+  }
+
   /// @notice The ```redeemFromVault``` function redeems shares from a specific vault
   /// @param _vault The address of the vault to redeem from
   /// @param _amountShares The amount of shares to redeem (0 for all)
