@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import '../interfaces/IDecentralizedIndex.sol';
+import '../interfaces/IFraxlendPair.sol';
 import '../interfaces/IStakingPoolToken.sol';
 import '../interfaces/IUniswapV2Pair.sol';
 import '../interfaces/IMinimalOracle.sol';
@@ -16,6 +17,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
   /// @dev or the borrow token in a lending pair
   address public immutable BASE_TOKEN;
   bool public immutable BASE_IS_POD;
+  bool public immutable BASE_IS_FRAX_PAIR;
   address internal immutable BASE_IN_CL;
 
   /// @dev The pod stake token and oracle quote token that custodies UniV2 LP tokens
@@ -51,51 +53,62 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
 
   event SetTwapInterval(uint32 oldMax, uint32 newMax);
 
-  constructor(
-    address _baseToken,
-    bool _baseIsPod,
-    address _spTKN,
-    address _underlyingClPool,
-    address _baseConversionChainlinkFeed,
-    address _baseConversionClPool,
-    address _clBaseFeed,
-    address _clQuoteFeed,
-    address _clSinglePriceOracle,
-    address _uniswapSinglePriceOracle,
-    address _v2Reserves
-  ) {
+  constructor(bytes memory _immutables) {
+    address _v2Reserves;
+    (
+      BASE_TOKEN,
+      BASE_IS_POD,
+      BASE_IS_FRAX_PAIR,
+      SP_TKN,
+      UNDERLYING_TKN_CL_POOL,
+      BASE_CONVERSION_CHAINLINK_FEED,
+      BASE_CONVERSION_CL_POOL,
+      CHAINLINK_BASE_PRICE_FEED,
+      CHAINLINK_QUOTE_PRICE_FEED,
+      CHAINLINK_SINGLE_PRICE_ORACLE,
+      UNISWAP_V3_SINGLE_PRICE_ORACLE,
+      _v2Reserves
+    ) = abi.decode(
+      _immutables,
+      (
+        address,
+        bool,
+        bool,
+        address,
+        address,
+        address,
+        address,
+        address,
+        address,
+        address,
+        address,
+        address
+      )
+    );
+    V2_RESERVES = IV2Reserves(_v2Reserves);
+
     // only one (or neither) of the base conversion config should be populated
     require(
-      _baseConversionChainlinkFeed == address(0) ||
-        _baseConversionClPool == address(0),
+      BASE_CONVERSION_CHAINLINK_FEED == address(0) ||
+        BASE_CONVERSION_CL_POOL == address(0),
       'CONV'
     );
 
-    BASE_TOKEN = _baseToken;
-    BASE_IS_POD = _baseIsPod;
-    SP_TKN = _spTKN;
-    UNDERLYING_TKN_CL_POOL = _underlyingClPool;
-    BASE_CONVERSION_CHAINLINK_FEED = _baseConversionChainlinkFeed;
-    BASE_CONVERSION_CL_POOL = _baseConversionClPool;
-    CHAINLINK_BASE_PRICE_FEED = _clBaseFeed;
-    CHAINLINK_QUOTE_PRICE_FEED = _clQuoteFeed;
-    CHAINLINK_SINGLE_PRICE_ORACLE = _clSinglePriceOracle;
-    UNISWAP_V3_SINGLE_PRICE_ORACLE = _uniswapSinglePriceOracle;
-    V2_RESERVES = IV2Reserves(_v2Reserves);
-
-    if (_clQuoteFeed != address(0)) {
-      require(_clBaseFeed != address(0), 'BCLF');
+    if (CHAINLINK_QUOTE_PRICE_FEED != address(0)) {
+      require(CHAINLINK_BASE_PRICE_FEED != address(0), 'BCLF');
     }
 
-    address _baseInCl = _baseToken;
+    address _baseInCl = BASE_TOKEN;
     if (BASE_IS_POD) {
       IDecentralizedIndex.IndexAssetInfo[]
-        memory _baseAssets = IDecentralizedIndex(_baseToken).getAllAssets();
+        memory _baseAssets = IDecentralizedIndex(BASE_TOKEN).getAllAssets();
       _baseInCl = _baseAssets[0].token;
+    } else if (BASE_IS_FRAX_PAIR) {
+      _baseInCl = IFraxlendPair(BASE_TOKEN).asset();
     }
     BASE_IN_CL = _baseInCl;
 
-    address _pod = IStakingPoolToken(_spTKN).indexFund();
+    address _pod = IStakingPoolToken(SP_TKN).indexFund();
     IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(
       _pod
     ).getAllAssets();
@@ -180,6 +193,10 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     // better handling accounting for liquidation path
     if (BASE_IS_POD) {
       _spTknBasePrice18 = _checkAndHandleBaseTokenPodConfig(_spTknBasePrice18);
+    } else if (BASE_IS_FRAX_PAIR) {
+      _spTknBasePrice18 =
+        (_spTknBasePrice18 * _spTknBasePrice18) /
+        IFraxlendPair(BASE_TOKEN).convertToAssets(_spTknBasePrice18);
     }
   }
 
@@ -225,15 +242,6 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     // of base token. This will more accurately ensure healthy LTVs when lending since
     // a liquidation path will need to account for unwrap fees
     _basePerPTkn18 = _accountForUnwrapFeeInPrice(POD, _basePerPTkn18);
-  }
-
-  function _getBaseTokenInClPool() internal view returns (address _base) {
-    _base = BASE_TOKEN;
-    if (BASE_IS_POD) {
-      IDecentralizedIndex.IndexAssetInfo[]
-        memory _baseAssets = IDecentralizedIndex(BASE_TOKEN).getAllAssets();
-      _base = _baseAssets[0].token;
-    }
   }
 
   function _checkAndHandleBaseTokenPodConfig(
@@ -282,12 +290,10 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
       ).getAllAssets();
       _underlying = _assets[0].token;
     }
-    return
-      (_amtUnderlying *
-        IDecentralizedIndex(_pod).totalAssets(_underlying) *
-        10 ** IERC20Metadata(_pod).decimals()) /
-      IERC20(_pod).totalSupply() /
+    uint256 _pTknAmt = (_amtUnderlying *
+      10 ** IERC20Metadata(_pod).decimals()) /
       10 ** IERC20Metadata(_underlying).decimals();
+    return IDecentralizedIndex(_pod).convertToAssets(_pTknAmt);
   }
 
   function _accountForUnwrapFeeInPrice(

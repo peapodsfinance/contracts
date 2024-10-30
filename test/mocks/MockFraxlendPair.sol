@@ -52,6 +52,10 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
     return _userBorrowShares[user];
   }
 
+  function convertToAssets(uint256 shares) external view returns (uint256) {
+    return (shares * _totalBorrow.amount) / _totalBorrow.shares;
+  }
+
   function addInterest(
     bool _returnAccounting
   ) external override returns (uint256, uint256, uint256, uint64) {

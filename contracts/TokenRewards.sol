@@ -165,10 +165,11 @@ contract TokenRewards is ITokenRewards, Context {
     // if we want to leave rewards for this pod as the paired LP token without
     // swapping into rewardsToken, simply deposit them here for stakers to claim
     if (LEAVE_AS_PAIRED_LP_TOKEN) {
-      // since we will not execute the burn fee in this case,
-      // we will take 2x the admin fee
-      _adminAmt += _adminAmt;
-      _amountTkn -= _adminAmt;
+      (, uint256 _yieldBurnFee) = _getYieldFees();
+      uint256 _burnAmount = (_amountTkn * _yieldBurnFee) /
+        PROTOCOL_FEE_ROUTER.protocolFees().DEN();
+      _adminAmt += _burnAmount;
+      _amountTkn -= _burnAmount;
       if (_adminAmt > 0) {
         _processAdminFee(_adminAmt);
       }

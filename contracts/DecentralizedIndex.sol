@@ -247,7 +247,9 @@ abstract contract DecentralizedIndex is
     if (_amtToProcess == 0 || fees.burn == 0) {
       return;
     }
-    _burn(address(this), (_amtToProcess * fees.burn) / DEN);
+    uint256 _burnAmt = (_amtToProcess * fees.burn) / DEN;
+    _totalSupply -= _burnAmt;
+    _burn(address(this), _burnAmt);
   }
 
   /// @notice The ```_feeSwap``` function processes built up fees by converting to pairedLpToken
@@ -363,6 +365,7 @@ abstract contract DecentralizedIndex is
   /// @notice The ```burn``` function allows any user to burn an amount of their pTKN
   /// @param _amount Number of pTKN to burn
   function burn(uint256 _amount) external lock {
+    _totalSupply -= _amount;
     _burn(_msgSender(), _amount);
   }
 
@@ -511,6 +514,8 @@ abstract contract DecentralizedIndex is
     IFlashLoanRecipient(_recipient).callback(_data);
     // Make sure the calling user pays fee of 0.1% more than they flash minted to recipient
     _burn(_recipient, _amount);
+    // only adjust _totalSupply by fee amt since we didn't add to supply at mint during flash mint
+    _totalSupply -= _fee == 0 ? 1 : _fee;
     _burn(_msgSender(), _fee == 0 ? 1 : _fee);
     _shortCircuitRewards = 0;
     emit FlashMint(_msgSender(), _recipient, _amount);

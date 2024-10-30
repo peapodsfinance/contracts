@@ -7,7 +7,6 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './interfaces/ILendingAssetVault.sol';
-import 'forge-std/console.sol';
 
 interface IVaultInterestUpdate {
   function addInterest(
@@ -40,6 +39,9 @@ contract LendingAssetVault is
   address[] _vaultWhitelistAry;
   // vault address => idx in _vaultWhitelistAry
   mapping(address => uint256) _vaultWhitelistAryIdx;
+
+  bool _lastDepEnabled = true;
+  mapping(address => uint256) _lastDeposit;
 
   modifier onlyWhitelist() {
     require(vaultWhitelist[_msgSender()], 'WL');
@@ -132,6 +134,7 @@ contract LendingAssetVault is
     _shares = convertToShares(_assets);
     require(_shares != 0, 'MS');
     _totalAssets += _assets;
+    _lastDeposit[_receiver] = block.number;
     _mint(_receiver, _shares);
     IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _assets);
     emit Deposit(_msgSender(), _receiver, _assets, _shares);
@@ -205,14 +208,6 @@ contract LendingAssetVault is
     _withdraw(_shares, _assets, _owner, _msgSender(), _receiver);
   }
 
-  /// @notice Donate assets to the vault without receiving shares
-  /// @param _assetAmt The amount of assets to donate
-  function donate(uint256 _assetAmt) external {
-    uint256 _newShares = _deposit(_assetAmt, address(this));
-    _burn(address(this), _newShares);
-    emit DonateAssets(_msgSender(), _assetAmt, _newShares);
-  }
-
   /// @notice Internal function to handle share withdrawals
   /// @param _shares The amount of shares to withdraw
   /// @param _assets The amount of assets to withdraw
@@ -233,6 +228,7 @@ contract LendingAssetVault is
     _totalAssets -= _assets;
 
     require(_totalAvailable >= _assets, 'AV');
+    require(!_lastDepEnabled || block.number > _lastDeposit[_owner], 'MIN');
     _burn(_owner, _shares);
     IERC20(_asset).safeTransfer(_receiver, _assets);
     emit Withdraw(_owner, _receiver, _receiver, _assets, _shares);
@@ -385,6 +381,11 @@ contract LendingAssetVault is
       delete _vaultWhitelistAryIdx[_vault];
     }
     emit SetVaultWhitelist(_vault, _allowed);
+  }
+
+  function setLastDepEnabled(bool _isEnabled) external onlyOwner {
+    require(_lastDepEnabled != _isEnabled, 'T');
+    _lastDepEnabled = _isEnabled;
   }
 
   /// @notice The ```setVaultMaxPerc``` function sets the maximum amount of vault assets allowed to be allocated to a whitelisted vault

@@ -149,10 +149,9 @@ contract WeightedIndex is DecentralizedIndex {
     uint256 _assets
   ) external view override returns (uint256 _shares) {
     bool _firstIn = _isFirstIn();
-    uint256 _tokenCurSupply = totalAssets();
     uint256 _tokenAmtSupplyRatioX96 = _firstIn
       ? FixedPoint96.Q96
-      : (_assets * FixedPoint96.Q96) / _tokenCurSupply;
+      : (_assets * FixedPoint96.Q96) / _totalAssets[indexTokens[0].token];
     if (_firstIn) {
       _shares =
         (_assets * FixedPoint96.Q96 * 10 ** decimals()) /
@@ -168,10 +167,20 @@ contract WeightedIndex is DecentralizedIndex {
   function convertToAssets(
     uint256 _shares
   ) external view override returns (uint256 _assets) {
-    uint256 _percAfterFeeX96 = (_shares * FixedPoint96.Q96) / _totalSupply;
-    _assets =
-      (_totalAssets[indexTokens[0].token] * _percAfterFeeX96) /
-      FixedPoint96.Q96;
+    bool _firstIn = _isFirstIn();
+    uint256 _percSharesX96_2 = _firstIn
+      ? 2 ** (96 / 2)
+      : (_shares * 2 ** (96 / 2)) / _totalSupply;
+    if (_firstIn) {
+      _assets =
+        (indexTokens[0].q1 * _percSharesX96_2) /
+        FixedPoint96.Q96 /
+        2 ** (96 / 2);
+    } else {
+      _assets =
+        (_totalAssets[indexTokens[0].token] * _percSharesX96_2) /
+        2 ** (96 / 2);
+    }
   }
 
   /// @notice The ```bond``` function wraps a user into a pod and mints new pTKN
@@ -243,10 +252,11 @@ contract WeightedIndex is DecentralizedIndex {
     address[] memory,
     uint8[] memory
   ) external override lock noSwapOrFee {
-    uint256 _amountAfterFee = _isLastOut(_amount)
+    uint256 _amountAfterFee = _isLastOut(_amount) ||
+      REWARDS_WHITELIST.isWhitelistedFromDebondFee(_msgSender())
       ? _amount
       : (_amount * (DEN - fees.debond)) / DEN;
-    uint256 _percAfterFeeX96 = (_amountAfterFee * FixedPoint96.Q96) /
+    uint256 _percSharesX96 = (_amountAfterFee * FixedPoint96.Q96) /
       _totalSupply;
     super._transfer(_msgSender(), address(this), _amount);
     _totalSupply -= _amountAfterFee;
@@ -255,7 +265,7 @@ contract WeightedIndex is DecentralizedIndex {
     uint256 _il = indexTokens.length;
     for (uint256 _i; _i < _il; _i++) {
       uint256 _debondAmount = (_totalAssets[indexTokens[_i].token] *
-        _percAfterFeeX96) / FixedPoint96.Q96;
+        _percSharesX96) / FixedPoint96.Q96;
       if (_debondAmount > 0) {
         _totalAssets[indexTokens[_i].token] -= _debondAmount;
         IERC20(indexTokens[_i].token).safeTransfer(_msgSender(), _debondAmount);

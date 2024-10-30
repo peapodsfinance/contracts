@@ -487,7 +487,7 @@ contract LeverageManagerTest is Test {
     // Set open fee
     leverageManager.setOpenFeePerc(openFeePerc);
 
-    uint256 _adminAspBalBefore = aspTkn.balanceOf(address(this));
+    uint256 _adminDaiBalBefore = IERC20(dai).balanceOf(address(this));
 
     vm.startPrank(ALICE);
 
@@ -523,8 +523,8 @@ contract LeverageManagerTest is Test {
       'Incorrect Pod Token balance after adding leverage'
     );
     assertGt(
-      aspTkn.balanceOf(address(this)),
-      _adminAspBalBefore,
+      IERC20(dai).balanceOf(address(this)),
+      _adminDaiBalBefore,
       'Protocol fee successfully collected'
     );
   }
