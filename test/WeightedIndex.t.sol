@@ -39,6 +39,14 @@ contract WeightedIndexTest is Test {
     uint256 amount
   );
 
+  event AddLiquidity(
+    address indexed user,
+    uint256 idxLPTokens,
+    uint256 pairedLPTokens
+  );
+
+  event RemoveLiquidity(address indexed user, uint256 lpTokens);
+
   function setUp() public {
     peas = PEAS(0x02f92800F57BCD74066F5709F1Daa1A4302Df875);
     twapUtils = new V3TwapUtilities();
@@ -383,5 +391,136 @@ contract WeightedIndexTest is Test {
     uint256 assets = 2e18;
     uint256 shares = pod.convertToShares(assets);
     assertEq(shares, assets / 2, 'Should reflect 1:2 share to asset ratio');
+  }
+
+  function test_addLiquidityV2() public {
+    // First bond some tokens to have pTKN to add liquidity with
+    uint256 podTokensToAdd = 1e18;
+    uint256 pairedTokensToAdd = 1e18;
+    uint256 slippage = 50; // 5% slippage
+
+    // Bond tokens first to have some to add liquidity with
+    peas.approve(address(pod), podTokensToAdd * 2);
+    pod.bond(address(peas), podTokensToAdd, 0);
+
+    // Deal some paired tokens to this contract
+    deal(pod.PAIRED_LP_TOKEN(), address(this), pairedTokensToAdd);
+
+    // Get initial balances
+    uint256 initialPodBalance = pod.balanceOf(address(this));
+    uint256 initialPairedBalance = IERC20(pod.PAIRED_LP_TOKEN()).balanceOf(
+      address(this)
+    );
+
+    // Approve tokens for liquidity addition
+    IERC20(pod.PAIRED_LP_TOKEN()).approve(address(pod), pairedTokensToAdd);
+
+    // Get initial LP token balance
+    address v2Pool = pod.DEX_HANDLER().getV2Pool(
+      address(pod),
+      pod.PAIRED_LP_TOKEN()
+    );
+    uint256 initialLpBalance = IERC20(v2Pool).balanceOf(address(this));
+
+    // Expect AddLiquidity event
+    vm.expectEmit(true, false, false, true);
+    emit AddLiquidity(address(this), podTokensToAdd, pairedTokensToAdd);
+
+    // Add liquidity
+    uint256 lpTokensReceived = pod.addLiquidityV2(
+      podTokensToAdd,
+      pairedTokensToAdd,
+      slippage,
+      block.timestamp
+    );
+
+    // Verify LP tokens were received
+    assertGt(lpTokensReceived, 0, 'Should receive LP tokens');
+    assertEq(
+      IERC20(v2Pool).balanceOf(address(this)) - initialLpBalance,
+      lpTokensReceived,
+      'LP token balance should increase by returned amount'
+    );
+
+    // Verify token balances were reduced
+    assertEq(
+      pod.balanceOf(address(this)),
+      initialPodBalance - podTokensToAdd,
+      'Pod token balance should decrease'
+    );
+    assertEq(
+      IERC20(pod.PAIRED_LP_TOKEN()).balanceOf(address(this)),
+      initialPairedBalance - pairedTokensToAdd,
+      'Paired token balance should decrease'
+    );
+  }
+
+  function test_removeLiquidityV2() public {
+    // First add liquidity so we have LP tokens to remove
+    uint256 podTokensToAdd = 1e18;
+    uint256 pairedTokensToAdd = 1e18;
+    uint256 slippage = 50; // 5% slippage
+
+    // Bond tokens first to have some to add liquidity with
+    peas.approve(address(pod), podTokensToAdd * 2);
+    pod.bond(address(peas), podTokensToAdd, 0);
+
+    // Deal some paired tokens and approve for liquidity addition
+    deal(pod.PAIRED_LP_TOKEN(), address(this), pairedTokensToAdd);
+    IERC20(pod.PAIRED_LP_TOKEN()).approve(address(pod), pairedTokensToAdd);
+
+    // Add liquidity first
+    uint256 lpTokensReceived = pod.addLiquidityV2(
+      podTokensToAdd,
+      pairedTokensToAdd,
+      slippage,
+      block.timestamp
+    );
+
+    // Get initial balances before removal
+    uint256 initialPodBalance = pod.balanceOf(address(this));
+    uint256 initialPairedBalance = IERC20(pod.PAIRED_LP_TOKEN()).balanceOf(
+      address(this)
+    );
+
+    // Get V2 pool address
+    address v2Pool = pod.DEX_HANDLER().getV2Pool(
+      address(pod),
+      pod.PAIRED_LP_TOKEN()
+    );
+
+    // Approve LP tokens for removal
+    IERC20(v2Pool).approve(address(pod), lpTokensReceived);
+
+    // Expect RemoveLiquidity event
+    vm.expectEmit(true, false, false, true);
+    emit RemoveLiquidity(address(this), lpTokensReceived);
+
+    // Remove liquidity
+    pod.removeLiquidityV2(
+      lpTokensReceived,
+      0, // min pod tokens (accepting any slippage for test)
+      0, // min paired tokens (accepting any slippage for test)
+      block.timestamp
+    );
+
+    // Verify LP tokens were burned
+    assertEq(
+      IERC20(v2Pool).balanceOf(address(this)),
+      0,
+      'All LP tokens should be burned'
+    );
+
+    // Verify token balances increased
+    assertGt(
+      pod.balanceOf(address(this)),
+      initialPodBalance,
+      'Pod token balance should increase'
+    );
+    assertGt(
+      IERC20(pod.PAIRED_LP_TOKEN()).balanceOf(address(this)),
+      initialPairedBalance,
+      'Paired token balance should increase'
+    );
   }
 }

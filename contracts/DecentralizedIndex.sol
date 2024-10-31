@@ -370,13 +370,13 @@ abstract contract DecentralizedIndex is
   }
 
   /// @notice The ```addLiquidityV2``` function mints new liquidity for the pod
-  /// @param _idxLPTokens Number pTKN to add to liquidity
+  /// @param _pTKNLPTokens Number pTKN to add to liquidity
   /// @param _pairedLPTokens Number of pairedLpToken to add to liquidity
   /// @param _slippage LP slippage with 1000 precision
   /// @param _deadline LP validation deadline
   /// @return _liquidity Number of new liquidity tokens minted
   function addLiquidityV2(
-    uint256 _idxLPTokens,
+    uint256 _pTKNLPTokens,
     uint256 _pairedLPTokens,
     uint256 _slippage, // 100 == 10%, 1000 == 100%
     uint256 _deadline
@@ -384,8 +384,8 @@ abstract contract DecentralizedIndex is
     uint256 _idxTokensBefore = balanceOf(address(this));
     uint256 _pairedBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
 
-    super._transfer(_msgSender(), address(this), _idxLPTokens);
-    _approve(address(this), address(DEX_HANDLER), _idxLPTokens);
+    super._transfer(_msgSender(), address(this), _pTKNLPTokens);
+    _approve(address(this), address(DEX_HANDLER), _pTKNLPTokens);
 
     IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
       _msgSender(),
@@ -403,9 +403,9 @@ abstract contract DecentralizedIndex is
     DEX_HANDLER.addLiquidity(
       address(this),
       PAIRED_LP_TOKEN,
-      _idxLPTokens,
+      _pTKNLPTokens,
       _pairedLPTokens,
-      (_idxLPTokens * (1000 - _slippage)) / 1000,
+      (_pTKNLPTokens * (1000 - _slippage)) / 1000,
       (_pairedLPTokens * (1000 - _slippage)) / 1000,
       _msgSender(),
       _deadline
@@ -426,7 +426,7 @@ abstract contract DecentralizedIndex is
         IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) - _pairedBefore
       );
     }
-    emit AddLiquidity(_msgSender(), _idxLPTokens, _pairedLPTokens);
+    emit AddLiquidity(_msgSender(), _pTKNLPTokens, _pairedLPTokens);
     return
       IERC20(DEX_HANDLER.getV2Pool(address(this), PAIRED_LP_TOKEN)).balanceOf(
         _msgSender()

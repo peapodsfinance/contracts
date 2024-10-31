@@ -335,8 +335,27 @@ contract LendingAssetVault is
     super._transfer(_from, _to, _amount);
   }
 
+  /// @notice The ```depositToVault``` function deposits assets to a specific vault
+  /// @param _vault The vault to deposit assets to
+  /// @param _amountAssets The amount of assets to deposit
+  function depositToVault(
+    address _vault,
+    uint256 _amountAssets
+  ) external onlyOwner {
+    require(_amountAssets > 0);
+    _updateAssetMetadataFromVault(_vault);
+    IERC20(_asset).safeIncreaseAllowance(_vault, _amountAssets);
+    uint256 _amountShares = IERC4626(_vault).deposit(
+      _amountAssets,
+      address(this)
+    );
+    vaultUtilization[_vault] += _amountAssets;
+    _totalAssetsUtilized += _amountAssets;
+    emit DepositToVault(_vault, _amountAssets, _amountShares);
+  }
+
   /// @notice The ```redeemFromVault``` function redeems shares from a specific vault
-  /// @param _vault The address of the vault to redeem from
+  /// @param _vault The vault to redeem shares from
   /// @param _amountShares The amount of shares to redeem (0 for all)
   function redeemFromVault(
     address _vault,
@@ -369,7 +388,7 @@ contract LendingAssetVault is
   }
 
   /// @notice Add or remove a vault from the whitelist
-  /// @param _vault The address of the vault to update
+  /// @param _vault The vault to update
   /// @param _allowed True to add to whitelist, false to remove
   function setVaultWhitelist(address _vault, bool _allowed) external onlyOwner {
     require(vaultWhitelist[_vault] != _allowed, 'T');

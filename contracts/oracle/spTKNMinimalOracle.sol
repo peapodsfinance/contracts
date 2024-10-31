@@ -194,9 +194,9 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     if (BASE_IS_POD) {
       _spTknBasePrice18 = _checkAndHandleBaseTokenPodConfig(_spTknBasePrice18);
     } else if (BASE_IS_FRAX_PAIR) {
-      _spTknBasePrice18 =
-        (_spTknBasePrice18 * _spTknBasePrice18) /
-        IFraxlendPair(BASE_TOKEN).convertToAssets(_spTknBasePrice18);
+      _spTknBasePrice18 = IFraxlendPair(BASE_TOKEN).convertToAssets(
+        _spTknBasePrice18
+      );
     }
   }
 

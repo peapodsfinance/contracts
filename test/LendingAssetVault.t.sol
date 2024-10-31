@@ -2,10 +2,10 @@
 pragma solidity ^0.8.19;
 
 import { Test } from 'forge-std/Test.sol';
+import 'forge-std/console.sol';
 import '../contracts/test/TestERC20.sol';
 import '../contracts/test/TestERC4626Vault.sol';
 import '../contracts/LendingAssetVault.sol';
-import 'forge-std/console.sol';
 
 contract LendingAssetVaultTest is Test {
   TestERC20 _asset;
@@ -286,6 +286,75 @@ contract LendingAssetVaultTest is Test {
 
     vm.expectRevert();
     _lendingAssetVault.redeemFromVault(address(_testVault), _moreThanAvailable);
+  }
+
+  function test_depositToVault() public {
+    uint256 _lavDepAmt = 10e18;
+    uint256 _extDepAmt = _lavDepAmt / 2;
+    _lendingAssetVault.deposit(_lavDepAmt, address(this));
+    address[] memory vaults = new address[](1);
+    vaults[0] = address(_testVault);
+    uint256[] memory percentages = new uint256[](1);
+    percentages[0] = 10000;
+    _lendingAssetVault.setVaultMaxPerc(vaults, percentages);
+
+    uint256 initialVaultUtilization = _lendingAssetVault.vaultUtilization(
+      address(_testVault)
+    );
+    uint256 initialTotalAssetsUtilized = _lendingAssetVault.totalAssets() -
+      _lendingAssetVault.totalAvailableAssets();
+    uint256 initialVaultShares = _testVault.balanceOf(
+      address(_lendingAssetVault)
+    );
+
+    _lendingAssetVault.depositToVault(address(_testVault), _extDepAmt);
+
+    assertEq(
+      _lendingAssetVault.vaultUtilization(address(_testVault)),
+      initialVaultUtilization + _extDepAmt,
+      'Vault utilization should increase'
+    );
+    assertEq(
+      _lendingAssetVault.totalAssets() -
+        _lendingAssetVault.totalAvailableAssets(),
+      initialTotalAssetsUtilized + _extDepAmt,
+      'Total assets utilized should increase'
+    );
+    assertGt(
+      _testVault.balanceOf(address(_lendingAssetVault)),
+      initialVaultShares,
+      'Vault shares should increase'
+    );
+  }
+
+  function test_depositToVault_ZeroAmount() public {
+    uint256 _lavDepAmt = 10e18;
+    _lendingAssetVault.deposit(_lavDepAmt, address(this));
+    address[] memory vaults = new address[](1);
+    vaults[0] = address(_testVault);
+    uint256[] memory percentages = new uint256[](1);
+    percentages[0] = 10000;
+    _lendingAssetVault.setVaultMaxPerc(vaults, percentages);
+
+    vm.expectRevert();
+    _lendingAssetVault.depositToVault(address(_testVault), 0);
+  }
+
+  function test_depositToVault_NotOwner() public {
+    uint256 _lavDepAmt = 10e18;
+    uint256 _extDepAmt = _lavDepAmt / 2;
+    _lendingAssetVault.deposit(_lavDepAmt, address(this));
+    address[] memory vaults = new address[](1);
+    vaults[0] = address(_testVault);
+    uint256[] memory percentages = new uint256[](1);
+    percentages[0] = 10000;
+    _lendingAssetVault.setVaultMaxPerc(vaults, percentages);
+
+    address notOwner = makeAddr('notOwner');
+    vm.startPrank(notOwner);
+    vm.expectRevert('Ownable: caller is not the owner');
+    _lendingAssetVault.depositToVault(address(_testVault), _extDepAmt);
+    vm.stopPrank();
   }
 
   function test_frontrunWhitelistWithdraw() public {
