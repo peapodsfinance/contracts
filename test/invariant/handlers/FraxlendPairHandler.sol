@@ -86,7 +86,7 @@ contract FraxlendPairHandler is Properties {
         cache.fraxAsset = cache.fraxPair.asset();
 
         shares = fl.clamp(shares, 0, cache.fraxPair.convertToShares(IERC20(cache.fraxAsset).balanceOf(cache.user)));
-        cache.assets = cache.fraxPair.convertToAssets(shares);
+        cache.assets = cache.fraxPair.toAssetAmount(shares, true, true);
 
         vm.prank(cache.user);
         IERC20(cache.fraxAsset).approve(address(cache.fraxPair), cache.assets);
@@ -361,7 +361,7 @@ contract FraxlendPairHandler is Properties {
         __beforeLM(address(cache.fraxPair), cache.pod, address(cache.fraxCollateral), address(0));
 
         shares = fl.clamp(shares, 0, cache.fraxPair.userBorrowShares(cache.borrower));
-        cache.amountToRepay = cache.fraxPair.toBorrowAmount(shares, false, true);
+        cache.amountToRepay = cache.fraxPair.toBorrowAmount(shares, true, true);
 
         cache.sharesToBurn = _lendingAssetVault.vaultUtilization(address(cache.fraxPair)) > cache.amountToRepay ? 
         cache.fraxPair.convertToShares(cache.amountToRepay) :

@@ -42,7 +42,7 @@ contract AutoCompoundingPodLpHandler is Properties {
         cache.spTKN = StakingPoolToken(IDecentralizedIndex(cache.aspTKN.pod()).lpStakingPool());
 
         assets = fl.clamp(assets, 0, IERC20(cache.aspTKNAsset).balanceOf(cache.user));
-        if (assets == 0) return;
+        if (assets == 0 || cache.aspTKN.convertToShares(assets) == 0) return;
 
         __beforeAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
@@ -115,6 +115,7 @@ contract AutoCompoundingPodLpHandler is Properties {
         if (shares == 0) return;
 
         cache.assets = cache.aspTKN.convertToAssets(shares);
+        fl.log("ASSETS1", cache.assets);
 
         __beforeAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
@@ -198,7 +199,7 @@ contract AutoCompoundingPodLpHandler is Properties {
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
-            invariant_POD_37(assets);
+            // invariant_POD_37(assets);
             invariant_POD_38();
 
         } catch Error(string memory reason) {

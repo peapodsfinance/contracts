@@ -74,7 +74,7 @@ contract LeverageManagerHandler is Properties {
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
         (cache.podAddress, cache.lendingPair, cache.custodian, , ) = _leverageManager.positionProps(cache.positionId);
         cache.pod = WeightedIndex(payable(cache.podAddress));
-        cache.flashSource = _leverageManager.flashSource(cache.podAddress);
+        cache.flashSource = _leverageManager.flashSource(IFraxlendPair(cache.lendingPair).asset());
         cache.aspTKN = AutoCompoundingPodLp(IFraxlendPair(cache.lendingPair).collateralContract());
 
         __beforeLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
@@ -88,6 +88,8 @@ contract LeverageManagerHandler is Properties {
 
         vm.prank(cache.user);
         cache.pod.approve(address(_leverageManager), podAmount);
+        
+        fl.log("PAIRED LP AMOUNT", IERC20(cache.pod.PAIRED_LP_TOKEN()).balanceOf(IFlashLoanSource(cache.flashSource).source()));
         
         if (pairedLpAmount > IERC20(cache.pod.PAIRED_LP_TOKEN()).balanceOf(IFlashLoanSource(cache.flashSource).source())) return;
 
@@ -202,7 +204,7 @@ contract LeverageManagerHandler is Properties {
         __beforeLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
 
         cache.pod = WeightedIndex(payable(cache.podAddress));
-        cache.flashSource = _leverageManager.flashSource(cache.podAddress);
+        cache.flashSource = _leverageManager.flashSource(IFraxlendPair(cache.lendingPair).asset());
         cache.borrowToken = cache.selfLendingPod != address(0) ? 
             IFraxlendPair(cache.lendingPair).asset()
             : IDecentralizedIndex(cache.podAddress).PAIRED_LP_TOKEN();

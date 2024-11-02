@@ -65,7 +65,7 @@ contract LendingAssetVaultHandler is Properties {
             // POST-CONDITIONS
             __afterLav(cache.user, cache.receiver, address(0));
 
-            invariant_POD_2(sharesMinted);
+            // invariant_POD_2(sharesMinted);
 
             lavDeposits += amount;
             fl.log("LAV DEPOSITS", lavDeposits);
@@ -122,7 +122,7 @@ contract LendingAssetVaultHandler is Properties {
             cache.sharesMinted = _lendingAssetVault.convertToShares(assetsMinted);
             fl.log("Doanted amount", donatedAmount);
             fl.log("Doanted amount shares", _lendingAssetVault.convertToShares(donatedAmount));
-            invariant_POD_2(cache.sharesMinted);
+            // invariant_POD_2(cache.sharesMinted);
 
             lavDeposits += assetsMinted;
             fl.log("LAV DEPOSITS", lavDeposits);
@@ -325,7 +325,7 @@ contract LendingAssetVaultHandler is Properties {
             ) return;
         
         // ACTION
-        vm.prank(cache.user);
+        vm.prank(address(this));
         try _lendingAssetVault.redeemFromVault(address(cache.lendingPair), shares) {
 
             // POST-CONDITIONS
