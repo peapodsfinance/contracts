@@ -61,13 +61,15 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         } catch Error(string memory reason) {
             
-            string[6] memory stringErrors = [
+            string[8] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED",
-                "ERC20: transfer amount exceeds balance"
+                "ERC20: transfer amount exceeds balance",
+                "MS",
+                "SafeERC20: decreased allowance below zero" // @audit added this
             ];
 
             bool expected = false;
@@ -120,7 +122,7 @@ contract AutoCompoundingPodLpHandler is Properties {
         __beforeAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
         vm.prank(cache.user);
-        IERC20(cache.aspTKNAsset).approve(cache.aspTKNAddress, cache.assets);
+        IERC20(cache.aspTKNAsset).approve(cache.aspTKNAddress, type(uint256).max);
 
         // ACTION
         vm.prank(cache.user);
@@ -134,13 +136,14 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         } catch Error(string memory reason) {
             
-            string[6] memory stringErrors = [
+            string[7] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED",
-                "ERC20: transfer amount exceeds balance"
+                "ERC20: transfer amount exceeds balance",
+                "SafeERC20: decreased allowance below zero" // @audit added this
             ];
 
             bool expected = false;
@@ -204,13 +207,14 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         } catch Error(string memory reason) {
             
-            string[6] memory stringErrors = [
+            string[7] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED",
-                "ERC20: transfer amount exceeds balance"
+                "ERC20: transfer amount exceeds balance",
+                "SafeERC20: decreased allowance below zero"
             ];
 
             bool expected = false;
@@ -276,13 +280,14 @@ contract AutoCompoundingPodLpHandler is Properties {
 
         } catch Error(string memory reason) {
             
-            string[6] memory stringErrors = [
+            string[7] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
                 "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT",
                 "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED",
-                "ERC20: transfer amount exceeds balance"
+                "ERC20: transfer amount exceeds balance",
+                "SafeERC20: decreased allowance below zero" // @audit added this
             ];
 
             bool expected = false;

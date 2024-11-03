@@ -962,6 +962,8 @@ contract FuzzSetup is Test, FuzzBase {
         // moving time to help out the twap
         vm.warp(block.timestamp + 1 days);
 
+        _updatePrices(block.timestamp);
+
         emit Message("1aa");
 
         _fraxLPToken1Peas = FraxlendPair(
@@ -1171,16 +1173,16 @@ contract FuzzSetup is Test, FuzzBase {
 
     function _setupActors() internal {
         for (uint256 i; i < users.length; i++) {
-            vm.deal(users[i], 100000 ether);
+            vm.deal(users[i], 1000000 ether);
             vm.prank(users[i]);
-            _weth.deposit{value: 100000 ether}();
+            _weth.deposit{value: 1000000 ether}();
 
-            _tokenA.mint(users[i], 100000 ether);
-            _tokenB.mint(users[i], 100000e6);
-            _tokenC.mint(users[i], 100000 ether);
-            _mockDai.mint(users[i], 100000 ether);
+            _tokenA.mint(users[i], 1000000 ether);
+            _tokenB.mint(users[i], 1000000e6);
+            _tokenC.mint(users[i], 1000000 ether);
+            _mockDai.mint(users[i], 1000000 ether);
 
-            _peas.transfer(users[i], 100000 ether);
+            _peas.transfer(users[i], 1000000 ether);
         }
     }
 
@@ -1299,4 +1301,15 @@ contract FuzzSetup is Test, FuzzBase {
             fl.t(true, "a == b");
         }
     }
+
+    function getPanicCode(bytes memory revertData) internal returns (uint256) {
+    fl.log("REVERT DATA LENGTH", revertData.length);
+    if (revertData.length < 36) return 0;
+
+    uint256 panicCode;
+    assembly {
+        panicCode := mload(add(revertData, 36))
+    }
+    return panicCode;
+}
 }

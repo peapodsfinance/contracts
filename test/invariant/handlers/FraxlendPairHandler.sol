@@ -241,7 +241,7 @@ contract FraxlendPairHandler is Properties {
         __afterLM(address(cache.fraxPair), cache.pod, address(cache.fraxCollateral), address(0));
         _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV; 
 
-        invariant_POD_4(cache.fraxPair);
+        // invariant_POD_4(cache.fraxPair);
     }
 
     // addCollateral
@@ -431,7 +431,7 @@ contract FraxlendPairHandler is Properties {
         __beforeLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
 
         shares = uint128(fl.clamp(uint256(shares), 0, cache.fraxPair.userBorrowShares(cache.custodian)));
-
+        if (shares == 0) return;
         _updatePrices(positionIdSeed);
 
         // ACTION

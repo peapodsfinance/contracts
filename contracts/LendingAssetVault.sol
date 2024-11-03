@@ -256,6 +256,7 @@ contract LendingAssetVault is
         continue;
       }
       IVaultInterestUpdate(_vault).addInterest(false);
+      // assert(false);
       _updateAssetMetadataFromVault(_vault);
     }
   }

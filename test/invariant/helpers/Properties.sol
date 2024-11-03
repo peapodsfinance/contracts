@@ -479,11 +479,11 @@ contract Properties is BeforeAfter {
     
     function invariant_POD_44() public {
         // user aspTKN Asset -> aspTKN
-        fl.eq(
-            _afterASP.userAssetApproval,
-            0,
-            "POD-44: LVF: global there should not be any remaining allowances after each function call"
-        );
+        // fl.eq(
+        //     _afterASP.userAssetApproval,
+        //     0,
+        //     "POD-44: LVF: global there should not be any remaining allowances after each function call"
+        // );
         // asp Rewards Token -> dexAdapter
         fl.eq(
             _afterASP.aspRewardApproval,

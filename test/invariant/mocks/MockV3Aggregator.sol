@@ -77,7 +77,7 @@ contract MockV3Aggregator {
   }
 
   function maxAnswer() external view returns (int192) {
-    return int192(type(uint192).max);
+    return type(int192).max;
   }
 
     function description() external pure returns (string memory) {
