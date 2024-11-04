@@ -3,6 +3,7 @@
 node_modules
 out
 echidna/
+echidna-1/
 cache_forge
 crytic-export
 

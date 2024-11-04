@@ -89,9 +89,7 @@ contract LeverageManagerHandler is Properties {
 
         vm.prank(cache.user);
         cache.pod.approve(address(_leverageManager), podAmount);
-        
-        fl.log("PAIRED LP AMOUNT", IERC20(cache.pod.PAIRED_LP_TOKEN()).balanceOf(IFlashLoanSource(cache.flashSource).source()));
-        
+                
         if (cache.pairedLpAmount > IERC20(cache.pod.PAIRED_LP_TOKEN()).balanceOf(IFlashLoanSource(cache.flashSource).source())) return;
 
         uint256 feeAmount = FullMath.mulDivRoundingUp(cache.pairedLpAmount, 10000, 1e6);
@@ -122,7 +120,7 @@ contract LeverageManagerHandler is Properties {
             (uint256 fraxAssetsLessVault, ) = FraxlendPair(cache.lendingPair).totalAsset();
             _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV;
 
-            // invariant_POD_4(FraxlendPair(cache.lendingPair)); // @audit fails
+            invariant_POD_4(FraxlendPair(cache.lendingPair)); // @audit fails
             invariant_POD_17();
             invariant_POD_18();
             invariant_POD_20();
@@ -147,7 +145,6 @@ contract LeverageManagerHandler is Properties {
             for (uint256 i = 0; i < errors.length; i++) {
                 if (errors[i] == bytes4(err)) {
                     expected = true;
-                    fl.log("EXPECTED", expected);
                     break;
                 }
             }
@@ -270,23 +267,20 @@ contract LeverageManagerHandler is Properties {
             invariant_POD_4(FraxlendPair(cache.lendingPair));
             invariant_POD_16();
             invariant_POD_19();
-            // invariant_POD_23(); // @audit failing
+            invariant_POD_23(); // @audit failing
             invariant_POD_24();
             invariant_POD_25();
             invariant_POD_42(cache.lendingPair);
 
             if (_beforeLM.vaultUtilization > 0) {
                 invariant_POD_6();
-                // invariant_POD_7(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization); // @audit fails
-                // invariant_POD_8(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization); // @audit fails
+                invariant_POD_7(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization); // @audit fails
+                invariant_POD_8(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization); // @audit fails
             }
 
         } catch (bytes memory err) {
             if (getPanicCode(err) == 17) return; // @audit added these
-            // fl.t(false, "TEST");
         } catch Error(string memory reason) {
-
-            // fl.t(false, reason);
             
             string[5] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
@@ -301,7 +295,7 @@ contract LeverageManagerHandler is Properties {
                 if (compareStrings(stringErrors[i], reason)) {
                     expected = true;    
                 } else if (compareStrings(reason, stringErrors[2])) {
-                    // invariant_POD_1(); // @audit failing
+                    invariant_POD_1(); // @audit failing
                 }
             }
             fl.t(expected, reason);

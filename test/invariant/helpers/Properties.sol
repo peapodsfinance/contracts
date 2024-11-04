@@ -138,12 +138,12 @@ contract Properties is BeforeAfter {
     function invariant_POD_14(uint256 assets) internal {
         // LendingAssetVault::donate Post-donation shares shouldn't have increased, 
         // but totalAssets should have by donated amount
-        // assertApproxEq(
-        //     _afterLav.totalSupply,
-        //     _beforeLav.totalSupply,
-        //     1,
-        //     "POD-14a: LendingAssetVault::donate Post-donation shares shouldn't have increased, but totalAssets should have by donated amount"
-        // );
+        assertApproxEq(
+            _afterLav.totalSupply,
+            _beforeLav.totalSupply,
+            1,
+            "POD-14a: LendingAssetVault::donate Post-donation shares shouldn't have increased, but totalAssets should have by donated amount"
+        );
         fl.gte(
             _afterLav.totalAssets,
             _beforeLav.totalAssets + assets,

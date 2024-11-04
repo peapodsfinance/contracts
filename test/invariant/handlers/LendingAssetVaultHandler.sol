@@ -65,10 +65,9 @@ contract LendingAssetVaultHandler is Properties {
             // POST-CONDITIONS
             __afterLav(cache.user, cache.receiver, address(0));
 
-            // invariant_POD_2(sharesMinted);
+            invariant_POD_2(sharesMinted);
 
             lavDeposits += amount;
-            fl.log("LAV DEPOSITS", lavDeposits);
 
         } catch {
             fl.t(false, "LAV DEPOSIT FAILED");
@@ -120,12 +119,10 @@ contract LendingAssetVaultHandler is Properties {
             __afterLav(cache.user, cache.receiver, address(0));
 
             cache.sharesMinted = _lendingAssetVault.convertToShares(assetsMinted);
-            fl.log("Doanted amount", donatedAmount);
-            fl.log("Doanted amount shares", _lendingAssetVault.convertToShares(donatedAmount));
-            // invariant_POD_2(cache.sharesMinted);
+
+            invariant_POD_2(cache.sharesMinted);
 
             lavDeposits += assetsMinted;
-            fl.log("LAV DEPOSITS", lavDeposits);
 
         } catch {
             fl.t(false, "LAV MINT FAILED");
@@ -182,7 +179,6 @@ contract LendingAssetVaultHandler is Properties {
             invariant_POD_13(cache.assets, cache.maxAssets);
 
             lavDeposits -= cache.assets;
-            fl.log("LAV DEPOSITS", lavDeposits);
 
         } catch {
             fl.t(false, "LAV WITHDRAW FAILED");
@@ -237,7 +233,6 @@ contract LendingAssetVaultHandler is Properties {
             invariant_POD_13(assetsWithdrawn, cache.maxAssets);
 
             lavDeposits -= assetsWithdrawn;
-            fl.log("LAV DEPOSITS", lavDeposits);
 
         } catch {
             fl.t(false, "LAV REDEEM FAILED");

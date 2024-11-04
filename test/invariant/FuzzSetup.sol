@@ -458,9 +458,8 @@ contract FuzzSetup is Test, FuzzBase {
 
             // fl.log("TWAP UTILS CODE", code);
             // fl.log("TWAP UTILS CREATION CODE", type(MockV3TwapUtilities).creationCode);
-            // // abi.encodePacked(bytecode, abi.encode(arg1, arg2))
-
-            // fl.t(false, "TEST");
+            // // abi.encodePacked(bytecode, abi.encode(arg1, arg2)) // @audit this was for reference. None of these contracts have constructor args
+            // @audit this is how I've been getting creationCode!!!
 
             _twapUtils = MockV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D);
         } else {
@@ -1191,7 +1190,6 @@ contract FuzzSetup is Test, FuzzBase {
     }
 
     function randomPod(uint256 seed) internal returns (WeightedIndex) {
-        fl.log("POD 1", address(_pods[bound(seed, 0, _pods.length - 1)]));
         return _pods[bound(seed, 0, _pods.length - 1)];
     }
 
