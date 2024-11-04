@@ -116,15 +116,15 @@ contract Properties is BeforeAfter {
         );
     }
 
-    // function invariant_POD_12() public {
-    //     // LendingAssetVault::global total assets == sum(deposits + donations + interest accrued - withdrawals)
-    //     assertApproxEq(
-    //         lavDeposits,
-    //         _lendingAssetVault.totalAssets(),
-    //         1,
-    //         "POD-12: LendingAssetVault::global total assets == sum(deposits + donations + interest accrued - withdrawals)"
-    //     );
-    // }
+    function invariant_POD_12() public {
+        // LendingAssetVault::global total assets == sum(deposits + donations + interest accrued - withdrawals)
+        assertApproxEq(
+            lavDeposits,
+            _lendingAssetVault.totalAssets(),
+            1,
+            "POD-12: LendingAssetVault::global total assets == sum(deposits + donations + interest accrued - withdrawals)"
+        );
+    }
 
     function invariant_POD_13(uint256 actualAmount, uint256 maxAmount) internal {
         // LendingAssetVault::withdraw/redeem User can't withdraw more than their share of total assets
@@ -273,38 +273,38 @@ contract Properties is BeforeAfter {
         );
     }
  
-    // function invariant_POD_26(uint256 fraxlendPairSeed) public {
-    //     // FraxLend: cbr change with one large update == cbr change with multiple, smaller updates
+    function invariant_POD_26(uint256 fraxlendPairSeed) public {
+        // FraxLend: cbr change with one large update == cbr change with multiple, smaller updates
 
-    //     FraxlendPair fraxPair = randomFraxPair(fraxlendPairSeed);
+        FraxlendPair fraxPair = randomFraxPair(fraxlendPairSeed);
 
-    //     uint256 thirtyMinTaBefore = _lendingAssetVault.totalAssets();
-    //     vm.warp(block.timestamp + 30 minutes);
-    //     vm.prank(address(fraxPair));
-    //     _lendingAssetVault.whitelistUpdate(true);
-    //     uint256 thirtyMinTaAfter = _lendingAssetVault.totalAssets();
+        uint256 thirtyMinTaBefore = _lendingAssetVault.totalAssets();
+        vm.warp(block.timestamp + 30 minutes);
+        vm.prank(address(fraxPair));
+        _lendingAssetVault.whitelistUpdate(true);
+        uint256 thirtyMinTaAfter = _lendingAssetVault.totalAssets();
 
-    //     uint256 tenMinTaBefore = _lendingAssetVault.totalAssets();
-    //     vm.warp(block.timestamp + 10 minutes);
-    //     vm.prank(address(fraxPair));
-    //     _lendingAssetVault.whitelistUpdate(true);
+        uint256 tenMinTaBefore = _lendingAssetVault.totalAssets();
+        vm.warp(block.timestamp + 10 minutes);
+        vm.prank(address(fraxPair));
+        _lendingAssetVault.whitelistUpdate(true);
 
-    //     vm.warp(block.timestamp + 10 minutes);
-    //     vm.prank(address(fraxPair));
-    //     _lendingAssetVault.whitelistUpdate(true);
+        vm.warp(block.timestamp + 10 minutes);
+        vm.prank(address(fraxPair));
+        _lendingAssetVault.whitelistUpdate(true);
 
-    //     vm.warp(block.timestamp + 10 minutes);
-    //     vm.prank(address(fraxPair));
-    //     _lendingAssetVault.whitelistUpdate(true);
+        vm.warp(block.timestamp + 10 minutes);
+        vm.prank(address(fraxPair));
+        _lendingAssetVault.whitelistUpdate(true);
 
-    //     uint256 tenMinTaAfter = _lendingAssetVault.totalAssets();
+        uint256 tenMinTaAfter = _lendingAssetVault.totalAssets();
 
-    //     fl.eq(
-    //         thirtyMinTaAfter - thirtyMinTaBefore,
-    //         tenMinTaAfter - tenMinTaBefore,
-    //         "POD-26: FraxLend: cbr change with one large update == cbr change with multiple, smaller updates"
-    //     );
-    // }
+        fl.eq(
+            thirtyMinTaAfter - thirtyMinTaBefore,
+            tenMinTaAfter - tenMinTaBefore,
+            "POD-26: FraxLend: cbr change with one large update == cbr change with multiple, smaller updates"
+        );
+    }
 
     function invariant_POD_27() public {
         // IERC20(pod).balanceOf(leverageManager) == 0, IERC20(pairedLpToken).balanceOf(leverageManager) == 0

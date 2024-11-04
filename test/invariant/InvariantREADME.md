@@ -126,7 +126,6 @@ PATH=./test/invariant/:$PATH echidna test/invariant/PeapodsInvariant.sol --contr
 # Invariants
 | **Invariant ID** | **Invariant Description** | **Passed** | **Remediation** | **Run Count** |
 |:--------------:|:-----|:-----------:|:-----------:|:-----------:|
-| **POD-01** | Insert description here | PASS |  | 10m+
 | **POD-1** |	LeverageManager::_acquireBorrowTokenForRepayment should never Uniswap revert	| ❌ | ❌ | 10m+
 | **POD-2** |	LendingAssetVault::deposit/mint share balance of receiver should increase	| ❌ | ❌ | 10m+
 | **POD-3** |	LendingAssetVault::withdraw/redeem share balance of user should decrease	| ✅ | ✅ | 10m+ 
