@@ -39,11 +39,11 @@ See https://book.getfoundry.sh/reference/forge/forge-test for more info
 
 ```sh
 $ # without verbosity of any kind
-$ forge test --fork-url https://eth.llamarpc.com
+$ forge test --no-match-test invariant --fork-url https://eth.llamarpc.com
 $ # show logs in tests
-$ forge test -vv --fork-url https://eth.llamarpc.com
+$ forge test -vv --no-match-test invariant --fork-url https://eth.llamarpc.com
 $ # full trace of all calls
-$ forge test -vvvv --fork-url https://eth.llamarpc.com
+$ forge test -vvvv --no-match-test invariant --fork-url https://eth.llamarpc.com
 ```
 
 ## Flatten

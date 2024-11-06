@@ -22,11 +22,11 @@ contract ForgeTest is
     setup();
   }
 
-  function test_setup() public {
+  function test_invariant_setup() public {
     assert(true);
   }
 
-  function test_stakingpool_distribute_revert() public {
+  function test_invariant_stakingpool_distribute_revert() public {
     vm.warp(block.timestamp + 300);
     vm.roll(block.number + 998);
     try
@@ -96,7 +96,7 @@ contract ForgeTest is
     aspTKN_deposit(4663194, 0, 1094359, 105214);
   }
 
-  function test_insufficient_input() public {
+  function test_invariant_insufficient_input() public {
     try
       this.pod_bond(
         250157921023061974319881054496296286566727692382981851335645139098026382396,
@@ -147,7 +147,7 @@ contract ForgeTest is
     aspTKN_deposit(111270, 97, 2547, 1080);
   }
 
-  function test_replay_underflow() public {
+  function test_invariant_replay_underflow() public {
     try
       this.pod_bond(
         846478,
@@ -190,7 +190,7 @@ contract ForgeTest is
     );
   }
 
-  function test_replay_liquidate() public {
+  function test_invariant_replay_liquidate() public {
     try
       this.pod_bond(
         63007,
@@ -277,7 +277,7 @@ contract ForgeTest is
     );
   }
 
-  function test_allowance() public {
+  function test_invariant_allowance() public {
     try
       this.pod_bond(
         2455,
@@ -579,7 +579,7 @@ contract ForgeTest is
 
   // }
 
-  function test_staking_distribute_revert_2() public {
+  function test_invariant_staking_distribute_revert_2() public {
     try
       this.pod_bond(
         105884479757225818457661125543805960270998586613234916755531932767203989,
@@ -635,7 +635,7 @@ contract ForgeTest is
     );
   }
 
-  function test_pod_37() public {
+  function test_invariant_pod_37() public {
     try
       this.stakingPoolLp_buyTokens(
         530750800318784861666816782007403530305993069307275981402456526758699,
@@ -679,7 +679,7 @@ contract ForgeTest is
     );
   }
 
-  function test_pod_02() public {
+  function test_invariant_pod_02() public {
     vm.prank(0x0000000000000000000000000000000000010000);
     vm.warp(block.timestamp + 300);
     vm.roll(block.number + 4223);
@@ -887,7 +887,7 @@ contract ForgeTest is
     );
   }
 
-  // function test_underflow_in_repay() public {
+  // function test_invariant_underflow_in_repay() public {
   //     try this.pod_bond(7022049818913187730117533536857775838670993071139783662245094458252062013157,115792089237316195423570985008687907853269984665640564039457584007913129639935,909443620792920291454337328716761112724751128613986465269184108190355383075,43463783436723556015402320338566512858919201445495112352393819244656283733998) {} catch {}
 
   //     try this.pod_addLiquidityV2(14949126567366865455660427194232658325485070114475829205611693930272948513882,62455761731055096511669097430125637864793503665928793051952687757584953327911,51571152111227253860480826982117364960178568893176886959408335681243810679032,34329864147376268547264192633450043674726644031178567023737769278339617756478) {} catch {}
