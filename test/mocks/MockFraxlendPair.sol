@@ -52,9 +52,25 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
     return _userBorrowShares[user];
   }
 
+  function convertToAssets(uint256 shares) external view returns (uint256) {
+    return (shares * _totalBorrow.amount) / _totalBorrow.shares;
+  }
+
   function addInterest(
     bool _returnAccounting
-  ) external override returns (uint256, uint256, uint256, uint64) {
+  )
+    external
+    override
+    returns (
+      uint256,
+      uint256,
+      uint256,
+      CurrentRateInfo memory _currentRateInfo,
+      VaultAccount memory _totalAsset,
+      VaultAccount memory __totalBorrow
+    )
+  {
+    __totalBorrow = _totalBorrow;
     // Simplified implementation for mock purposes
     uint256 interestAmount = _totalBorrow.amount / 100; // 1% interest
     _totalBorrow.amount += uint128(interestAmount);
@@ -65,10 +81,12 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
         interestAmount,
         _totalBorrow.amount,
         _totalBorrow.shares,
-        uint64(block.timestamp)
+        _currentRateInfo,
+        _totalAsset,
+        _totalBorrow
       );
     } else {
-      return (0, 0, 0, 0);
+      return (0, 0, 0, _currentRateInfo, _totalAsset, _totalBorrow);
     }
   }
 

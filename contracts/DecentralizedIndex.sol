@@ -247,7 +247,9 @@ abstract contract DecentralizedIndex is
     if (_amtToProcess == 0 || fees.burn == 0) {
       return;
     }
-    _burn(address(this), (_amtToProcess * fees.burn) / DEN);
+    uint256 _burnAmt = (_amtToProcess * fees.burn) / DEN;
+    _totalSupply -= _burnAmt;
+    _burn(address(this), _burnAmt);
   }
 
   /// @notice The ```_feeSwap``` function processes built up fees by converting to pairedLpToken
@@ -363,17 +365,18 @@ abstract contract DecentralizedIndex is
   /// @notice The ```burn``` function allows any user to burn an amount of their pTKN
   /// @param _amount Number of pTKN to burn
   function burn(uint256 _amount) external lock {
+    _totalSupply -= _amount;
     _burn(_msgSender(), _amount);
   }
 
   /// @notice The ```addLiquidityV2``` function mints new liquidity for the pod
-  /// @param _idxLPTokens Number pTKN to add to liquidity
+  /// @param _pTKNLPTokens Number pTKN to add to liquidity
   /// @param _pairedLPTokens Number of pairedLpToken to add to liquidity
   /// @param _slippage LP slippage with 1000 precision
   /// @param _deadline LP validation deadline
   /// @return _liquidity Number of new liquidity tokens minted
   function addLiquidityV2(
-    uint256 _idxLPTokens,
+    uint256 _pTKNLPTokens,
     uint256 _pairedLPTokens,
     uint256 _slippage, // 100 == 10%, 1000 == 100%
     uint256 _deadline
@@ -381,8 +384,8 @@ abstract contract DecentralizedIndex is
     uint256 _idxTokensBefore = balanceOf(address(this));
     uint256 _pairedBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
 
-    super._transfer(_msgSender(), address(this), _idxLPTokens);
-    _approve(address(this), address(DEX_HANDLER), _idxLPTokens);
+    super._transfer(_msgSender(), address(this), _pTKNLPTokens);
+    _approve(address(this), address(DEX_HANDLER), _pTKNLPTokens);
 
     IERC20(PAIRED_LP_TOKEN).safeTransferFrom(
       _msgSender(),
@@ -400,9 +403,9 @@ abstract contract DecentralizedIndex is
     DEX_HANDLER.addLiquidity(
       address(this),
       PAIRED_LP_TOKEN,
-      _idxLPTokens,
+      _pTKNLPTokens,
       _pairedLPTokens,
-      (_idxLPTokens * (1000 - _slippage)) / 1000,
+      (_pTKNLPTokens * (1000 - _slippage)) / 1000,
       (_pairedLPTokens * (1000 - _slippage)) / 1000,
       _msgSender(),
       _deadline
@@ -423,7 +426,7 @@ abstract contract DecentralizedIndex is
         IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) - _pairedBefore
       );
     }
-    emit AddLiquidity(_msgSender(), _idxLPTokens, _pairedLPTokens);
+    emit AddLiquidity(_msgSender(), _pTKNLPTokens, _pairedLPTokens);
     return
       IERC20(DEX_HANDLER.getV2Pool(address(this), PAIRED_LP_TOKEN)).balanceOf(
         _msgSender()
@@ -511,6 +514,8 @@ abstract contract DecentralizedIndex is
     IFlashLoanRecipient(_recipient).callback(_data);
     // Make sure the calling user pays fee of 0.1% more than they flash minted to recipient
     _burn(_recipient, _amount);
+    // only adjust _totalSupply by fee amt since we didn't add to supply at mint during flash mint
+    _totalSupply -= _fee == 0 ? 1 : _fee;
     _burn(_msgSender(), _fee == 0 ? 1 : _fee);
     _shortCircuitRewards = 0;
     emit FlashMint(_msgSender(), _recipient, _amount);

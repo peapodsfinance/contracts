@@ -15,6 +15,9 @@ import './UniswapDexAdapter.sol';
 contract CamelotDexAdapter is UniswapDexAdapter {
   using SafeERC20 for IERC20;
 
+  IUniswapV2Router02 constant V2_ROUTER_UNI =
+    IUniswapV2Router02(0x02b7D3D5438037D49A25ed15ae34F2d0099494B5);
+
   constructor(
     IV3TwapUtilities _v3TwapUtilities,
     address _v2Router,
@@ -73,6 +76,45 @@ contract CamelotDexAdapter is UniswapDexAdapter {
         block.timestamp
       );
     return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
+  }
+
+  function swapV2SingleExactOut(
+    address _tokenIn,
+    address _tokenOut,
+    uint256 _amountInMax,
+    uint256 _amountOut,
+    address _recipient
+  ) external virtual override returns (uint256 _amountInUsed) {
+    uint256 _inBefore = IERC20(_tokenIn).balanceOf(address(this));
+    if (_amountInMax == 0) {
+      _amountInMax = IERC20(_tokenIn).balanceOf(address(this));
+    } else {
+      IERC20(_tokenIn).safeTransferFrom(
+        _msgSender(),
+        address(this),
+        _amountInMax
+      );
+    }
+    address[] memory _path = new address[](2);
+    _path[0] = _tokenIn;
+    _path[1] = _tokenOut;
+    IERC20(_tokenIn).safeIncreaseAllowance(
+      address(V2_ROUTER_UNI),
+      _amountInMax
+    );
+    V2_ROUTER_UNI.swapTokensForExactTokens(
+      _amountOut,
+      _amountInMax,
+      _path,
+      _recipient,
+      block.timestamp
+    );
+    uint256 _inRemaining = IERC20(_tokenIn).balanceOf(address(this)) -
+      _inBefore;
+    if (_inRemaining > 0) {
+      IERC20(_tokenIn).safeTransfer(_msgSender(), _inRemaining);
+    }
+    _amountInUsed = _amountInMax - _inRemaining;
   }
 
   function swapV3Single(

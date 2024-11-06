@@ -19,7 +19,7 @@ import './interfaces/IV3TwapUtilities.sol';
 contract TokenRewards is ITokenRewards, Context {
   using SafeERC20 for IERC20;
 
-  uint256 constant PRECISION = 10 ** 36;
+  uint256 constant PRECISION = 10 ** 27;
   uint256 constant REWARDS_SWAP_SLIPPAGE = 20; // 2%
   uint24 constant REWARDS_POOL_FEE = 10000; // 1%
   int24 constant REWARDS_TICK_SPACING = 200;
@@ -166,10 +166,11 @@ contract TokenRewards is ITokenRewards, Context {
     // if we want to leave rewards for this pod as the paired LP token without
     // swapping into rewardsToken, simply deposit them here for stakers to claim
     if (LEAVE_AS_PAIRED_LP_TOKEN) {
-      // since we will not execute the burn fee in this case,
-      // we will take 2x the admin fee
-      _adminAmt += _adminAmt;
-      _amountTkn -= _adminAmt;
+      (, uint256 _yieldBurnFee) = _getYieldFees();
+      uint256 _burnAmount = (_amountTkn * _yieldBurnFee) /
+        PROTOCOL_FEE_ROUTER.protocolFees().DEN();
+      _adminAmt += _burnAmount;
+      _amountTkn -= _burnAmount;
       if (_adminAmt > 0) {
         _processAdminFee(_adminAmt);
       }
@@ -251,7 +252,7 @@ contract TokenRewards is ITokenRewards, Context {
     }
 
     uint256 _depositAmount = _amountTotal;
-    if (_token == rewardsToken && !LEAVE_AS_PAIRED_LP_TOKEN) {
+    if (_token == rewardsToken) {
       (, uint256 _yieldBurnFee) = _getYieldFees();
       if (_yieldBurnFee > 0) {
         uint256 _burnAmount = (_amountTotal * _yieldBurnFee) /

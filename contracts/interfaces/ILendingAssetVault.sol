@@ -6,6 +6,8 @@ interface ILendingAssetVault {
 
   event PayBackUsedAssets(address indexed user, uint256 amount);
 
+  event DepositToVault(address indexed vault, uint256 assets, uint256 shares);
+
   event RedeemFromVault(address indexed vault, uint256 shares, uint256 assets);
 
   event SetMaxVaults(uint8 oldMax, uint8 newMax);

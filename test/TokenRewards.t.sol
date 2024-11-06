@@ -103,7 +103,7 @@ contract TokenRewardsTest is Test {
   MockDexAdapter public dexAdapter;
   MockV3TwapUtilities public v3TwapUtilities;
 
-  uint256 constant PRECISION = 10 ** 36;
+  uint256 constant PRECISION = 10 ** 27;
 
   function setUp() public {
     pairedToken = new MockERC20('Paired LP Token', 'PLP');

@@ -434,7 +434,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     } catch {
       IERC20(_pairedLpToken).safeDecreaseAllowance(
         address(DEX_ADAPTER),
-        _pairedRemaining
+        _pairedSwapAmt
       );
       emit AddLpAndStakeV2SwapError(
         _pairedLpToken,
@@ -491,7 +491,12 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
       address(this)
     );
     if (_twoHops) {
-      uint256 _intermediateBal = IERC20(_path[1]).balanceOf(address(this));
+      uint256 _intermediateBal = _amountOut > 0
+        ? _amountOut
+        : IERC20(_path[1]).balanceOf(address(this));
+      if (maxSwap[_path[1]] > 0 && _intermediateBal > maxSwap[_path[1]]) {
+        _intermediateBal = maxSwap[_path[1]];
+      }
       IERC20(_path[1]).safeIncreaseAllowance(
         address(DEX_ADAPTER),
         _intermediateBal
@@ -520,22 +525,20 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
       DEX_ADAPTER.getV2Pool(_t0, _t1)
     );
     uint112 _r = _swapT == _t0 ? _r0 : _r1;
-    emit Message112("_r", _r);
-    emit MessageUint("fullAmt", _fullAmt);
-    emit MessageUint("_sqrt(_fullAmt * (_r * 3988000 + _fullAmt * 3988009))", _sqrt(_fullAmt * (_r * 3988000 + _fullAmt * 3988009)));
-    emit MessageUint("(_fullAmt * 1997)) / 1994", (_fullAmt * 1997) / 1994);
-    return (_sqrt(_r * (_r * 3988009 + _fullAmt * 3988000)) - _r * 1997) / 1994;
-    // return
-    //   (_sqrt(_fullAmt * (_r * 3988000 + _fullAmt * 3988009)) -
-    //     (_fullAmt * 1997)) / 1994;
+    return
+      (_sqrt(_r * (_r * 3988000 + _fullAmt * 3988009)) - (_r * 1997)) / 1994;
   }
 
-  function _sqrt(uint256 x) private returns (uint256 y) {
-    uint256 z = (x + 1) / 2;
-    y = x;
-    while (z < y) {
-      y = z;
-      z = (x / z + z) / 2;
+  function _sqrt(uint256 y) private pure returns (uint256 z) {
+    if (y > 3) {
+      z = y;
+      uint256 x = y / 2 + 1;
+      while (x < z) {
+        z = x;
+        x = (y / x + x) / 2;
+      }
+    } else if (y != 0) {
+      z = 1;
     }
   }
 

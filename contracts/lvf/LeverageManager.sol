@@ -326,9 +326,16 @@ contract LeverageManager is
       (uint256, uint256, uint256)
     );
     address _pod = positionProps[_props.positionId].pod;
+    uint256 _borrowTknAmtToLp = _d.amount;
+    // if there's an open fee send debt/borrow token to protocol
+    if (openFeePerc > 0) {
+      uint256 _openFeeAmt = (_borrowTknAmtToLp * openFeePerc) / 1000;
+      IERC20(_d.token).safeTransfer(owner(), _openFeeAmt);
+      _borrowTknAmtToLp -= _openFeeAmt;
+    }
     (uint256 _pTknAmtUsed, , uint256 _pairedLeftover) = _lpAndStakeInPod(
       _d.token,
-      _d.amount,
+      _borrowTknAmtToLp,
       _props
     );
     _ptknRefundAmt = _props.pTknAmt - _pTknAmtUsed;
@@ -339,19 +346,12 @@ contract LeverageManager is
       _props
     );
 
-    // if there's an open fee send aspTKN generated to protocol
-    address _aspTkn = _getAspTkn(_props.positionId);
-    if (openFeePerc > 0) {
-      uint256 _openFeeAmt = (_aspTknCollateralBal * openFeePerc) / 1000;
-      IERC20(_aspTkn).safeTransfer(owner(), _openFeeAmt);
-      _aspTknCollateralBal -= _openFeeAmt;
-    }
-
     uint256 _flashPaybackAmt = _d.amount + _d.fee;
     uint256 _borrowAmt = _overrideBorrowAmt > _flashPaybackAmt
       ? _overrideBorrowAmt
       : _flashPaybackAmt;
 
+    address _aspTkn = _getAspTkn(_props.positionId);
     IERC20(_aspTkn).safeTransfer(
       positionProps[_props.positionId].custodian,
       _aspTknCollateralBal

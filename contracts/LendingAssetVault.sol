@@ -7,14 +7,24 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './interfaces/ILendingAssetVault.sol';
-import 'forge-std/console.sol';
+import './interfaces/IFraxlendPair.sol';
+import { VaultAccount } from './libraries/VaultAccount.sol';
 
 import '../test/invariant/modules/fraxlend/interfaces/IFraxlendPair.sol';
 
 interface IVaultInterestUpdate {
   function addInterest(
     bool
-  ) external returns (uint256, uint256, uint256, uint64);
+  )
+    external
+    returns (
+      uint256,
+      uint256,
+      uint256,
+      IFraxlendPair.CurrentRateInfo memory,
+      VaultAccount memory,
+      VaultAccount memory
+    );
 }
 
 contract LendingAssetVault is
@@ -42,6 +52,9 @@ contract LendingAssetVault is
   address[] _vaultWhitelistAry;
   // vault address => idx in _vaultWhitelistAry
   mapping(address => uint256) _vaultWhitelistAryIdx;
+
+  bool _lastDepEnabled = true;
+  mapping(address => uint256) _lastDeposit;
 
   modifier onlyWhitelist() {
     require(vaultWhitelist[_msgSender()], 'WL');
@@ -117,6 +130,7 @@ contract LendingAssetVault is
     uint256 _assets,
     address _receiver
   ) external override returns (uint256 _shares) {
+    _updateInterestAndMdInAllVaults(address(0));
     _shares = _deposit(_assets, _receiver);
   }
 
@@ -129,11 +143,10 @@ contract LendingAssetVault is
     address _receiver
   ) internal returns (uint256 _shares) {
     require(_assets != 0, 'M');
-
-    _updateInterestAndMdInAllVaults(address(0));
     _shares = convertToShares(_assets);
     require(_shares != 0, 'MS');
     _totalAssets += _assets;
+    _lastDeposit[_receiver] = block.number;
     _mint(_receiver, _shares);
     IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _assets);
     emit Deposit(_msgSender(), _receiver, _assets, _shares);
@@ -153,6 +166,7 @@ contract LendingAssetVault is
     uint256 _shares,
     address _receiver
   ) external override returns (uint256 _assets) {
+    _updateInterestAndMdInAllVaults(address(0));
     _assets = convertToAssets(_shares);
     _deposit(_assets, _receiver);
   }
@@ -207,14 +221,6 @@ contract LendingAssetVault is
     _withdraw(_shares, _assets, _owner, _msgSender(), _receiver);
   }
 
-  /// @notice Donate assets to the vault without receiving shares
-  /// @param _assetAmt The amount of assets to donate
-  function donate(uint256 _assetAmt) external {
-    uint256 _newShares = _deposit(_assetAmt, address(this));
-    _burn(address(this), _newShares);
-    emit DonateAssets(_msgSender(), _assetAmt, _newShares);
-  }
-
   /// @notice Internal function to handle share withdrawals
   /// @param _shares The amount of shares to withdraw
   /// @param _assets The amount of assets to withdraw
@@ -235,6 +241,7 @@ contract LendingAssetVault is
     _totalAssets -= _assets;
 
     require(_totalAvailable >= _assets, 'AV');
+    require(!_lastDepEnabled || block.number > _lastDeposit[_owner], 'MIN');
     _burn(_owner, _shares);
     IERC20(_asset).safeTransfer(_receiver, _assets);
     emit Withdraw(_owner, _receiver, _receiver, _assets, _shares);
@@ -339,8 +346,36 @@ contract LendingAssetVault is
     emit UpdateAssetMetadataFromVault(_vault);
   }
 
+  function _transfer(
+    address _from,
+    address _to,
+    uint256 _amount
+  ) internal override {
+    _lastDeposit[_to] = block.number;
+    super._transfer(_from, _to, _amount);
+  }
+
+  /// @notice The ```depositToVault``` function deposits assets to a specific vault
+  /// @param _vault The vault to deposit assets to
+  /// @param _amountAssets The amount of assets to deposit
+  function depositToVault(
+    address _vault,
+    uint256 _amountAssets
+  ) external onlyOwner {
+    require(_amountAssets > 0);
+    _updateAssetMetadataFromVault(_vault);
+    IERC20(_asset).safeIncreaseAllowance(_vault, _amountAssets);
+    uint256 _amountShares = IERC4626(_vault).deposit(
+      _amountAssets,
+      address(this)
+    );
+    vaultUtilization[_vault] += _amountAssets;
+    _totalAssetsUtilized += _amountAssets;
+    emit DepositToVault(_vault, _amountAssets, _amountShares);
+  }
+
   /// @notice The ```redeemFromVault``` function redeems shares from a specific vault
-  /// @param _vault The address of the vault to redeem from
+  /// @param _vault The vault to redeem shares from
   /// @param _amountShares The amount of shares to redeem (0 for all)
   function redeemFromVault(
     address _vault,
@@ -373,7 +408,7 @@ contract LendingAssetVault is
   }
 
   /// @notice Add or remove a vault from the whitelist
-  /// @param _vault The address of the vault to update
+  /// @param _vault The vault to update
   /// @param _allowed True to add to whitelist, false to remove
   function setVaultWhitelist(address _vault, bool _allowed) external onlyOwner {
     require(vaultWhitelist[_vault] != _allowed, 'T');
@@ -394,6 +429,11 @@ contract LendingAssetVault is
       delete _vaultWhitelistAryIdx[_vault];
     }
     emit SetVaultWhitelist(_vault, _allowed);
+  }
+
+  function setLastDepEnabled(bool _isEnabled) external onlyOwner {
+    require(_lastDepEnabled != _isEnabled, 'T');
+    _lastDepEnabled = _isEnabled;
   }
 
   /// @notice The ```setVaultMaxPerc``` function sets the maximum amount of vault assets allowed to be allocated to a whitelisted vault

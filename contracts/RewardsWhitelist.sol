@@ -7,6 +7,8 @@ import './interfaces/IRewardsWhitelister.sol';
 contract RewardsWhitelist is IRewardsWhitelister, Ownable {
   uint8 constant MAX = 12;
 
+  mapping(address => bool) public override isWhitelistedFromDebondFee;
+
   mapping(address => bool) public override paused;
   mapping(address => bool) public override whitelist;
   address[] public _whitelistAry;
@@ -19,6 +21,15 @@ contract RewardsWhitelist is IRewardsWhitelister, Ownable {
     returns (address[] memory)
   {
     return _whitelistAry;
+  }
+
+  function setOmitFromDebondFees(
+    address _address,
+    bool _isWhitelisted
+  ) external onlyOwner {
+    require(isWhitelistedFromDebondFee[_address] != _isWhitelisted, 'T');
+    isWhitelistedFromDebondFee[_address] = _isWhitelisted;
+    emit SetOmitFromDebondFees(_address, _isWhitelisted);
   }
 
   function setPaused(address _token, bool _isPaused) external onlyOwner {

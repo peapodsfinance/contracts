@@ -4,7 +4,13 @@ pragma solidity ^0.8.19;
 interface IRewardsWhitelister {
   event PauseToken(address indexed token, bool isPaused);
 
+  event SetOmitFromDebondFees(address addy, bool isWhitelisted);
+
   event ToggleToken(address indexed token, bool isWhitelisted);
+
+  function isWhitelistedFromDebondFee(
+    address addy
+  ) external view returns (bool);
 
   function paused(address token) external view returns (bool);
 

@@ -6,6 +6,8 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '../interfaces/ILendingAssetVault.sol';
+import '../interfaces/IFraxlendPair.sol';
+import { VaultAccount } from '../libraries/VaultAccount.sol';
 
 contract TestERC4626Vault is IERC4626, ERC20, ERC20Permit {
   using SafeERC20 for IERC20;
@@ -23,7 +25,17 @@ contract TestERC4626Vault is IERC4626, ERC20, ERC20Permit {
   // Needed for LendingAssetVault
   function addInterest(
     bool
-  ) external returns (uint256, uint256, uint256, uint64) {}
+  )
+    external
+    returns (
+      uint256,
+      uint256,
+      uint256,
+      IFraxlendPair.CurrentRateInfo memory _currentRateInfo,
+      VaultAccount memory _totalAsset,
+      VaultAccount memory _totalBorrow
+    )
+  {}
 
   function asset() external view override returns (address) {
     return _asset;
