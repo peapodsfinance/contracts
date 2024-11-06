@@ -18,7 +18,7 @@ import './interfaces/IV3TwapUtilities.sol';
 contract TokenRewards is ITokenRewards, Context {
   using SafeERC20 for IERC20;
 
-  uint256 constant PRECISION = 10 ** 36;
+  uint256 constant PRECISION = 10 ** 27;
   uint256 constant REWARDS_SWAP_SLIPPAGE = 20; // 2%
   uint24 constant REWARDS_POOL_FEE = 10000; // 1%
   int24 constant REWARDS_TICK_SPACING = 200;
@@ -251,7 +251,7 @@ contract TokenRewards is ITokenRewards, Context {
     }
 
     uint256 _depositAmount = _amountTotal;
-    if (_token == rewardsToken && !LEAVE_AS_PAIRED_LP_TOKEN) {
+    if (_token == rewardsToken) {
       (, uint256 _yieldBurnFee) = _getYieldFees();
       if (_yieldBurnFee > 0) {
         uint256 _burnAmount = (_amountTotal * _yieldBurnFee) /

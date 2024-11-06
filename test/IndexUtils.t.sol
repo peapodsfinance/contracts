@@ -4,12 +4,14 @@ pragma solidity ^0.8.19;
 import 'forge-std/console.sol';
 import '@openzeppelin/contracts/interfaces/IERC20.sol';
 import '../contracts/IndexUtils.sol';
+import '../contracts/WeightedIndex.sol';
 import '../contracts/interfaces/IDecentralizedIndex.sol';
 import '../contracts/interfaces/IStakingPoolToken.sol';
 import { PodHelperTest } from './helpers/PodHelper.t.sol';
 
 contract IndexUtilsTest is PodHelperTest {
-  address peas = 0x02f92800F57BCD74066F5709F1Daa1A4302Df875;
+  address constant peas = 0x02f92800F57BCD74066F5709F1Daa1A4302Df875;
+  address constant dai = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
   IndexUtils public utils;
 
   function setUp() public override {
@@ -154,6 +156,155 @@ contract IndexUtilsTest is PodHelperTest {
       address(this).balance,
       initialEthBalance,
       'ETH balance should decrease'
+    );
+  }
+
+  function test_bond_SingleAsset() public {
+    // Get a pod with single asset
+    address podToDup = IStakingPoolToken(
+      0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1 // spPDAI
+    ).indexFund();
+    address newPod = _dupPodAndSeedLp(podToDup, address(0), 0, 0);
+    IDecentralizedIndex indexFund = IDecentralizedIndex(newPod);
+
+    // Get the underlying asset
+    IDecentralizedIndex.IndexAssetInfo[] memory assets = indexFund
+      .getAllAssets();
+    address underlyingToken = assets[0].token;
+    uint256 bondAmount = 1e18;
+
+    // Deal tokens and approve
+    deal(underlyingToken, address(this), bondAmount);
+    IERC20(underlyingToken).approve(address(utils), bondAmount);
+
+    // Get initial balances
+    uint256 initialTokenBalance = IERC20(underlyingToken).balanceOf(
+      address(this)
+    );
+    uint256 initialPodBalance = IERC20(address(indexFund)).balanceOf(
+      address(this)
+    );
+
+    // Bond through utils
+    utils.bond(indexFund, underlyingToken, bondAmount, 0);
+
+    // Verify token transfer
+    assertApproxEqAbs(
+      IERC20(underlyingToken).balanceOf(address(this)),
+      initialTokenBalance - bondAmount,
+      1, // 1 wei forgiveness for rounding down
+      'Token balance should decrease by bond amount'
+    );
+
+    // Verify pod tokens received
+    assertGt(
+      IERC20(address(indexFund)).balanceOf(address(this)),
+      initialPodBalance,
+      'Should receive pod tokens'
+    );
+  }
+
+  function test_bond_MultipleAssets() public {
+    // Create a pod with multiple assets
+    address[] memory tokens = new address[](2);
+    tokens[0] = peas;
+    tokens[1] = dai;
+    uint256[] memory weights = new uint256[](2);
+    weights[0] = 50;
+    weights[1] = (weights[0] * 3) / 2;
+
+    IDecentralizedIndex.Config memory config;
+    IDecentralizedIndex.Fees memory fees;
+
+    address newPod = address(
+      new WeightedIndex(
+        'Test Multi',
+        'tMULTI',
+        config,
+        fees,
+        tokens,
+        weights,
+        false,
+        false,
+        _getImmutables(dai, 0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb)
+      )
+    );
+    IDecentralizedIndex indexFund = IDecentralizedIndex(newPod);
+
+    // Setup bond amounts
+    uint256 bondAmount = 1e18;
+
+    // Deal tokens and approve
+    deal(peas, address(this), bondAmount);
+    IERC20(peas).approve(address(utils), bondAmount);
+    deal(dai, address(this), (bondAmount * 3) / 2);
+    IERC20(dai).approve(address(utils), (bondAmount * 3) / 2);
+
+    // Get initial balances
+    uint256 initialPeasBalance = IERC20(peas).balanceOf(address(this));
+    uint256 initialDaiBalance = IERC20(dai).balanceOf(address(this));
+    uint256 initialPodBalance = IERC20(address(indexFund)).balanceOf(
+      address(this)
+    );
+
+    // Bond through utils
+    utils.bond(indexFund, peas, bondAmount, 0);
+
+    // Verify token transfers
+    assertApproxEqAbs(
+      IERC20(peas).balanceOf(address(this)),
+      initialPeasBalance - bondAmount,
+      1, // 1 wei forgiveness for rounding down
+      'PEAS balance should decrease by bond amount'
+    );
+    assertApproxEqAbs(
+      IERC20(dai).balanceOf(address(this)),
+      initialDaiBalance - ((bondAmount * 3) / 2),
+      1, // 1 wei forgiveness for rounding down
+      'DAI balance should decrease by bond amount'
+    );
+
+    // Verify pod tokens received
+    assertGt(
+      IERC20(address(indexFund)).balanceOf(address(this)),
+      initialPodBalance,
+      'Should receive pod tokens'
+    );
+  }
+
+  function test_bond_RefundsExcess() public {
+    // Get a pod with single asset
+    address podToDup = IStakingPoolToken(
+      0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1 // spPDAI
+    ).indexFund();
+    address newPod = _dupPodAndSeedLp(podToDup, address(0), 0, 0);
+    IDecentralizedIndex indexFund = IDecentralizedIndex(newPod);
+
+    // Get the underlying asset
+    IDecentralizedIndex.IndexAssetInfo[] memory assets = indexFund
+      .getAllAssets();
+    address underlyingToken = assets[0].token;
+    uint256 bondAmount = 1e18;
+    uint256 excessAmount = 0.5e18;
+
+    // Deal extra tokens and approve
+    deal(underlyingToken, address(this), bondAmount + excessAmount);
+    IERC20(underlyingToken).approve(address(utils), bondAmount + excessAmount);
+
+    // Get initial balance
+    uint256 initialTokenBalance = IERC20(underlyingToken).balanceOf(
+      address(this)
+    );
+
+    // Bond through utils
+    utils.bond(indexFund, underlyingToken, bondAmount, 0);
+
+    // Verify excess was refunded
+    assertApproxEqAbs(
+      IERC20(underlyingToken).balanceOf(address(this)),
+      initialTokenBalance - bondAmount,
+      1, // 1 wei forgiveness for rounding down
+      'Should only use bondAmount and refund excess'
     );
   }
 

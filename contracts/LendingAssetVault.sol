@@ -7,11 +7,22 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './interfaces/ILendingAssetVault.sol';
+import './interfaces/IFraxlendPair.sol';
+import { VaultAccount } from './libraries/VaultAccount.sol';
 
 interface IVaultInterestUpdate {
   function addInterest(
     bool
-  ) external returns (uint256, uint256, uint256, uint64);
+  )
+    external
+    returns (
+      uint256,
+      uint256,
+      uint256,
+      IFraxlendPair.CurrentRateInfo memory,
+      VaultAccount memory,
+      VaultAccount memory
+    );
 }
 
 contract LendingAssetVault is
@@ -117,6 +128,7 @@ contract LendingAssetVault is
     uint256 _assets,
     address _receiver
   ) external override returns (uint256 _shares) {
+    _updateInterestAndMdInAllVaults(address(0));
     _shares = _deposit(_assets, _receiver);
   }
 
@@ -129,8 +141,6 @@ contract LendingAssetVault is
     address _receiver
   ) internal returns (uint256 _shares) {
     require(_assets != 0, 'M');
-
-    _updateInterestAndMdInAllVaults(address(0));
     _shares = convertToShares(_assets);
     require(_shares != 0, 'MS');
     _totalAssets += _assets;
@@ -154,6 +164,7 @@ contract LendingAssetVault is
     uint256 _shares,
     address _receiver
   ) external override returns (uint256 _assets) {
+    _updateInterestAndMdInAllVaults(address(0));
     _assets = convertToAssets(_shares);
     _deposit(_assets, _receiver);
   }

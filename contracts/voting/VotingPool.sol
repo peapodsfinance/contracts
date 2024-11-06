@@ -10,6 +10,8 @@ import '../TokenRewards.sol';
 contract VotingPool is IVotingPool, ERC20, Ownable {
   using SafeERC20 for IERC20;
 
+  uint256 constant PRECISION = 10 ** 18;
+
   address public immutable override REWARDS;
   uint256 public override lockupPeriod = 7 days;
 
@@ -65,7 +67,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     Stake storage _stake = stakes[_user][_asset];
     uint256 _den = _stake.stakedToOutputDenomenator > 0
       ? _stake.stakedToOutputDenomenator
-      : 1;
+      : PRECISION;
     uint256 _mintedAmtBefore = (_stake.amtStaked *
       _stake.stakedToOutputFactor) / _den;
     _stake.amtStaked += _addAmt;
@@ -110,8 +112,8 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
   function _getConversionFactorAndDenom(
     address _asset
   ) internal view returns (uint256 _factor, uint256 _denom) {
-    _factor = 1;
-    _denom = 1;
+    _factor = PRECISION;
+    _denom = PRECISION;
     if (address(assets[_asset].convFactor) != address(0)) {
       (_factor, _denom) = assets[_asset].convFactor.getConversionFactor(_asset);
     }

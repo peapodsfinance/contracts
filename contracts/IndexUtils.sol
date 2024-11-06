@@ -35,7 +35,7 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
       .getAllAssets();
     uint256[] memory _balsBefore = new uint256[](_assets.length);
 
-    uint256 _tokenCurSupply = IERC20(_token).balanceOf(address(_indexFund));
+    uint256 _tokenCurSupply = _indexFund.totalAssets(_token);
     uint256 _tokenAmtSupplyRatioX96 = _indexFund.totalSupply() == 0
       ? FixedPoint96.Q96
       : (_amount * FixedPoint96.Q96) / _tokenCurSupply;
@@ -43,7 +43,7 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
     for (uint256 _i; _i < _al; _i++) {
       uint256 _amountNeeded = _indexFund.totalSupply() == 0
         ? _indexFund.getInitialAmount(_token, _amount, _assets[_i].token)
-        : (IERC20(_assets[_i].token).balanceOf(address(_indexFund)) *
+        : (_indexFund.totalAssets(_assets[_i].token) *
           _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
       _balsBefore[_i] = IERC20(_assets[_i].token).balanceOf(address(this));
       IERC20(_assets[_i].token).safeTransferFrom(

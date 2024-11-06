@@ -185,6 +185,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     uint256 _basePerSpTkn18 = (2 *
       _avgBaseAssetInLp18 *
       10 ** IERC20Metadata(_pair).decimals()) / IERC20(_pair).totalSupply();
+    require(_basePerSpTkn18 > 0, 'V2R');
     _spTknBasePrice18 = 10 ** (18 * 2) / _basePerSpTkn18;
 
     // if the base asset is a pod, we will assume that the CL/chainlink pool(s) are
