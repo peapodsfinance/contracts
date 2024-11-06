@@ -384,6 +384,10 @@ contract LeverageManager is
     );
   }
 
+  event Debug(string a);
+  event DebugUint(string a, uint256 b);
+  event DebugBool(string a, bool b);
+
   function _removeLeverage(
     bytes memory _userData
   ) internal returns (uint256 _podAmtRemaining, uint256 _borrowAmtRemaining) {
@@ -424,6 +428,8 @@ contract LeverageManager is
       _pairedAssetAmtMin
     );
     _podAmtRemaining = _podAmtReceived;
+
+    emit Debug("HERE");
 
     // redeem borrow asset from lending pair for self lending positions
     if (_isPodSelfLending(_props.positionId)) {
@@ -494,6 +500,10 @@ contract LeverageManager is
     uint256 _userProvidedDebtAmtMax
   ) internal returns (uint256 _podAmtRemaining) {
     _podAmtRemaining = _podAmtReceived;
+
+    emit DebugUint("_repayAmount", _repayAmount);
+    emit DebugUint("_pairedAmtReceived", _pairedAmtReceived);
+
     uint256 _borrowNeeded = _repayAmount - _pairedAmtReceived;
     uint256 _borrowAmtNeededToSwap = _borrowNeeded;
     if (_userProvidedDebtAmtMax > 0) {

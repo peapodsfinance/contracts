@@ -1,6 +1,11 @@
 .DS_Store
 .vscode
 node_modules
+out
+echidna/
+echidna-1/
+cache_forge
+crytic-export
 
 #Hardhat files
 cache
