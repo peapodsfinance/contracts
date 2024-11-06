@@ -24,10 +24,7 @@ contract aspTKNMinimalOracle is spTKNMinimalOracle {
     uint256 _assetFactor = 10 ** 18;
     uint256 _aspTknPerSpTkn = IERC4626(ASP_TKN).convertToShares(_assetFactor);
     (_isBadData, _priceLow, _priceHigh) = super.getPrices();
-    if (_priceLow == 0 && _priceHigh == 0) assert(false);
     _priceLow = (_priceLow * _aspTknPerSpTkn) / _assetFactor;
     _priceHigh = (_priceHigh * _aspTknPerSpTkn) / _assetFactor;
-    if (_priceLow == 0) _priceLow = 1e18;
-    if (_priceHigh == 0) _priceHigh = 1e18;
   }
 }

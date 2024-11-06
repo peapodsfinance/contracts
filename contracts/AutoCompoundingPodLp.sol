@@ -121,8 +121,6 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     _deposit(_assets, _shares, _receiver);
   }
 
-  event Message(string a);
-
   function _deposit(
     uint256 _assets,
     uint256 _shares,
@@ -132,7 +130,6 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     require(_shares != 0, 'MS');
 
     _totalAssets += _assets;
-    emit Message("HERE");
     IERC20(_asset()).safeTransferFrom(_msgSender(), address(this), _assets);
     _mint(_receiver, _shares);
     emit Deposit(_msgSender(), _receiver, _assets, _shares);
@@ -256,7 +253,6 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
       if (_bal == 0) {
         continue;
       }
-      emit MessageUint("amountIn balance", _bal);
       uint256 _newLp = _tokenToPodLp(_token, _bal, 0, _deadline);
       _lpAmtOut += _newLp;
     }
@@ -270,16 +266,13 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     uint256 _amountLpOutMin,
     uint256 _deadline
   ) internal returns (uint256 _lpAmtOut) {
-    emit MessageUint("amountIn tokenToPodLP", _amountIn);
     uint256 _pairedOut = _tokenToPairedLpToken(_token, _amountIn);
-    emit MessageUint("_pairedOut1", _pairedOut);
     if (_pairedOut > 0) {
       uint256 _pairedFee = (_pairedOut * protocolFee) / 1000;
       if (_pairedFee > 0) {
         _protocolFees += _pairedFee;
         _pairedOut -= _pairedFee;
       }
-      emit MessageUint("_pairedOut2", _pairedOut);
       _lpAmtOut = _pairedLpTokenToPodLp(_pairedOut, _deadline);
       require(_lpAmtOut >= _amountLpOutMin, 'M');
     }
@@ -289,14 +282,11 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     address _token,
     uint256 _amountIn
   ) internal returns (uint256 _amountOut) {
-    emit MessageUint("_amountIn token to pairedLpToken", _amountIn);
     address _pairedLpToken = pod.PAIRED_LP_TOKEN();
     address _swapOutputTkn = _pairedLpToken;
     if (_token == _pairedLpToken) {
-      emit Message("HERE IN TOKEN TO PAIRED LP TOKEN");
       return _amountIn;
     } else if (maxSwap[_token] > 0 && _amountIn > maxSwap[_token]) {
-      emit Message("HERE IN TOKEN TO PAIRED LP TOKEN1");
       _amountIn = maxSwap[_token];
     }
 
@@ -335,7 +325,6 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
       )
     returns (uint256 __amountOut) {
       _tokenToPairedSwapAmountInOverride[_rewardsToken][_swapOutputTkn] = 0;
-      emit MessageUint("AMOUNT OUT PAIRELPTOKN", __amountOut);
       _amountOut = __amountOut;
 
       // if this is a self-lending pod, convert the received borrow token
@@ -362,25 +351,18 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
   }
 
-
   function _pairedLpTokenToPodLp(
     uint256 _amountIn,
     uint256 _deadline
   ) internal returns (uint256 _amountOut) {
     address _pairedLpToken = pod.PAIRED_LP_TOKEN();
-    emit Message("HERE");
-    emit MessageUint("amountIn _pairedLpTokenToPodLp", _amountIn);
     uint256 _pairedSwapAmt = _getSwapAmt(
       _pairedLpToken,
       address(pod),
       _pairedLpToken,
       _amountIn
     );
-    emit Message("HERE2");
-    emit MessageUint("_amountIn", _amountIn);
-    emit MessageUint("_pairedSwapAmt", _pairedSwapAmt);
     uint256 _pairedRemaining = _amountIn - _pairedSwapAmt;
-    emit Message("HERE3");
     uint256 _minPtknOut;
     if (address(podOracle) != address(0)) {
       // calculate the min out with 5% slippage
@@ -511,16 +493,13 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
   }
 
-  event MessageUint(string a, uint256 b);
-  event Message112(string a, uint112 b);
-
   // optimal one-sided supply LP: https://blog.alphaventuredao.io/onesideduniswap/
   function _getSwapAmt(
     address _t0,
     address _t1,
     address _swapT,
     uint256 _fullAmt
-  ) internal returns (uint256) {
+  ) internal view returns (uint256) {
     (uint112 _r0, uint112 _r1) = DEX_ADAPTER.getReserves(
       DEX_ADAPTER.getV2Pool(_t0, _t1)
     );
