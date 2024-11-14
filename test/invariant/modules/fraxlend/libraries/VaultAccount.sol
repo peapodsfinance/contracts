@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: ISC
 pragma solidity ^0.8.19;
 
-import { IERC4626Extended } from "../interfaces/IERC4626Extended.sol";
+import {IERC4626Extended} from "../interfaces/IERC4626Extended.sol";
 
 struct VaultAccount {
     uint128 amount; // Total amount, analogous to market cap
@@ -15,7 +15,7 @@ struct VaultAccount {
 library VaultAccountingLibrary {
     function totalAmount(VaultAccount memory total, address vault) internal view returns (uint256 amount) {
         if (vault == address(0)) {
-          return total.amount;
+            return total.amount;
         }
         return total.amount + IERC4626Extended(vault).totalAvailableAssetsForVault(address(this));
     }

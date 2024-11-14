@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-import '../interfaces/IOracleSlippage.sol';
+import "../interfaces/IOracleSlippage.sol";
 
-import 'v3-periphery/base/PeripheryImmutableState.sol';
-import 'v3-periphery/base/BlockTimestamp.sol';
-import 'v3-periphery/libraries/Path.sol';
-import 'v3-periphery/libraries/PoolAddress.sol';
-import 'v3-core/interfaces/IUniswapV3Pool.sol';
-import 'v3-periphery/libraries/OracleLibrary.sol';
+import "v3-periphery/base/PeripheryImmutableState.sol";
+import "v3-periphery/base/BlockTimestamp.sol";
+import "v3-periphery/libraries/Path.sol";
+import "v3-periphery/libraries/PoolAddress.sol";
+import "v3-core/interfaces/IUniswapV3Pool.sol";
+import "v3-periphery/libraries/OracleLibrary.sol";
 
 abstract contract OracleSlippage is IOracleSlippage, PeripheryImmutableState, BlockTimestamp {
     using Path for bytes;
@@ -21,23 +21,23 @@ abstract contract OracleSlippage is IOracleSlippage, PeripheryImmutableState, Bl
     {
         uint16 observationIndex;
         uint16 observationCardinality;
-        (, currentTick, observationIndex, observationCardinality, , , ) = pool.slot0();
+        (, currentTick, observationIndex, observationCardinality,,,) = pool.slot0();
 
         // 2 observations are needed to reliably calculate the block starting tick
-        require(observationCardinality > 1, 'NEO');
+        require(observationCardinality > 1, "NEO");
 
         // If the latest observation occurred in the past, then no tick-changing trades have happened in this block
         // therefore the tick in `slot0` is the same as at the beginning of the current block.
         // We don't need to check if this observation is initialized - it is guaranteed to be.
-        (uint32 observationTimestamp, int56 tickCumulative, , ) = pool.observations(observationIndex);
+        (uint32 observationTimestamp, int56 tickCumulative,,) = pool.observations(observationIndex);
         if (observationTimestamp != uint32(_blockTimestamp())) {
             blockStartingTick = currentTick;
         } else {
             uint256 prevIndex = (uint256(observationIndex) + observationCardinality - 1) % observationCardinality;
-            (uint32 prevObservationTimestamp, int56 prevTickCumulative, , bool prevInitialized) =
+            (uint32 prevObservationTimestamp, int56 prevTickCumulative,, bool prevInitialized) =
                 pool.observations(prevIndex);
 
-            require(prevInitialized, 'ONI');
+            require(prevInitialized, "ONI");
 
             uint32 delta = observationTimestamp - prevObservationTimestamp;
             blockStartingTick = int24((tickCumulative - prevTickCumulative) / int56(int256(uint256(delta))));
@@ -45,11 +45,12 @@ abstract contract OracleSlippage is IOracleSlippage, PeripheryImmutableState, Bl
     }
 
     /// @dev Virtual function to get pool addresses that can be overridden in tests.
-    function getPoolAddress(
-        address tokenA,
-        address tokenB,
-        uint24 fee
-    ) internal view virtual returns (IUniswapV3Pool pool) {
+    function getPoolAddress(address tokenA, address tokenB, uint24 fee)
+        internal
+        view
+        virtual
+        returns (IUniswapV3Pool pool)
+    {
         pool = IUniswapV3Pool(PoolAddress.computeAddress(factory, PoolAddress.getPoolKey(tokenA, tokenB, fee)));
     }
 
@@ -77,8 +78,8 @@ abstract contract OracleSlippage is IOracleSlippage, PeripheryImmutableState, Bl
                 // we optimize for the secondsAgo == 0 case, i.e. since the beginning of the block
                 (averageTick, currentTick) = getBlockStartingAndCurrentTick(pool);
             } else {
-                (averageTick, ) = OracleLibrary.consult(address(pool), secondsAgo);
-                (, currentTick, , , , , ) = IUniswapV3Pool(pool).slot0();
+                (averageTick,) = OracleLibrary.consult(address(pool), secondsAgo);
+                (, currentTick,,,,,) = IUniswapV3Pool(pool).slot0();
             }
 
             if (i == numPools - 1) {
@@ -122,11 +123,11 @@ abstract contract OracleSlippage is IOracleSlippage, PeripheryImmutableState, Bl
     /// average, where the weights are the fraction of the total input amount allocated to each path.
     /// Returned synthetic ticks always represent tokenOut/tokenIn prices, meaning lower ticks are worse.
     /// Paths must all start and end in the same token.
-    function getSyntheticTicks(
-        bytes[] memory paths,
-        uint128[] memory amounts,
-        uint32 secondsAgo
-    ) internal view returns (int256 averageSyntheticAverageTick, int256 averageSyntheticCurrentTick) {
+    function getSyntheticTicks(bytes[] memory paths, uint128[] memory amounts, uint32 secondsAgo)
+        internal
+        view
+        returns (int256 averageSyntheticAverageTick, int256 averageSyntheticCurrentTick)
+    {
         require(paths.length == amounts.length);
 
         OracleLibrary.WeightedTickData[] memory weightedSyntheticAverageTicks =
@@ -147,13 +148,13 @@ abstract contract OracleSlippage is IOracleSlippage, PeripheryImmutableState, Bl
     }
 
     /// @inheritdoc IOracleSlippage
-    function checkOracleSlippage(
-        bytes memory path,
-        uint24 maximumTickDivergence,
-        uint32 secondsAgo
-    ) external view override {
+    function checkOracleSlippage(bytes memory path, uint24 maximumTickDivergence, uint32 secondsAgo)
+        external
+        view
+        override
+    {
         (int256 syntheticAverageTick, int256 syntheticCurrentTick) = getSyntheticTicks(path, secondsAgo);
-        require(syntheticAverageTick - syntheticCurrentTick < int256(uint256(maximumTickDivergence)), 'TD');
+        require(syntheticAverageTick - syntheticCurrentTick < int256(uint256(maximumTickDivergence)), "TD");
     }
 
     /// @inheritdoc IOracleSlippage
@@ -165,6 +166,8 @@ abstract contract OracleSlippage is IOracleSlippage, PeripheryImmutableState, Bl
     ) external view override {
         (int256 averageSyntheticAverageTick, int256 averageSyntheticCurrentTick) =
             getSyntheticTicks(paths, amounts, secondsAgo);
-        require(averageSyntheticAverageTick - averageSyntheticCurrentTick < int256(uint256(maximumTickDivergence)), 'TD');
+        require(
+            averageSyntheticAverageTick - averageSyntheticCurrentTick < int256(uint256(maximumTickDivergence)), "TD"
+        );
     }
 }

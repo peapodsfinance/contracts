@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-import 'v3-periphery/base/PeripheryPayments.sol';
-import 'v3-periphery/libraries/TransferHelper.sol';
+import "v3-periphery/base/PeripheryPayments.sol";
+import "v3-periphery/libraries/TransferHelper.sol";
 
-import '../interfaces/IPeripheryPaymentsExtended.sol';
+import "../interfaces/IPeripheryPaymentsExtended.sol";
 
 abstract contract PeripheryPaymentsExtended is IPeripheryPaymentsExtended, PeripheryPayments {
     /// @inheritdoc IPeripheryPaymentsExtended

@@ -11,14 +11,13 @@ import {FullMath} from "v3-core/libraries/FullMath.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract PodHandler is Properties {
-
     struct BondTemps {
         address user;
         WeightedIndex pod;
         address token;
     }
+
     function pod_bond(uint256 userIndexSeed, uint256 podIndexSeed, uint256 indexTokenSeed, uint256 amount) public {
-        
         // PRE-CONDITIONS
         BondTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
@@ -32,16 +31,13 @@ contract PodHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try cache.pod.bond(
-            cache.token,
-            amount,
-            0
-        ) {} catch {
+        try cache.pod.bond(cache.token, amount, 0) {}
+        catch {
             fl.t(false, "BOND FAILED");
         }
     }
 
-    struct DebondTemps{
+    struct DebondTemps {
         address user;
         WeightedIndex pod;
         address[] array1;
@@ -49,7 +45,6 @@ contract PodHandler is Properties {
     }
 
     function pod_debond(uint256 userIndexSeed, uint256 podIndexSeed, uint256 amount) public {
-        
         // PRE-CONDITIONS
         DebondTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
@@ -62,12 +57,8 @@ contract PodHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try cache.pod.debond(
-            amount,
-            cache.array1,
-            cache.array2
-        ) {
-        } catch (bytes memory lowLevelData) {
+        try cache.pod.debond(amount, cache.array1, cache.array2) {}
+        catch (bytes memory lowLevelData) {
             // If the external call fails with a low-level error
             fl.log("CODE", lowLevelData);
             // fl.t(false, "DEBOND FAILED");
@@ -86,8 +77,7 @@ contract PodHandler is Properties {
         uint256 podIndexSeed,
         uint256 indexLpTokens,
         uint256 pairedLpTokens
-        ) public {
-
+    ) public {
         // PRE-CONDITIONS
         AddLiquidityTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
@@ -97,11 +87,11 @@ contract PodHandler is Properties {
 
         indexLpTokens = fl.clamp(indexLpTokens, 0, cache.pod.balanceOf(cache.user));
 
-        (uint256 reserve0, uint256 reserve1, ) = IUniswapV2Pair(cache.v2Pool).getReserves();
-        
-        address(cache.pod) < cache.pairedLpToken ? 
-        pairedLpTokens = _v2SwapRouter.quote(indexLpTokens, reserve0, reserve1) : 
-        pairedLpTokens = _v2SwapRouter.quote(indexLpTokens, reserve1, reserve0);
+        (uint256 reserve0, uint256 reserve1,) = IUniswapV2Pair(cache.v2Pool).getReserves();
+
+        address(cache.pod) < cache.pairedLpToken
+            ? pairedLpTokens = _v2SwapRouter.quote(indexLpTokens, reserve0, reserve1)
+            : pairedLpTokens = _v2SwapRouter.quote(indexLpTokens, reserve1, reserve0);
 
         if (indexLpTokens < 1000 || IERC20(cache.pairedLpToken).balanceOf(cache.user) < pairedLpTokens) return;
 
@@ -112,21 +102,14 @@ contract PodHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try cache.pod.addLiquidityV2(
-            indexLpTokens,
-            pairedLpTokens,
-            100,
-            block.timestamp
-        ) {} catch Error(string memory reason) {
-            
-            string[1] memory stringErrors = [
-                "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"
-            ];
+        try cache.pod.addLiquidityV2(indexLpTokens, pairedLpTokens, 100, block.timestamp) {}
+        catch Error(string memory reason) {
+            string[1] memory stringErrors = ["UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED"];
 
             bool expected = false;
             for (uint256 i = 0; i < stringErrors.length; i++) {
                 if (compareStrings(stringErrors[i], reason)) {
-                    expected = true;    
+                    expected = true;
                     break;
                 }
             }

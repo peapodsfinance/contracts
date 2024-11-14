@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import 'v3-periphery/interfaces/INonfungiblePositionManager.sol';
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "v3-periphery/interfaces/INonfungiblePositionManager.sol";
 
-import '../interfaces/IApproveAndCall.sol';
-import './ImmutableState.sol';
+import "../interfaces/IApproveAndCall.sol";
+import "./ImmutableState.sol";
 
 /// @title Approve and Call
 /// @notice Allows callers to approve the Uniswap V3 position manager from this contract,
@@ -79,25 +79,24 @@ abstract contract ApproveAndCall is IApproveAndCall, ImmutableState {
 
     /// @inheritdoc IApproveAndCall
     function mint(MintParams calldata params) external payable override returns (bytes memory result) {
-        return
-            callPositionManager(
-                abi.encodeWithSelector(
-                    INonfungiblePositionManager.mint.selector,
-                    INonfungiblePositionManager.MintParams({
-                        token0: params.token0,
-                        token1: params.token1,
-                        fee: params.fee,
-                        tickLower: params.tickLower,
-                        tickUpper: params.tickUpper,
-                        amount0Desired: balanceOf(params.token0),
-                        amount1Desired: balanceOf(params.token1),
-                        amount0Min: params.amount0Min,
-                        amount1Min: params.amount1Min,
-                        recipient: params.recipient,
-                        deadline: type(uint256).max // deadline should be checked via multicall
-                    })
-                )
-            );
+        return callPositionManager(
+            abi.encodeWithSelector(
+                INonfungiblePositionManager.mint.selector,
+                INonfungiblePositionManager.MintParams({
+                    token0: params.token0,
+                    token1: params.token1,
+                    fee: params.fee,
+                    tickLower: params.tickLower,
+                    tickUpper: params.tickUpper,
+                    amount0Desired: balanceOf(params.token0),
+                    amount1Desired: balanceOf(params.token1),
+                    amount0Min: params.amount0Min,
+                    amount1Min: params.amount1Min,
+                    recipient: params.recipient,
+                    deadline: type(uint256).max // deadline should be checked via multicall
+                })
+            )
+        );
     }
 
     /// @inheritdoc IApproveAndCall
@@ -107,19 +106,18 @@ abstract contract ApproveAndCall is IApproveAndCall, ImmutableState {
         override
         returns (bytes memory result)
     {
-        return
-            callPositionManager(
-                abi.encodeWithSelector(
-                    INonfungiblePositionManager.increaseLiquidity.selector,
-                    INonfungiblePositionManager.IncreaseLiquidityParams({
-                        tokenId: params.tokenId,
-                        amount0Desired: balanceOf(params.token0),
-                        amount1Desired: balanceOf(params.token1),
-                        amount0Min: params.amount0Min,
-                        amount1Min: params.amount1Min,
-                        deadline: type(uint256).max // deadline should be checked via multicall
-                    })
-                )
-            );
+        return callPositionManager(
+            abi.encodeWithSelector(
+                INonfungiblePositionManager.increaseLiquidity.selector,
+                INonfungiblePositionManager.IncreaseLiquidityParams({
+                    tokenId: params.tokenId,
+                    amount0Desired: balanceOf(params.token0),
+                    amount1Desired: balanceOf(params.token1),
+                    amount0Min: params.amount0Min,
+                    amount1Min: params.amount1Min,
+                    deadline: type(uint256).max // deadline should be checked via multicall
+                })
+            )
+        );
     }
 }

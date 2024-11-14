@@ -3,5 +3,5 @@ pragma solidity >=0.5.0;
 
 // https://github.com/velodrome-finance/slipstream/blob/main/contracts/core/interfaces/ICLFactory.sol
 interface ICLFactory {
-  function poolImplementation() external view returns (address);
+    function poolImplementation() external view returns (address);
 }

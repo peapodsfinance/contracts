@@ -352,6 +352,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
     event DebugUint(string a, uint256 b);
     event DebugAddress(string a, address b);
     event DebugBool(string a, bool b);
+
     function swapExactTokensForTokensSupportingFeeOnTransferTokens(
         uint256 amountIn,
         uint256 amountOutMin,
@@ -369,7 +370,10 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         emit DebugUint("PATH BALANCE OF TO", IERC20(path[path.length - 1]).balanceOf(to));
         emit DebugUint("BALANCE BEFORE", balanceBefore);
         emit DebugUint("AMOUNT MIN", amountOutMin);
-        emit DebugBool("AMOUNT OUT >= AMOUNT OUT MIN", IERC20(path[path.length - 1]).balanceOf(to).sub(balanceBefore) >= amountOutMin);
+        emit DebugBool(
+            "AMOUNT OUT >= AMOUNT OUT MIN",
+            IERC20(path[path.length - 1]).balanceOf(to).sub(balanceBefore) >= amountOutMin
+        );
         require(
             IERC20(path[path.length - 1]).balanceOf(to).sub(balanceBefore) >= amountOutMin,
             "UniswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT"

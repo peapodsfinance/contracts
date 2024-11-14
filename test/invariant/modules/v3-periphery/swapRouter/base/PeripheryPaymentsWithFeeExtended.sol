@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-import 'v3-periphery/base/PeripheryPaymentsWithFee.sol';
+import "v3-periphery/base/PeripheryPaymentsWithFee.sol";
 
-import '../interfaces/IPeripheryPaymentsWithFeeExtended.sol';
-import './PeripheryPaymentsExtended.sol';
+import "../interfaces/IPeripheryPaymentsWithFeeExtended.sol";
+import "./PeripheryPaymentsExtended.sol";
 
 abstract contract PeripheryPaymentsWithFeeExtended is
     IPeripheryPaymentsWithFeeExtended,
@@ -12,21 +12,20 @@ abstract contract PeripheryPaymentsWithFeeExtended is
     PeripheryPaymentsWithFee
 {
     /// @inheritdoc IPeripheryPaymentsWithFeeExtended
-    function unwrapWETH9WithFee(
-        uint256 amountMinimum,
-        uint256 feeBips,
-        address feeRecipient
-    ) external payable override {
+    function unwrapWETH9WithFee(uint256 amountMinimum, uint256 feeBips, address feeRecipient)
+        external
+        payable
+        override
+    {
         unwrapWETH9WithFee(amountMinimum, msg.sender, feeBips, feeRecipient);
     }
 
     /// @inheritdoc IPeripheryPaymentsWithFeeExtended
-    function sweepTokenWithFee(
-        address token,
-        uint256 amountMinimum,
-        uint256 feeBips,
-        address feeRecipient
-    ) external payable override {
+    function sweepTokenWithFee(address token, uint256 amountMinimum, uint256 feeBips, address feeRecipient)
+        external
+        payable
+        override
+    {
         sweepTokenWithFee(token, amountMinimum, msg.sender, feeBips, feeRecipient);
     }
 }

@@ -13,12 +13,11 @@ library CallbackValidation {
     /// @param tokenB The contract address of the other token
     /// @param fee The fee collected upon every swap in the pool, denominated in hundredths of a bip
     /// @return pool The V3 pool contract address
-    function verifyCallback(
-        address factory,
-        address tokenA,
-        address tokenB,
-        uint24 fee
-    ) internal view returns (IUniswapV3Pool pool) {
+    function verifyCallback(address factory, address tokenA, address tokenB, uint24 fee)
+        internal
+        view
+        returns (IUniswapV3Pool pool)
+    {
         pool = IUniswapV3Pool(IUniswapV3Factory(factory).getPool(tokenA, tokenB, fee));
         require(msg.sender == address(pool));
     }
@@ -27,10 +26,11 @@ library CallbackValidation {
     /// @param factory The contract address of the Uniswap V3 factory
     /// @param poolKey The identifying key of the V3 pool
     /// @return pool The V3 pool contract address
-    function verifyCallback(
-        address factory,
-        PoolAddress.PoolKey memory poolKey
-    ) internal view returns (IUniswapV3Pool pool) {
+    function verifyCallback(address factory, PoolAddress.PoolKey memory poolKey)
+        internal
+        view
+        returns (IUniswapV3Pool pool)
+    {
         pool = IUniswapV3Pool(IUniswapV3Factory(factory).getPool(poolKey.token0, poolKey.token1, poolKey.fee));
         require(msg.sender == address(pool));
     }

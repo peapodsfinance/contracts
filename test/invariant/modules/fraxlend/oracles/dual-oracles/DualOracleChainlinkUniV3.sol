@@ -21,10 +21,10 @@ pragma solidity ^0.8.19;
 
 // ====================================================================
 
-import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import { IStaticOracle } from "@mean-finance/uniswap-v3-oracle/solidity/interfaces/IStaticOracle.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { Timelock2Step } from "../../Timelock2Step.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {IStaticOracle} from "@mean-finance/uniswap-v3-oracle/solidity/interfaces/IStaticOracle.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Timelock2Step} from "../../Timelock2Step.sol";
 
 /// @title DualOracleChainlinkUniV3
 /// @author Drake Evans (Frax Finance) https://github.com/drakeevans
@@ -66,25 +66,21 @@ contract DualOracleChainlinkUniV3 is Timelock2Step {
         address _timelockAddress,
         string memory _name
     ) Timelock2Step() {
-        _setTimelock({ _newTimelock: _timelockAddress });
+        _setTimelock({_newTimelock: _timelockAddress});
 
         BASE_TOKEN = _baseToken;
         QUOTE_TOKEN = _quoteToken;
         CHAINLINK_MULTIPLY_ADDRESS = _chainlinkMultiplyAddress;
         CHAINLINK_DIVIDE_ADDRESS = _chainlinkDivideAddress;
-        uint8 _multiplyDecimals = _chainlinkMultiplyAddress != address(0)
-            ? AggregatorV3Interface(_chainlinkMultiplyAddress).decimals()
-            : 0;
-        uint8 _divideDecimals = _chainlinkDivideAddress != address(0)
-            ? AggregatorV3Interface(_chainlinkDivideAddress).decimals()
-            : 0;
-        CHAINLINK_NORMALIZATION =
-            10 **
-                (18 +
-                    _multiplyDecimals -
-                    _divideDecimals +
-                    IERC20Metadata(_baseToken).decimals() -
-                    IERC20Metadata(_quoteToken).decimals());
+        uint8 _multiplyDecimals =
+            _chainlinkMultiplyAddress != address(0) ? AggregatorV3Interface(_chainlinkMultiplyAddress).decimals() : 0;
+        uint8 _divideDecimals =
+            _chainlinkDivideAddress != address(0) ? AggregatorV3Interface(_chainlinkDivideAddress).decimals() : 0;
+        CHAINLINK_NORMALIZATION = 10
+            ** (
+                18 + _multiplyDecimals - _divideDecimals + IERC20Metadata(_baseToken).decimals()
+                    - IERC20Metadata(_quoteToken).decimals()
+            );
 
         maxOracleDelay = _maxOracleDelay;
 
@@ -108,8 +104,8 @@ contract DualOracleChainlinkUniV3 is Timelock2Step {
         _price = uint256(1e36);
 
         if (CHAINLINK_MULTIPLY_ADDRESS != address(0)) {
-            (, int256 _answer, , uint256 _updatedAt, ) = AggregatorV3Interface(CHAINLINK_MULTIPLY_ADDRESS)
-                .latestRoundData();
+            (, int256 _answer,, uint256 _updatedAt,) =
+                AggregatorV3Interface(CHAINLINK_MULTIPLY_ADDRESS).latestRoundData();
 
             // If data is stale or negative, set bad data to true and return
             if (_answer <= 0 || (block.timestamp - _updatedAt > maxOracleDelay)) {
@@ -120,8 +116,7 @@ contract DualOracleChainlinkUniV3 is Timelock2Step {
         }
 
         if (CHAINLINK_DIVIDE_ADDRESS != address(0)) {
-            (, int256 _answer, , uint256 _updatedAt, ) = AggregatorV3Interface(CHAINLINK_DIVIDE_ADDRESS)
-                .latestRoundData();
+            (, int256 _answer,, uint256 _updatedAt,) = AggregatorV3Interface(CHAINLINK_DIVIDE_ADDRESS).latestRoundData();
 
             // If data is stale or negative, set bad data to true and return
             if (_answer <= 0 || (block.timestamp - _updatedAt > maxOracleDelay)) {
@@ -144,11 +139,7 @@ contract DualOracleChainlinkUniV3 is Timelock2Step {
         address[] memory _pools = new address[](1);
         _pools[0] = UNI_V3_PAIR_ADDRESS;
         uint256 _price1 = IStaticOracle(0xB210CE856631EeEB767eFa666EC7C1C57738d438).quoteSpecificPoolsWithTimePeriod(
-            ORACLE_PRECISION,
-            BASE_TOKEN,
-            QUOTE_TOKEN,
-            _pools,
-            TWAP_DURATION
+            ORACLE_PRECISION, BASE_TOKEN, QUOTE_TOKEN, _pools, TWAP_DURATION
         );
         uint256 _price2;
         (_isBadData, _price2) = _getChainlinkPrice();

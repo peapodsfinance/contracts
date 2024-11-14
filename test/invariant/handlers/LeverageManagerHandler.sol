@@ -25,14 +25,12 @@ import {FraxlendPairConstants} from "../modules/fraxlend/FraxlendPairConstants.s
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract LeverageManagerHandler is Properties {
-
     struct InitPositionTemps {
         address user;
         WeightedIndex pod;
     }
 
     function leverageManager_initializePosition(uint256 userIndexSeed, uint256 podIndexSeed) public {
-
         // PRE-CONDITIONS
         InitPositionTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
@@ -67,35 +65,39 @@ contract LeverageManagerHandler is Properties {
     }
 
     function leverageManager_addLeverage(uint256 positionIdSeed, uint256 podAmount, uint256 pairedLpAmount) public {
-
         // PRE-CONDITIONS
         AddLeverageTemps memory cache;
         cache.positionNFT = _leverageManager.positionNFT();
         cache.positionId = fl.clamp(positionIdSeed, 0, cache.positionNFT.totalSupply());
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
-        (cache.podAddress, cache.lendingPair, cache.custodian, , ) = _leverageManager.positionProps(cache.positionId);
+        (cache.podAddress, cache.lendingPair, cache.custodian,,) = _leverageManager.positionProps(cache.positionId);
         cache.pod = WeightedIndex(payable(cache.podAddress));
         cache.flashSource = _leverageManager.flashSource(IFraxlendPair(cache.lendingPair).asset());
         cache.aspTKN = AutoCompoundingPodLp(IFraxlendPair(cache.lendingPair).collateralContract());
 
-        __beforeLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
+        __beforeLM(
+            cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian
+        );
 
         podAmount = fl.clamp(podAmount, 0, cache.pod.balanceOf(cache.user));
         if (podAmount < 1e14) return;
 
         address lpPair = _uniV2Factory.getPair(cache.podAddress, cache.pod.PAIRED_LP_TOKEN());
-        (uint112 reserve0, uint112 reserve1, ) = IUniswapV2Pair(lpPair).getReserves();
+        (uint112 reserve0, uint112 reserve1,) = IUniswapV2Pair(lpPair).getReserves();
         cache.pairedLpAmount = _v2SwapRouter.quote(podAmount, reserve0, reserve1);
 
         vm.prank(cache.user);
         cache.pod.approve(address(_leverageManager), podAmount);
-                
-        if (cache.pairedLpAmount > IERC20(cache.pod.PAIRED_LP_TOKEN()).balanceOf(IFlashLoanSource(cache.flashSource).source())) return;
+
+        if (
+            cache.pairedLpAmount
+                > IERC20(cache.pod.PAIRED_LP_TOKEN()).balanceOf(IFlashLoanSource(cache.flashSource).source())
+        ) return;
 
         uint256 feeAmount = FullMath.mulDivRoundingUp(cache.pairedLpAmount, 10000, 1e6);
 
         uint256 fraxAssets = FraxlendPair(cache.lendingPair).totalAssets();
-        (, , uint256 fraxBorrows, , ) = IFraxlendPair(cache.lendingPair).getPairAccounting();
+        (,, uint256 fraxBorrows,,) = IFraxlendPair(cache.lendingPair).getPairAccounting();
         if (pairedLpAmount + feeAmount > fraxAssets - fraxBorrows) return;
 
         _updatePrices(positionIdSeed);
@@ -113,12 +115,19 @@ contract LeverageManagerHandler is Properties {
                 cache.pairedLpAmount + feeAmount, // pairedLpAmount + feeAmount,
                 1000,
                 block.timestamp
-            )) {
-            
+            )
+        ) {
             // POST-CONDITIONS
-            __afterLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
-            (uint256 fraxAssetsLessVault, ) = FraxlendPair(cache.lendingPair).totalAsset();
-            _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV;
+            __afterLM(
+                cache.lendingPair,
+                cache.podAddress,
+                IFraxlendPair(cache.lendingPair).collateralContract(),
+                cache.custodian
+            );
+            (uint256 fraxAssetsLessVault,) = FraxlendPair(cache.lendingPair).totalAsset();
+            _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV
+                ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV
+                : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV;
 
             invariant_POD_4(FraxlendPair(cache.lendingPair)); // @audit fails
             invariant_POD_17();
@@ -133,13 +142,10 @@ contract LeverageManagerHandler is Properties {
                 invariant_POD_10((cache.pairedLpAmount + feeAmount) - (fraxAssetsLessVault - fraxBorrows));
                 invariant_POD_11((cache.pairedLpAmount + feeAmount) - (fraxAssetsLessVault - fraxBorrows));
             }
-            
         } catch (bytes memory err) {
-
             if (getPanicCode(err) == 17 || getPanicCode(err) == 18) return; // @audit added these
 
-            bytes4[1] memory errors =
-                [FraxlendPairConstants.Insolvent.selector];
+            bytes4[1] memory errors = [FraxlendPairConstants.Insolvent.selector];
 
             bool expected = false;
             for (uint256 i = 0; i < errors.length; i++) {
@@ -150,7 +156,6 @@ contract LeverageManagerHandler is Properties {
             }
             fl.t(expected, FuzzLibString.getRevertMsg(err));
         } catch Error(string memory reason) {
-            
             string[7] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
@@ -189,80 +194,85 @@ contract LeverageManagerHandler is Properties {
     }
 
     function leverageManager_removeLeverage(
-        uint256 positionIdSeed, 
-        uint256 borrowAssets, 
+        uint256 positionIdSeed,
+        uint256 borrowAssets,
         uint256 collateralAmount,
         uint256 userDebtRepay
-        ) public {
-
+    ) public {
         // PRE-CONDITIONS
         RemoveLeverageTemps memory cache;
         cache.positionNFT = _leverageManager.positionNFT();
         cache.positionId = fl.clamp(positionIdSeed, 0, cache.positionNFT.totalSupply());
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
-        (cache.podAddress, cache.lendingPair, cache.custodian, , cache.selfLendingPod) = _leverageManager.positionProps(cache.positionId);
+        (cache.podAddress, cache.lendingPair, cache.custodian,, cache.selfLendingPod) =
+            _leverageManager.positionProps(cache.positionId);
 
         // I don't think flash is accounting for interest to be added???
         FraxlendPair(cache.lendingPair).addInterest(false);
 
-        __beforeLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
+        __beforeLM(
+            cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian
+        );
 
         cache.pod = WeightedIndex(payable(cache.podAddress));
         cache.flashSource = _leverageManager.flashSource(IFraxlendPair(cache.lendingPair).asset());
-        cache.borrowToken = cache.selfLendingPod != address(0) ? 
-            IFraxlendPair(cache.lendingPair).asset()
+        cache.borrowToken = cache.selfLendingPod != address(0)
+            ? IFraxlendPair(cache.lendingPair).asset()
             : IDecentralizedIndex(cache.podAddress).PAIRED_LP_TOKEN();
 
-        (cache.interestEarned, , , , , ) = FraxlendPair(cache.lendingPair).previewAddInterest();
+        (cache.interestEarned,,,,,) = FraxlendPair(cache.lendingPair).previewAddInterest();
 
-        // borrowAssets starts as shares, will change to assets here in a sec 
+        // borrowAssets starts as shares, will change to assets here in a sec
         borrowAssets = fl.clamp(borrowAssets, 0, IFraxlendPair(cache.lendingPair).userBorrowShares(cache.custodian));
         cache.repayShares = borrowAssets;
-        borrowAssets = VaultAccountingLibrary.toAmount(IFraxlendPair(cache.lendingPair).totalBorrow(), borrowAssets + cache.interestEarned, true);
+        borrowAssets = VaultAccountingLibrary.toAmount(
+            IFraxlendPair(cache.lendingPair).totalBorrow(), borrowAssets + cache.interestEarned, true
+        );
 
-        cache.sharesToBurn = _lendingAssetVault.vaultUtilization(cache.lendingPair) > borrowAssets ? 
-        FraxlendPair(cache.lendingPair).convertToShares(borrowAssets) :
-        FraxlendPair(cache.lendingPair).convertToShares(_lendingAssetVault.vaultUtilization(cache.lendingPair));
-        
+        cache.sharesToBurn = _lendingAssetVault.vaultUtilization(cache.lendingPair) > borrowAssets
+            ? FraxlendPair(cache.lendingPair).convertToShares(borrowAssets)
+            : FraxlendPair(cache.lendingPair).convertToShares(_lendingAssetVault.vaultUtilization(cache.lendingPair));
+
         uint256 feeAmount = FullMath.mulDivRoundingUp(borrowAssets, 10000, 1e6);
 
-        collateralAmount = fl.clamp(collateralAmount, 0, IFraxlendPair(cache.lendingPair).userCollateralBalance(cache.custodian));
+        collateralAmount =
+            fl.clamp(collateralAmount, 0, IFraxlendPair(cache.lendingPair).userCollateralBalance(cache.custodian));
         userDebtRepay = fl.clamp(userDebtRepay, 0, IERC20(cache.borrowToken).balanceOf(cache.user));
 
         if (
-            borrowAssets <= 1000 || 
-            collateralAmount <= 1000 ||
-            cache.sharesToBurn > IERC20(cache.lendingPair).balanceOf(address(_lendingAssetVault)) ||
-            borrowAssets > IERC20(IFraxlendPair(cache.lendingPair).asset()).balanceOf(cache.lendingPair) ||
-            borrowAssets > IERC20(cache.borrowToken).balanceOf(UniswapV3FlashSource(cache.flashSource).source())
-            ) return;
+            borrowAssets <= 1000 || collateralAmount <= 1000
+                || cache.sharesToBurn > IERC20(cache.lendingPair).balanceOf(address(_lendingAssetVault))
+                || borrowAssets > IERC20(IFraxlendPair(cache.lendingPair).asset()).balanceOf(cache.lendingPair)
+                || borrowAssets > IERC20(cache.borrowToken).balanceOf(UniswapV3FlashSource(cache.flashSource).source())
+        ) return;
 
-        if (!_solventCheckAfterRepay(
-            cache.custodian,
-            cache.lendingPair,
-            IFraxlendPair(cache.lendingPair).userBorrowShares(cache.custodian),
-            cache.repayShares,
-            IFraxlendPair(cache.lendingPair).userCollateralBalance(cache.custodian) - collateralAmount
-        )) return;
+        if (
+            !_solventCheckAfterRepay(
+                cache.custodian,
+                cache.lendingPair,
+                IFraxlendPair(cache.lendingPair).userBorrowShares(cache.custodian),
+                cache.repayShares,
+                IFraxlendPair(cache.lendingPair).userCollateralBalance(cache.custodian) - collateralAmount
+            )
+        ) return;
 
         vm.prank(cache.user);
-        IERC20(cache.borrowToken).approve(address(_leverageManager), borrowAssets+ feeAmount);
+        IERC20(cache.borrowToken).approve(address(_leverageManager), borrowAssets + feeAmount);
 
         // ACTION
         vm.prank(cache.user);
-        try _leverageManager.removeLeverage(
-            cache.positionId,
-            borrowAssets,
-            collateralAmount,
-            0,
-            0,
-            userDebtRepay
-        ) {
-
+        try _leverageManager.removeLeverage(cache.positionId, borrowAssets, collateralAmount, 0, 0, userDebtRepay) {
             // POST-CONDITIONS
-            __afterLM(cache.lendingPair, cache.podAddress, IFraxlendPair(cache.lendingPair).collateralContract(), cache.custodian);
-            
-            _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV; 
+            __afterLM(
+                cache.lendingPair,
+                cache.podAddress,
+                IFraxlendPair(cache.lendingPair).collateralContract(),
+                cache.custodian
+            );
+
+            _afterLM.totalAssetsLAV > _beforeLM.totalAssetsLAV
+                ? lavDeposits += _afterLM.totalAssetsLAV - _beforeLM.totalAssetsLAV
+                : lavDeposits -= _beforeLM.totalAssetsLAV - _afterLM.totalAssetsLAV;
 
             invariant_POD_4(FraxlendPair(cache.lendingPair));
             invariant_POD_16();
@@ -277,11 +287,9 @@ contract LeverageManagerHandler is Properties {
                 invariant_POD_7(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization); // @audit fails
                 invariant_POD_8(_beforeLM.vaultUtilization > borrowAssets ? borrowAssets : _beforeLM.vaultUtilization); // @audit fails
             }
-
         } catch (bytes memory err) {
             if (getPanicCode(err) == 17) return; // @audit added these
         } catch Error(string memory reason) {
-            
             string[5] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
@@ -293,7 +301,7 @@ contract LeverageManagerHandler is Properties {
             bool expected = false;
             for (uint256 i = 0; i < stringErrors.length; i++) {
                 if (compareStrings(stringErrors[i], reason)) {
-                    expected = true;    
+                    expected = true;
                 } else if (compareStrings(reason, stringErrors[2])) {
                     invariant_POD_1(); // @audit failing
                 }
@@ -308,13 +316,16 @@ contract LeverageManagerHandler is Properties {
         uint256 sharesAvailable,
         uint256 repayShares,
         uint256 _collateralAmount
-        ) internal returns (bool isSolvent) {
-        ( , , , , uint256 highExchangeRate) = FraxlendPair(lendingPair).exchangeRateInfo();
+    ) internal returns (bool isSolvent) {
+        (,,,, uint256 highExchangeRate) = FraxlendPair(lendingPair).exchangeRateInfo();
 
         uint256 sharesAfterRepay = sharesAvailable - repayShares;
 
         isSolvent = true;
-        uint256 _ltv = (((sharesAfterRepay * highExchangeRate) / FraxlendPair(lendingPair).EXCHANGE_PRECISION()) * FraxlendPair(lendingPair).LTV_PRECISION()) / _collateralAmount;
+        uint256 _ltv = (
+            ((sharesAfterRepay * highExchangeRate) / FraxlendPair(lendingPair).EXCHANGE_PRECISION())
+                * FraxlendPair(lendingPair).LTV_PRECISION()
+        ) / _collateralAmount;
         isSolvent = _ltv <= FraxlendPair(lendingPair).maxLTV();
     }
 }

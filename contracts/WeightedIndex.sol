@@ -3,308 +3,202 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
-import './interfaces/IUniswapV2Pair.sol';
-import './interfaces/IV3TwapUtilities.sol';
-import './DecentralizedIndex.sol';
+import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
+import "./interfaces/IUniswapV2Pair.sol";
+import "./interfaces/IV3TwapUtilities.sol";
+import "./DecentralizedIndex.sol";
 
 contract WeightedIndex is DecentralizedIndex {
-  using SafeERC20 for IERC20;
+    using SafeERC20 for IERC20;
 
-  uint256 _totalWeights;
+    uint256 _totalWeights;
 
-  constructor(
-    string memory _name,
-    string memory _symbol,
-    Config memory _config,
-    Fees memory _fees,
-    address[] memory _tokens,
-    uint256[] memory _weights,
-    bool _stakeRestriction,
-    bool _leaveRewardsAsPairedLp,
-    bytes memory _immutables
-  )
-    DecentralizedIndex(
-      _name,
-      _symbol,
-      IndexType.WEIGHTED,
-      _config,
-      _fees,
-      _stakeRestriction,
-      _leaveRewardsAsPairedLp,
-      _immutables
+    /// @notice The ```constructor``` initializes a new WeightedIndex pod
+    /// @param _name The name of the ERC20 token of the pod
+    /// @param _symbol The symbol/ticker of the ERC20 token of the pod
+    /// @param _config A struct containing some pod-level, one off configuration for the pod
+    /// @param _fees A struct holding all pod-level fees
+    /// @param _tokens The ERC20 token addresses that make up the pod
+    /// @param _weights The weights that each ERC20 token makes up in the pod, defined by token amount
+    /// @param _stakeRestriction If present, only he pod creator can add LP and stake in the pod
+    /// @param _leaveRewardsAsPairedLp If present, don't convert rewards to rewardsToken, leave and be claimable as pairedLpToken
+    /// @param _immutables A number of immutable options/addresses to help the pod function properly on the current network, see DecentralizedIndex for unpacking info
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        Config memory _config,
+        Fees memory _fees,
+        address[] memory _tokens,
+        uint256[] memory _weights,
+        bool _stakeRestriction,
+        bool _leaveRewardsAsPairedLp,
+        bytes memory _immutables
     )
-  {
-    require(_tokens.length == _weights.length, 'V');
-    uint256 _tl = _tokens.length;
-    for (uint8 _i; _i < _tl; _i++) {
-      require(!_isTokenInIndex[_tokens[_i]], 'D');
-      require(_weights[_i] > 0, 'W');
-      indexTokens.push(
-        IndexAssetInfo({
-          token: _tokens[_i],
-          basePriceUSDX96: 0,
-          weighting: _weights[_i],
-          c1: address(0),
-          q1: 0 // amountsPerIdxTokenX96
-        })
-      );
-      _totalWeights += _weights[_i];
-      _fundTokenIdx[_tokens[_i]] = _i;
-      _isTokenInIndex[_tokens[_i]] = true;
+        DecentralizedIndex(
+            _name,
+            _symbol,
+            IndexType.WEIGHTED,
+            _config,
+            _fees,
+            _stakeRestriction,
+            _leaveRewardsAsPairedLp,
+            _immutables
+        )
+    {
+        require(_tokens.length == _weights.length, "V");
+        uint256 _tl = _tokens.length;
+        for (uint8 _i; _i < _tl; _i++) {
+            require(!_isTokenInIndex[_tokens[_i]], "D");
+            require(_weights[_i] > 0, "W");
+            indexTokens.push(
+                IndexAssetInfo({
+                    token: _tokens[_i],
+                    basePriceUSDX96: 0,
+                    weighting: _weights[_i],
+                    c1: address(0),
+                    q1: 0 // amountsPerIdxTokenX96
+                })
+            );
+            _totalWeights += _weights[_i];
+            _fundTokenIdx[_tokens[_i]] = _i;
+            _isTokenInIndex[_tokens[_i]] = true;
 
-      (address _pairedLpToken, , , , , , address _dexAdapter) = abi.decode(
-        _immutables,
-        (address, address, address, address, address, address, address)
-      );
-      if (_config.blacklistTKNpTKNPoolV2 && _tokens[_i] != _pairedLpToken) {
-        address _blkPool = IDexAdapter(_dexAdapter).createV2Pool(
-          address(this),
-          _tokens[_i]
-        );
-        _blacklist[_blkPool] = true;
-      }
+            (address _pairedLpToken,,,,,, address _dexAdapter) =
+                abi.decode(_immutables, (address, address, address, address, address, address, address));
+            if (_config.blacklistTKNpTKNPoolV2 && _tokens[_i] != _pairedLpToken) {
+                address _blkPool = IDexAdapter(_dexAdapter).createV2Pool(address(this), _tokens[_i]);
+                _blacklist[_blkPool] = true;
+            }
+        }
+        // at idx == 0, need to find X in [1/X = tokenWeightAtIdx/totalWeights]
+        // at idx > 0, need to find Y in (Y/X = tokenWeightAtIdx/totalWeights)
+        uint256 _xX96 = (FixedPoint96.Q96 * _totalWeights) / _weights[0];
+        for (uint256 _i; _i < _tl; _i++) {
+            indexTokens[_i].q1 = (_weights[_i] * _xX96 * 10 ** IERC20Metadata(_tokens[_i]).decimals()) / _totalWeights;
+        }
     }
-    // at idx == 0, need to find X in [1/X = tokenWeightAtIdx/totalWeights]
-    // at idx > 0, need to find Y in (Y/X = tokenWeightAtIdx/totalWeights)
-    uint256 _xX96 = (FixedPoint96.Q96 * _totalWeights) / _weights[0];
-    for (uint256 _i; _i < _tl; _i++) {
-      indexTokens[_i].q1 =
-        (_weights[_i] * _xX96 * 10 ** IERC20Metadata(_tokens[_i]).decimals()) /
-        _totalWeights;
+
+    /// @notice The ```totalAssets``` function returns the number of assets for the first underlying TKN in the pod
+    /// @return _totalManagedAssets Number of TKN[0] currently in the pod
+    function totalAssets() public view override returns (uint256 _totalManagedAssets) {
+        _totalManagedAssets = _totalAssets[indexTokens[0].token];
     }
-  }
 
-  /// @notice The ```_getNativePriceUSDX96``` function gets an *unsafe* native tkn (ETH) price from a UniswapV2 pool
-  /// @return _priceX96 USD/native price scaled by Q96
-  function _getNativePriceUSDX96() internal view returns (uint256) {
-    IUniswapV2Pair _nativeStablePool = IUniswapV2Pair(
-      DEX_HANDLER.getV2Pool(DAI, WETH)
-    );
-    address _token0 = _nativeStablePool.token0();
-    (uint8 _decimals0, uint8 _decimals1) = (
-      IERC20Metadata(_token0).decimals(),
-      IERC20Metadata(_nativeStablePool.token1()).decimals()
-    );
-    (uint112 _res0, uint112 _res1, ) = _nativeStablePool.getReserves();
-    return
-      _token0 == DAI
-        ? (FixedPoint96.Q96 * _res0 * 10 ** _decimals1) /
-          _res1 /
-          10 ** _decimals0
-        : (FixedPoint96.Q96 * _res1 * 10 ** _decimals0) /
-          _res0 /
-          10 ** _decimals1;
-  }
-
-  /// @notice The ```_getTokenPriceUSDX96``` function gets an *unsafe* tkn price from a UniswapV2 pool
-  /// @param _token token we're getting the price for
-  /// @return _priceX96 USD/TKN price scaled by Q96
-  function _getTokenPriceUSDX96(
-    address _token
-  ) internal view returns (uint256) {
-    if (_token == WETH) {
-      return _getNativePriceUSDX96();
+    /// @notice The ```totalAssets``` function returns the number of assets for the specified TKN in the pod
+    /// @param _asset The asset we're querying for the total managed assets
+    /// @return _totalManagedAssets Number of tkns currently in the pod
+    function totalAssets(address _asset) public view override returns (uint256 _totalManagedAssets) {
+        _totalManagedAssets = _totalAssets[_asset];
     }
-    IUniswapV2Pair _pool = IUniswapV2Pair(DEX_HANDLER.getV2Pool(_token, WETH));
-    address _token0 = _pool.token0();
-    uint8 _decimals0 = IERC20Metadata(_token0).decimals();
-    uint8 _decimals1 = IERC20Metadata(_pool.token1()).decimals();
-    (uint112 _res0, uint112 _res1, ) = _pool.getReserves();
-    uint256 _nativePriceUSDX96 = _getNativePriceUSDX96();
-    return
-      _token0 == WETH
-        ? (_nativePriceUSDX96 * _res0 * 10 ** _decimals1) /
-          _res1 /
-          10 ** _decimals0
-        : (_nativePriceUSDX96 * _res1 * 10 ** _decimals0) /
-          _res0 /
-          10 ** _decimals1;
-  }
 
-  /// @notice The ```totalAssets``` function returns the number of assets for the first underlying TKN in the pod
-  /// @return _totalManagedAssets Number of TKN[0] currently in the pod
-  function totalAssets()
-    public
-    view
-    override
-    returns (uint256 _totalManagedAssets)
-  {
-    _totalManagedAssets = _totalAssets[indexTokens[0].token];
-  }
-
-  /// @notice The ```totalAssets``` function returns the number of assets for the specified TKN in the pod
-  /// @param _asset The asset we're querying for the total managed assets
-  /// @return _totalManagedAssets Number of tkns currently in the pod
-  function totalAssets(
-    address _asset
-  ) public view override returns (uint256 _totalManagedAssets) {
-    _totalManagedAssets = _totalAssets[_asset];
-  }
-
-  /// @notice The ```convertToShares``` function returns the number of pTKN minted based on _assets TKN excluding fees
-  /// @param _assets Number of underlying TKN[0] to determine how many pTKNs to be minted
-  /// @return _shares Number of pTKN to be minted
-  function convertToShares(
-    uint256 _assets
-  ) external view override returns (uint256 _shares) {
-    bool _firstIn = _isFirstIn();
-    uint256 _tokenAmtSupplyRatioX96 = _firstIn
-      ? FixedPoint96.Q96
-      : (_assets * FixedPoint96.Q96) / _totalAssets[indexTokens[0].token];
-    if (_firstIn) {
-      _shares =
-        (_assets * FixedPoint96.Q96 * 10 ** decimals()) /
-        indexTokens[0].q1;
-    } else {
-      _shares = (_totalSupply * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+    /// @notice The ```convertToShares``` function returns the number of pTKN minted based on _assets TKN excluding fees
+    /// @param _assets Number of underlying TKN[0] to determine how many pTKNs to be minted
+    /// @return _shares Number of pTKN to be minted
+    function convertToShares(uint256 _assets) external view override returns (uint256 _shares) {
+        bool _firstIn = _isFirstIn();
+        uint256 _tokenAmtSupplyRatioX96 =
+            _firstIn ? FixedPoint96.Q96 : (_assets * FixedPoint96.Q96) / _totalAssets[indexTokens[0].token];
+        if (_firstIn) {
+            _shares = (_assets * FixedPoint96.Q96 * 10 ** decimals()) / indexTokens[0].q1;
+        } else {
+            _shares = (_totalSupply * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+        }
     }
-  }
 
-  /// @notice The ```convertToAssets``` function returns the number of TKN returned based on burning _shares pTKN excluding fees
-  /// @param _shares Number of pTKN to burn
-  /// @return _assets Number of TKN[0] to be returned to user from pod
-  function convertToAssets(
-    uint256 _shares
-  ) external view override returns (uint256 _assets) {
-    bool _firstIn = _isFirstIn();
-    uint256 _percSharesX96_2 = _firstIn
-      ? 2 ** (96 / 2)
-      : (_shares * 2 ** (96 / 2)) / _totalSupply;
-    if (_firstIn) {
-      _assets =
-        (indexTokens[0].q1 * _percSharesX96_2) /
-        FixedPoint96.Q96 /
-        2 ** (96 / 2);
-    } else {
-      _assets =
-        (_totalAssets[indexTokens[0].token] * _percSharesX96_2) /
-        2 ** (96 / 2);
+    /// @notice The ```convertToAssets``` function returns the number of TKN returned based on burning _shares pTKN excluding fees
+    /// @param _shares Number of pTKN to burn
+    /// @return _assets Number of TKN[0] to be returned to user from pod
+    function convertToAssets(uint256 _shares) external view override returns (uint256 _assets) {
+        bool _firstIn = _isFirstIn();
+        uint256 _percSharesX96_2 = _firstIn ? 2 ** (96 / 2) : (_shares * 2 ** (96 / 2)) / _totalSupply;
+        if (_firstIn) {
+            _assets = (indexTokens[0].q1 * _percSharesX96_2) / FixedPoint96.Q96 / 2 ** (96 / 2);
+        } else {
+            _assets = (_totalAssets[indexTokens[0].token] * _percSharesX96_2) / 2 ** (96 / 2);
+        }
     }
-  }
 
-  /// @notice The ```bond``` function wraps a user into a pod and mints new pTKN
-  /// @param _token The token used to calculate the amount of pTKN minted
-  /// @param _amount Number of _tokens used to wrap into the pod
-  /// @param _amountMintMin Number of pTKN minimum that should be minted (slippage)
-  function bond(
-    address _token,
-    uint256 _amount,
-    uint256 _amountMintMin
-  ) external override lock noSwapOrFee {
-    _bond(_token, _amount, _amountMintMin, _msgSender());
-  }
-
-  function _bond(
-    address _token,
-    uint256 _amount,
-    uint256 _amountMintMin,
-    address _user
-  ) internal {
-    require(_isTokenInIndex[_token], 'IT');
-    uint256 _tokenIdx = _fundTokenIdx[_token];
-
-    bool _firstIn = _isFirstIn();
-    uint256 _tokenAmtSupplyRatioX96 = _firstIn
-      ? FixedPoint96.Q96
-      : (_amount * FixedPoint96.Q96) / _totalAssets[_token];
-    uint256 _tokensMinted;
-    if (_firstIn) {
-      _tokensMinted =
-        (_amount * FixedPoint96.Q96 * 10 ** decimals()) /
-        indexTokens[_tokenIdx].q1;
-    } else {
-      _tokensMinted =
-        (_totalSupply * _tokenAmtSupplyRatioX96) /
-        FixedPoint96.Q96;
+    /// @notice The ```bond``` function wraps a user into a pod and mints new pTKN
+    /// @param _token The token used to calculate the amount of pTKN minted
+    /// @param _amount Number of _tokens used to wrap into the pod
+    /// @param _amountMintMin Number of pTKN minimum that should be minted (slippage)
+    function bond(address _token, uint256 _amount, uint256 _amountMintMin) external override lock noSwapOrFee {
+        _bond(_token, _amount, _amountMintMin, _msgSender());
     }
-    uint256 _feeTokens = _canWrapFeeFree(_user)
-      ? 0
-      : (_tokensMinted * fees.bond) / DEN;
-    require(_tokensMinted - _feeTokens >= _amountMintMin, 'M');
-    _totalSupply += _tokensMinted;
-    _mint(_user, _tokensMinted - _feeTokens);
-    if (_feeTokens > 0) {
-      _mint(address(this), _feeTokens);
-      _processBurnFee(_feeTokens);
-    }
-    uint256 _il = indexTokens.length;
-    for (uint256 _i; _i < _il; _i++) {
-      uint256 _transferAmt = _firstIn
-        ? getInitialAmount(_token, _amount, indexTokens[_i].token)
-        : (_totalAssets[indexTokens[_i].token] * _tokenAmtSupplyRatioX96) /
-          FixedPoint96.Q96;
-      _totalAssets[indexTokens[_i].token] += _transferAmt;
-      _transferFromAndValidate(
-        IERC20(indexTokens[_i].token),
-        _user,
-        _transferAmt
-      );
-    }
-    _internalBond();
-    emit Bond(_user, _token, _amount, _tokensMinted);
-  }
 
-  /// @notice The ```debond``` function unwraps a user out of a pod and burns pTKN
-  /// @param _amount Number of pTKN to burn
-  function debond(
-    uint256 _amount,
-    address[] memory,
-    uint8[] memory
-  ) external override lock noSwapOrFee {
-    uint256 _amountAfterFee = _isLastOut(_amount) ||
-      REWARDS_WHITELIST.isWhitelistedFromDebondFee(_msgSender())
-      ? _amount
-      : (_amount * (DEN - fees.debond)) / DEN;
-    uint256 _percSharesX96 = (_amountAfterFee * FixedPoint96.Q96) /
-      _totalSupply;
-    super._transfer(_msgSender(), address(this), _amount);
-    _totalSupply -= _amountAfterFee;
-    _burn(address(this), _amountAfterFee);
-    _processBurnFee(_amount - _amountAfterFee);
-    uint256 _il = indexTokens.length;
-    for (uint256 _i; _i < _il; _i++) {
-      uint256 _debondAmount = (_totalAssets[indexTokens[_i].token] *
-        _percSharesX96) / FixedPoint96.Q96;
-      if (_debondAmount > 0) {
-        _totalAssets[indexTokens[_i].token] -= _debondAmount;
-        IERC20(indexTokens[_i].token).safeTransfer(_msgSender(), _debondAmount);
-      }
+    function _bond(address _token, uint256 _amount, uint256 _amountMintMin, address _user) internal {
+        require(_isTokenInIndex[_token], "IT");
+        uint256 _tokenIdx = _fundTokenIdx[_token];
+
+        bool _firstIn = _isFirstIn();
+        uint256 _tokenAmtSupplyRatioX96 =
+            _firstIn ? FixedPoint96.Q96 : (_amount * FixedPoint96.Q96) / _totalAssets[_token];
+        uint256 _tokensMinted;
+        if (_firstIn) {
+            _tokensMinted = (_amount * FixedPoint96.Q96 * 10 ** decimals()) / indexTokens[_tokenIdx].q1;
+        } else {
+            _tokensMinted = (_totalSupply * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+        }
+        uint256 _feeTokens = _canWrapFeeFree(_user) ? 0 : (_tokensMinted * fees.bond) / DEN;
+        require(_tokensMinted - _feeTokens >= _amountMintMin, "M");
+        _totalSupply += _tokensMinted;
+        _mint(_user, _tokensMinted - _feeTokens);
+        if (_feeTokens > 0) {
+            _mint(address(this), _feeTokens);
+            _processBurnFee(_feeTokens);
+        }
+        uint256 _il = indexTokens.length;
+        for (uint256 _i; _i < _il; _i++) {
+            uint256 _transferAmt = _firstIn
+                ? getInitialAmount(_token, _amount, indexTokens[_i].token)
+                : (_totalAssets[indexTokens[_i].token] * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+            _totalAssets[indexTokens[_i].token] += _transferAmt;
+            _transferFromAndValidate(IERC20(indexTokens[_i].token), _user, _transferAmt);
+        }
+        _internalBond();
+        emit Bond(_user, _token, _amount, _tokensMinted);
     }
-    // an arbitrage path of buy pTKN > debond > sell TKN does not trigger rewards
-    // so let's trigger processing here at debond to keep things moving along
-    _processPreSwapFeesAndSwap();
-    emit Debond(_msgSender(), _amount);
-  }
 
-  /// @notice The ```getInitialAmount``` function determines the initial amount of TKN2 needed
-  /// @notice based on an amount of TKN1 to wrap with. After an initial bond, vault share takes over
-  /// @param _sourceToken TKN we're referencing
-  /// @param _sourceAmount Amount of TKN we're referencing
-  /// @param _targetToken Target TKN we will return the amount that is needed
-  /// @return _amtTargetTkn Amount of _targetToken needed to wrap with
-  function getInitialAmount(
-    address _sourceToken,
-    uint256 _sourceAmount,
-    address _targetToken
-  ) public view override returns (uint256) {
-    uint256 _sourceTokenIdx = _fundTokenIdx[_sourceToken];
-    uint256 _targetTokenIdx = _fundTokenIdx[_targetToken];
-    return
-      (_sourceAmount *
-        indexTokens[_targetTokenIdx].weighting *
-        10 ** IERC20Metadata(_targetToken).decimals()) /
-      indexTokens[_sourceTokenIdx].weighting /
-      10 ** IERC20Metadata(_sourceToken).decimals();
-  }
+    /// @notice The ```debond``` function unwraps a user out of a pod and burns pTKN
+    /// @param _amount Number of pTKN to burn
+    function debond(uint256 _amount, address[] memory, uint8[] memory) external override lock noSwapOrFee {
+        uint256 _amountAfterFee = _isLastOut(_amount) || REWARDS_WHITELIST.isWhitelistedFromDebondFee(_msgSender())
+            ? _amount
+            : (_amount * (DEN - fees.debond)) / DEN;
+        uint256 _percSharesX96 = (_amountAfterFee * FixedPoint96.Q96) / _totalSupply;
+        super._transfer(_msgSender(), address(this), _amount);
+        _totalSupply -= _amountAfterFee;
+        _burn(address(this), _amountAfterFee);
+        _processBurnFee(_amount - _amountAfterFee);
+        uint256 _il = indexTokens.length;
+        for (uint256 _i; _i < _il; _i++) {
+            uint256 _debondAmount = (_totalAssets[indexTokens[_i].token] * _percSharesX96) / FixedPoint96.Q96;
+            if (_debondAmount > 0) {
+                _totalAssets[indexTokens[_i].token] -= _debondAmount;
+                IERC20(indexTokens[_i].token).safeTransfer(_msgSender(), _debondAmount);
+            }
+        }
+        // an arbitrage path of buy pTKN > debond > sell TKN does not trigger rewards
+        // so let's trigger processing here at debond to keep things moving along
+        _processPreSwapFeesAndSwap();
+        emit Debond(_msgSender(), _amount);
+    }
 
-  /// @notice The ```getTokenPriceUSDX96``` function is an external version of _getTokenPriceUSDX96, which gets an *unsafe* tkn price from a UniswapV2 pool
-  /// @notice This is used as a frontend helper but is NOT safe to be used as an oracle.
-  /// @param _token token we're getting the price for
-  /// @return _priceX96 USD/TKN price scaled by Q96
-  function getTokenPriceUSDX96(
-    address _token
-  ) external view override returns (uint256) {
-    return _getTokenPriceUSDX96(_token);
-  }
+    /// @notice The ```getInitialAmount``` function determines the initial amount of TKN2 needed
+    /// @notice based on an amount of TKN1 to wrap with. After an initial bond, vault share takes over
+    /// @param _sourceToken TKN we're referencing
+    /// @param _sourceAmount Amount of TKN we're referencing
+    /// @param _targetToken Target TKN we will return the amount that is needed
+    /// @return _amtTargetTkn Amount of _targetToken needed to wrap with
+    function getInitialAmount(address _sourceToken, uint256 _sourceAmount, address _targetToken)
+        public
+        view
+        override
+        returns (uint256)
+    {
+        uint256 _sourceTokenIdx = _fundTokenIdx[_sourceToken];
+        uint256 _targetTokenIdx = _fundTokenIdx[_targetToken];
+        return (_sourceAmount * indexTokens[_targetTokenIdx].weighting * 10 ** IERC20Metadata(_targetToken).decimals())
+            / indexTokens[_sourceTokenIdx].weighting / 10 ** IERC20Metadata(_sourceToken).decimals();
+    }
 }

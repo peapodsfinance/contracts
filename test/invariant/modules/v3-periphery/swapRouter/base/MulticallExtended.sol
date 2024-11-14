@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-import 'v3-periphery/base/Multicall.sol';
+import "v3-periphery/base/Multicall.sol";
 
-import '../interfaces/IMulticallExtended.sol';
-import '../base/PeripheryValidationExtended.sol';
+import "../interfaces/IMulticallExtended.sol";
+import "../base/PeripheryValidationExtended.sol";
 
 /// @title Multicall
 /// @notice Enables calling multiple methods in a single call to the contract

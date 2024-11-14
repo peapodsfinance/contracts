@@ -2,7 +2,5 @@
 pragma solidity ^0.8.19;
 
 interface IStakingConversionFactor {
-  function getConversionFactor(
-    address asset
-  ) external view returns (uint256 factor, uint256 denomenator);
+    function getConversionFactor(address asset) external view returns (uint256 factor, uint256 denomenator);
 }

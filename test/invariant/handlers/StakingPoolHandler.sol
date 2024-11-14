@@ -20,7 +20,6 @@ import {FraxlendPair} from "../modules/fraxlend/FraxlendPair.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract StakingPoolHandler is Properties {
-
     struct StakeTemps {
         address user;
         address stakingPool;
@@ -28,12 +27,7 @@ contract StakingPoolHandler is Properties {
         WeightedIndex pod;
     }
 
-    function stakingPool_stake(
-        uint256 userIndexSeed,
-        uint256 podIndexSeed,
-        uint256 amount
-    ) public {
-
+    function stakingPool_stake(uint256 userIndexSeed, uint256 podIndexSeed, uint256 amount) public {
         // PRE-CONDITIONS
         StakeTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
@@ -49,7 +43,8 @@ contract StakingPoolHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try StakingPoolToken(cache.stakingPool).stake(cache.user, amount) {} catch {
+        try StakingPoolToken(cache.stakingPool).stake(cache.user, amount) {}
+        catch {
             // fl.t(false, "STAKE FAILED");
         }
     }

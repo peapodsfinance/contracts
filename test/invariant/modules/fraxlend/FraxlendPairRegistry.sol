@@ -22,8 +22,8 @@ pragma solidity ^0.8.19;
 
 // ====================================================================
 
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 contract FraxlendPairRegistry is Ownable2Step {
     /// @notice addresses of deployers allowed to add to the registry

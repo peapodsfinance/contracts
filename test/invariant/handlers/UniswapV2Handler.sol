@@ -34,12 +34,9 @@ contract UniswapV2Handler is Properties {
         address to;
     }
 
-    function stakingPoolLp_buyTokens(
-        uint256 podIndexSeed,
-        uint256 fromIndexSeed,
-        uint256 toIndexSeed,
-        uint256 amountIn
-    ) public {
+    function stakingPoolLp_buyTokens(uint256 podIndexSeed, uint256 fromIndexSeed, uint256 toIndexSeed, uint256 amountIn)
+        public
+    {
         // PRE-CONDITIONS
         BuyTokenTemps memory cache;
         cache.pod = randomPod(podIndexSeed);
@@ -61,7 +58,7 @@ contract UniswapV2Handler is Properties {
         vm.prank(cache.from);
         _v2SwapRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
             amountIn, 0, path, cache.to, block.timestamp
-         );
+        );
     }
 
     // Trading pod token for staking pool token
@@ -132,7 +129,7 @@ contract UniswapV2Handler is Properties {
 
         amount1Desired = fl.clamp(amount1Desired, 1e14, cache.pod.balanceOf(cache.from));
 
-        (cache.reserve0, cache.reserve1, ) = cache.pair.getReserves();
+        (cache.reserve0, cache.reserve1,) = cache.pair.getReserves();
 
         if (cache.reserve0 == 0 || cache.reserve1 == 0) return;
 
@@ -182,7 +179,7 @@ contract UniswapV2Handler is Properties {
         if (cache.pair.balanceOf(cache.from) < 1e14) return;
         liquidity = fl.clamp(liquidity, 1e14, cache.pair.balanceOf(cache.from));
 
-        (cache.reserve0, cache.reserve1, ) = cache.pair.getReserves();
+        (cache.reserve0, cache.reserve1,) = cache.pair.getReserves();
         if (cache.reserve0 == 0 || cache.reserve1 == 0) return;
 
         cache.pairBalanceToken0 = cache.pod.balanceOf(address(cache.pair));
@@ -196,9 +193,7 @@ contract UniswapV2Handler is Properties {
 
         // ACTION
         vm.prank(cache.from);
-        _v2SwapRouter.removeLiquidity(
-            cache.pairedToken, address(cache.pod), liquidity, 0, 0, cache.to, block.timestamp
-        );
+        _v2SwapRouter.removeLiquidity(cache.pairedToken, address(cache.pod), liquidity, 0, 0, cache.to, block.timestamp);
     }
 
     struct SyncTemps {
@@ -225,12 +220,9 @@ contract UniswapV2Handler is Properties {
         address token;
     }
 
-    function stakingPoolLp_donate(
-        uint256 podIndexSeed,
-        uint256 fromIndexSeed,
-        uint256 toIndexSeed,
-        uint256 amount
-    ) public {
+    function stakingPoolLp_donate(uint256 podIndexSeed, uint256 fromIndexSeed, uint256 toIndexSeed, uint256 amount)
+        public
+    {
         // PRE-CONDITIONS
         DonateLPTemps memory cache;
         cache.pod = randomPod(podIndexSeed);

@@ -16,13 +16,15 @@ pragma solidity ^0.8.19;
 // Reviewers
 // Dennis: https://github.com/denett
 // ====================================================================
-import { Ownable2Step, Ownable } from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import { Timelock2Step } from "./Timelock2Step.sol";
-import { FraxlendPairAccessControlErrors } from "./FraxlendPairAccessControlErrors.sol";
-import { IERC4626Extended } from './interfaces/IERC4626Extended.sol';
+
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Timelock2Step} from "./Timelock2Step.sol";
+import {FraxlendPairAccessControlErrors} from "./FraxlendPairAccessControlErrors.sol";
+import {IERC4626Extended} from "./interfaces/IERC4626Extended.sol";
 /// @title FraxlendPairAccessControl
 /// @author Drake Evans (Frax Finance) https://github.com/drakeevans
 /// @notice  An abstract contract which contains the access control logic for FraxlendPair
+
 abstract contract FraxlendPairAccessControl is Timelock2Step, Ownable2Step, FraxlendPairAccessControlErrors {
     // Deployer
     address public immutable DEPLOYER_ADDRESS;
@@ -44,12 +46,11 @@ abstract contract FraxlendPairAccessControl is Timelock2Step, Ownable2Step, Frax
     bool public isInterestPaused;
     bool public isInterestAccessControlRevoked;
     /// @param _immutables abi.encode(address _circuitBreakerAddress, address _comptrollerAddress, address _timelockAddress)
+
     constructor(bytes memory _immutables) Timelock2Step() Ownable2Step() {
         // Handle Immutables Configuration
-        (address _circuitBreakerAddress, address _comptrollerAddress, address _timelockAddress) = abi.decode(
-            _immutables,
-            (address, address, address)
-        );
+        (address _circuitBreakerAddress, address _comptrollerAddress, address _timelockAddress) =
+            abi.decode(_immutables, (address, address, address));
         _setTimelock(_timelockAddress);
         _transferOwnership(_comptrollerAddress);
         // Deployer contract
@@ -59,16 +60,16 @@ abstract contract FraxlendPairAccessControl is Timelock2Step, Ownable2Step, Frax
     // ============================================================================================
     // Functions: Access Control
     // ============================================================================================
+
     function _requireProtocolOrOwner() internal view {
         if (
-            msg.sender != circuitBreakerAddress &&
-            msg.sender != owner() &&
-            msg.sender != DEPLOYER_ADDRESS &&
-            msg.sender != timelockAddress
+            msg.sender != circuitBreakerAddress && msg.sender != owner() && msg.sender != DEPLOYER_ADDRESS
+                && msg.sender != timelockAddress
         ) {
             revert OnlyProtocolOrOwner();
         }
     }
+
     function _requireTimelockOrOwner() internal view {
         if (msg.sender != owner() && msg.sender != timelockAddress) {
             revert OnlyTimelockOrOwner();
@@ -88,6 +89,7 @@ abstract contract FraxlendPairAccessControl is Timelock2Step, Ownable2Step, Frax
     /// @notice The ```SetBorrowLimit``` event is emitted when the borrow limit is set
     /// @param limit The new borrow limit
     event SetBorrowLimit(uint256 limit);
+
     function _setBorrowLimit(uint256 _limit) internal {
         borrowLimit = _limit;
         emit SetBorrowLimit(_limit);
@@ -106,6 +108,7 @@ abstract contract FraxlendPairAccessControl is Timelock2Step, Ownable2Step, Frax
     /// @notice The ```SetDepositLimit``` event is emitted when the deposit limit is set
     /// @param limit The new deposit limit
     event SetDepositLimit(uint256 limit);
+
     function _setDepositLimit(uint256 _limit) internal {
         depositLimit = _limit;
         emit SetDepositLimit(_limit);
@@ -122,6 +125,7 @@ abstract contract FraxlendPairAccessControl is Timelock2Step, Ownable2Step, Frax
     /// @notice The ```PauseRepay``` event is emitted when repay is paused or unpaused
     /// @param isPaused The new paused state
     event PauseRepay(bool isPaused);
+
     function _pauseRepay(bool _isPaused) internal {
         isRepayPaused = _isPaused;
         emit PauseRepay(_isPaused);
@@ -138,6 +142,7 @@ abstract contract FraxlendPairAccessControl is Timelock2Step, Ownable2Step, Frax
     /// @notice The ```PauseWithdraw``` event is emitted when withdraw is paused or unpaused
     /// @param isPaused The new paused state
     event PauseWithdraw(bool isPaused);
+
     function _pauseWithdraw(bool _isPaused) internal {
         isWithdrawPaused = _isPaused;
         emit PauseWithdraw(_isPaused);
@@ -154,6 +159,7 @@ abstract contract FraxlendPairAccessControl is Timelock2Step, Ownable2Step, Frax
     /// @notice The ```PauseLiquidate``` event is emitted when liquidate is paused or unpaused
     /// @param isPaused The new paused state
     event PauseLiquidate(bool isPaused);
+
     function _pauseLiquidate(bool _isPaused) internal {
         isLiquidatePaused = _isPaused;
         emit PauseLiquidate(_isPaused);
@@ -170,12 +176,15 @@ abstract contract FraxlendPairAccessControl is Timelock2Step, Ownable2Step, Frax
     /// @notice The ```PauseInterest``` event is emitted when interest is paused or unpaused
     /// @param isPaused The new paused state
     event PauseInterest(bool isPaused);
+
     function _pauseInterest(bool _isPaused) internal {
         isInterestPaused = _isPaused;
         emit PauseInterest(_isPaused);
     }
     /// @notice The ```SetExternalAssetVault``` event is emitted when the external vault account is changed
+
     event SetExternalAssetVault(address oldVault, address newVault);
+
     function _setExternalAssetVault(IERC4626Extended vault) internal {
         IERC4626Extended _oldVault = externalAssetVault;
         externalAssetVault = vault;

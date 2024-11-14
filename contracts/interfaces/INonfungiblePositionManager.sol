@@ -2,16 +2,14 @@
 pragma solidity ^0.8.19;
 
 interface INonfungiblePositionManager {
-  struct CollectParams {
-    uint256 tokenId;
-    address recipient;
-    uint128 amount0Max;
-    uint128 amount1Max;
-  }
+    struct CollectParams {
+        uint256 tokenId;
+        address recipient;
+        uint128 amount0Max;
+        uint128 amount1Max;
+    }
 
-  function collect(
-    CollectParams calldata params
-  ) external payable returns (uint256 amount0, uint256 amount1);
+    function collect(CollectParams calldata params) external payable returns (uint256 amount0, uint256 amount1);
 
-  function transferFrom(address from, address to, uint256 tokenId) external;
+    function transferFrom(address from, address to, uint256 tokenId) external;
 }

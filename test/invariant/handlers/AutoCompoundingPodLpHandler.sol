@@ -20,7 +20,6 @@ import {FraxlendPair} from "../modules/fraxlend/FraxlendPair.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract AutoCompoundingPodLpHandler is Properties {
-
     struct DepositTemps {
         address user;
         address receiver;
@@ -30,8 +29,9 @@ contract AutoCompoundingPodLpHandler is Properties {
         AutoCompoundingPodLp aspTKN;
     }
 
-    function aspTKN_deposit(uint256 userIndexSeed, uint256 receiverIndexSeed, uint256 aspTKNSeed, uint256 assets) public {
-
+    function aspTKN_deposit(uint256 userIndexSeed, uint256 receiverIndexSeed, uint256 aspTKNSeed, uint256 assets)
+        public
+    {
         // PRE-CONDITIONS
         DepositTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
@@ -52,15 +52,12 @@ contract AutoCompoundingPodLpHandler is Properties {
         // ACTION
         vm.prank(cache.user);
         try cache.aspTKN.deposit(assets, cache.receiver) {
-
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
             invariant_POD_35(assets);
             invariant_POD_38();
-
         } catch Error(string memory reason) {
-            
             string[8] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
@@ -79,15 +76,13 @@ contract AutoCompoundingPodLpHandler is Properties {
                 }
             }
             if (
-                compareStrings(reason, stringErrors[0]) || 
-                compareStrings(reason, stringErrors[1]) || 
-                compareStrings(reason, stringErrors[2]) || 
-                compareStrings(reason, stringErrors[3])
-                ) {
-                    invariant_POD_39();
-                } else if (compareStrings(reason, stringErrors[4])) {
-                    invariant_POD_40();
-                }
+                compareStrings(reason, stringErrors[0]) || compareStrings(reason, stringErrors[1])
+                    || compareStrings(reason, stringErrors[2]) || compareStrings(reason, stringErrors[3])
+            ) {
+                invariant_POD_39();
+            } else if (compareStrings(reason, stringErrors[4])) {
+                invariant_POD_40();
+            }
             fl.t(expected, reason);
         }
     }
@@ -103,7 +98,6 @@ contract AutoCompoundingPodLpHandler is Properties {
     }
 
     function aspTKN_mint(uint256 userIndexSeed, uint256 receiverIndexSeed, uint256 aspTKNSeed, uint256 shares) public {
-
         // PRE-CONDITIONS
         MintTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
@@ -126,15 +120,12 @@ contract AutoCompoundingPodLpHandler is Properties {
         // ACTION
         vm.prank(cache.user);
         try cache.aspTKN.mint(shares, cache.receiver) {
-
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
             invariant_POD_34(shares);
             invariant_POD_38();
-
         } catch Error(string memory reason) {
-            
             string[7] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
@@ -154,15 +145,13 @@ contract AutoCompoundingPodLpHandler is Properties {
             }
 
             if (
-                compareStrings(reason, stringErrors[0]) || 
-                compareStrings(reason, stringErrors[1]) || 
-                compareStrings(reason, stringErrors[2]) || 
-                compareStrings(reason, stringErrors[3])
-                ) {
-                    invariant_POD_39();
-                } else if (compareStrings(reason, stringErrors[4])) {
-                    invariant_POD_40();
-                }
+                compareStrings(reason, stringErrors[0]) || compareStrings(reason, stringErrors[1])
+                    || compareStrings(reason, stringErrors[2]) || compareStrings(reason, stringErrors[3])
+            ) {
+                invariant_POD_39();
+            } else if (compareStrings(reason, stringErrors[4])) {
+                invariant_POD_40();
+            }
 
             fl.t(expected, reason);
         }
@@ -178,8 +167,9 @@ contract AutoCompoundingPodLpHandler is Properties {
         AutoCompoundingPodLp aspTKN;
     }
 
-    function aspTKN_withdraw(uint256 userIndexSeed, uint256 receiverIndexSeed, uint256 aspTKNSeed, uint256 assets) public {
-
+    function aspTKN_withdraw(uint256 userIndexSeed, uint256 receiverIndexSeed, uint256 aspTKNSeed, uint256 assets)
+        public
+    {
         // PRE-CONDITIONS
         WithdrawTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
@@ -197,15 +187,12 @@ contract AutoCompoundingPodLpHandler is Properties {
         // ACTION
         vm.prank(cache.user);
         try cache.aspTKN.withdraw(assets, cache.receiver, cache.user) {
-
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
             invariant_POD_37(assets);
             invariant_POD_38();
-
         } catch Error(string memory reason) {
-            
             string[7] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
@@ -225,17 +212,15 @@ contract AutoCompoundingPodLpHandler is Properties {
             }
 
             if (
-                compareStrings(reason, stringErrors[0]) || 
-                compareStrings(reason, stringErrors[1]) || 
-                compareStrings(reason, stringErrors[2]) || 
-                compareStrings(reason, stringErrors[3])
-                ) {
-                    invariant_POD_39();
-                } else if (compareStrings(reason, stringErrors[4])) {
-                    invariant_POD_40();
-                } else if (compareStrings(reason, stringErrors[5])) {
-                    invariant_POD_41();
-                }
+                compareStrings(reason, stringErrors[0]) || compareStrings(reason, stringErrors[1])
+                    || compareStrings(reason, stringErrors[2]) || compareStrings(reason, stringErrors[3])
+            ) {
+                invariant_POD_39();
+            } else if (compareStrings(reason, stringErrors[4])) {
+                invariant_POD_40();
+            } else if (compareStrings(reason, stringErrors[5])) {
+                invariant_POD_41();
+            }
 
             fl.t(expected, reason);
         }
@@ -251,8 +236,9 @@ contract AutoCompoundingPodLpHandler is Properties {
         AutoCompoundingPodLp aspTKN;
     }
 
-    function aspTKN_redeem(uint256 userIndexSeed, uint256 receiverIndexSeed, uint256 aspTKNSeed, uint256 shares) public {
-
+    function aspTKN_redeem(uint256 userIndexSeed, uint256 receiverIndexSeed, uint256 aspTKNSeed, uint256 shares)
+        public
+    {
         // PRE-CONDITIONS
         RedeemTemps memory cache;
         cache.user = randomAddress(userIndexSeed);
@@ -270,15 +256,12 @@ contract AutoCompoundingPodLpHandler is Properties {
         // ACTION
         vm.prank(cache.user);
         try cache.aspTKN.redeem(shares, cache.receiver, cache.user) {
-
             // POST-CONDITIONS
             __afterAsp(cache.aspTKN, cache.spTKN, cache.user, cache.receiver);
 
             invariant_POD_36(shares);
             invariant_POD_38();
-
         } catch Error(string memory reason) {
-            
             string[7] memory stringErrors = [
                 "UniswapV2Router: INSUFFICIENT_A_AMOUNT",
                 "UniswapV2Router: INSUFFICIENT_B_AMOUNT",
@@ -298,17 +281,15 @@ contract AutoCompoundingPodLpHandler is Properties {
             }
 
             if (
-                compareStrings(reason, stringErrors[0]) || 
-                compareStrings(reason, stringErrors[1]) || 
-                compareStrings(reason, stringErrors[2]) || 
-                compareStrings(reason, stringErrors[3])
-                ) {
-                    invariant_POD_39();
-                } else if (compareStrings(reason, stringErrors[4])) {
-                    invariant_POD_40();
-                } else if (compareStrings(reason, stringErrors[5])) {
-                    invariant_POD_41();
-                }
+                compareStrings(reason, stringErrors[0]) || compareStrings(reason, stringErrors[1])
+                    || compareStrings(reason, stringErrors[2]) || compareStrings(reason, stringErrors[3])
+            ) {
+                invariant_POD_39();
+            } else if (compareStrings(reason, stringErrors[4])) {
+                invariant_POD_40();
+            } else if (compareStrings(reason, stringErrors[5])) {
+                invariant_POD_41();
+            }
 
             fl.t(expected, reason);
         }

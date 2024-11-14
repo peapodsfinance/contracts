@@ -25,7 +25,7 @@ pragma solidity ^0.8.19;
 
 // ====================================================================
 
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 contract FraxlendWhitelist is Ownable2Step {
     /// @notice Fraxlend Deployer Whitelist mapping.

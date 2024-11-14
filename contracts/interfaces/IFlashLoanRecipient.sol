@@ -2,5 +2,5 @@
 pragma solidity ^0.8.19;
 
 interface IFlashLoanRecipient {
-  function callback(bytes calldata data) external;
+    function callback(bytes calldata data) external;
 }

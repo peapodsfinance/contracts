@@ -12,8 +12,7 @@ import {FraxlendPairCore} from "../modules/fraxlend/FraxlendPairCore.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Properties is BeforeAfter {
-    
-    function invariant_POD_1() internal { 
+    function invariant_POD_1() internal {
         fl.t(false, "POD-1: LeverageManager::_acquireBorrowTokenForRepayment should never Uniswap revert");
     }
 
@@ -38,7 +37,7 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_4(FraxlendPair fraxPair) internal {
-        // LendingAssetVault::vaultUtilization[_vault] 
+        // LendingAssetVault::vaultUtilization[_vault]
         // vaultUtilization[_vault] == FraxLend.convertToAssets(LAV shares) post-update
         assertApproxEq(
             _lendingAssetVault.vaultUtilization(address(fraxPair)),
@@ -134,9 +133,9 @@ contract Properties is BeforeAfter {
             "POD-13: LendingAssetVault::withdraw/redeem User can't withdraw more than their share of total assets"
         );
     }
- 
+
     function invariant_POD_14(uint256 assets) internal {
-        // LendingAssetVault::donate Post-donation shares shouldn't have increased, 
+        // LendingAssetVault::donate Post-donation shares shouldn't have increased,
         // but totalAssets should have by donated amount
         assertApproxEq(
             _afterLav.totalSupply,
@@ -152,7 +151,7 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_15() public {
-        // LendingAssetVault::global FraxLend vault should never more assets lent to it from the LAV that the allotted _vaultMaxPerc 
+        // LendingAssetVault::global FraxLend vault should never more assets lent to it from the LAV that the allotted _vaultMaxPerc
         // e.g. convertToAssets(LAV fToken share balance) <= totalAssets * vault pct
         for (uint256 i; i < _fraxPairs.length; i++) {
             fl.lte(
@@ -174,7 +173,7 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_17() internal {
-        // LendingAssetVault::whitelistWithdraw Post-state utilization rate in FraxLend should have increased or not changed 
+        // LendingAssetVault::whitelistWithdraw Post-state utilization rate in FraxLend should have increased or not changed
         // (if called within from a redeem no change, increase if called from borrowAsset)
         fl.gte(
             _afterLM.utilizationRate,
@@ -182,7 +181,7 @@ contract Properties is BeforeAfter {
             "POD-17: LendingAssetVault::whitelistWithdraw Post-state utilization rate in FraxLend should have increased or not changed "
         );
     }
- 
+
     function invariant_POD_18() internal {
         // LeverageManager::addLeverage Post adding leverage, there totalBorrow amount and shares,
         //  as well as utilization should increase in Fraxlend
@@ -211,10 +210,10 @@ contract Properties is BeforeAfter {
             _beforeLM.totalBorrowShares,
             "POD-19b: LeverageManager::removeLeverage Post removing leverage, there totalBorrow amount and shares should decrease"
         );
-    } 
+    }
 
     function invariant_POD_20() internal {
-        // LeverageManager::addLeverage Post adding leverage, there should be a higher supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and 
+        // LeverageManager::addLeverage Post adding leverage, there should be a higher supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and
         // the custodian for the position should have a higher userCollateralBalance
         fl.gt(
             _afterLM.spTotalSupply,
@@ -224,7 +223,7 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_21() internal {
-        // LeverageManager::addLeverage Post adding leverage, there should be a higher supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and 
+        // LeverageManager::addLeverage Post adding leverage, there should be a higher supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and
         // the custodian for the position should have a higher userCollateralBalance
         fl.gt(
             _afterLM.aspTotalSupply,
@@ -234,7 +233,7 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_22() internal {
-        // LeverageManager::addLeverage Post adding leverage, there should be a higher supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and 
+        // LeverageManager::addLeverage Post adding leverage, there should be a higher supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and
         // the custodian for the position should have a higher userCollateralBalance
         fl.gt(
             _afterLM.custodianCollateralBalance,
@@ -244,7 +243,7 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_23() internal {
-        // LeverageManager::removeLeverage Post removing leverage, there should be a lower supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and 
+        // LeverageManager::removeLeverage Post removing leverage, there should be a lower supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and
         // the custodion for the position should have a lower userCollateralBalance of aspTKNS in FraxLend
         fl.lt(
             _afterLM.spTotalSupply,
@@ -254,7 +253,7 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_24() internal {
-        // LeverageManager::removeLeverage Post removing leverage, there should be a lower supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and 
+        // LeverageManager::removeLeverage Post removing leverage, there should be a lower supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and
         // the custodion for the position should have a lower userCollateralBalance of aspTKNS in FraxLend
         fl.lt(
             _afterLM.aspTotalSupply,
@@ -264,7 +263,7 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_25() internal {
-        // LeverageManager::removeLeverage Post removing leverage, there should be a lower supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and 
+        // LeverageManager::removeLeverage Post removing leverage, there should be a lower supply of spTKNs (StakingPoolToken) and aspTKNS (AutoCompoundingPodLp), and
         // the custodion for the position should have a lower userCollateralBalance of aspTKNS in FraxLend
         fl.lt(
             _afterLM.custodianCollateralBalance,
@@ -272,7 +271,7 @@ contract Properties is BeforeAfter {
             "POD-25: Post removing leverage, the custodian for the position should have a lower userCollateralBalance"
         );
     }
- 
+
     function invariant_POD_26(uint256 fraxlendPairSeed) public {
         // FraxLend: cbr change with one large update == cbr change with multiple, smaller updates
 
@@ -323,10 +322,10 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_28() public {
-        // FraxlendPair.totalAsset includes both direct deposits and external vault deposits. 
+        // FraxlendPair.totalAsset includes both direct deposits and external vault deposits.
         // Therefore, it shouuld always be greater or equal to vaultUtilization mapping tracked in LendingAssetVault
         for (uint256 i; i < _fraxPairs.length; i++) {
-            (uint128 pairTotalAssets, ) = FraxlendPairCore(address(_fraxPairs[i])).totalAsset();
+            (uint128 pairTotalAssets,) = FraxlendPairCore(address(_fraxPairs[i])).totalAsset();
             fl.gte(
                 uint256(pairTotalAssets),
                 _lendingAssetVault.vaultUtilization(address(_fraxPairs[i])),
@@ -365,10 +364,10 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_32() public {
-        // FraxLend: (totalBorrow.amount) / totalAsset.totalAmount(address(externalAssetVault)) 
+        // FraxLend: (totalBorrow.amount) / totalAsset.totalAmount(address(externalAssetVault))
         // should never be more than 100%
         for (uint256 i; i < _fraxPairs.length; i++) {
-            (uint256 totalAssetAmount, , uint256 totalBorrowAmount, , ) = _fraxPairs[i].getPairAccounting();
+            (uint256 totalAssetAmount,, uint256 totalBorrowAmount,,) = _fraxPairs[i].getPairAccounting();
             fl.lte(
                 totalBorrowAmount,
                 totalAssetAmount,
@@ -380,14 +379,14 @@ contract Properties is BeforeAfter {
     function invariant_POD_33() public {
         // FraxLend: totalAsset.totalAmount(address(0)) == 0 -> totalBorrow.amount == 0
         for (uint256 i; i < _fraxPairs.length; i++) {
-            (uint128 totalAssetAmount, ) = FraxlendPairCore(address(_fraxPairs[i])).totalAsset();
-            (uint128 totalBorrowAmount, ) = FraxlendPairCore(address(_fraxPairs[i])).totalBorrow();
+            (uint128 totalAssetAmount,) = FraxlendPairCore(address(_fraxPairs[i])).totalAsset();
+            (uint128 totalBorrowAmount,) = FraxlendPairCore(address(_fraxPairs[i])).totalBorrow();
             if (totalAssetAmount == 0) {
                 fl.eq(
-                totalBorrowAmount,
-                0,
-                "POD-33: FraxLend: totalAsset.totalAmount(address(0)) == 0 -> totalBorrow.amount == 0"
-            );
+                    totalBorrowAmount,
+                    0,
+                    "POD-33: FraxLend: totalAsset.totalAmount(address(0)) == 0 -> totalBorrow.amount == 0"
+                );
             }
         }
     }
@@ -402,7 +401,7 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_35(uint256 assets) internal {
-        // AutoCompoundingPodLP: deposit() should decrease user balance of sp tokens 
+        // AutoCompoundingPodLP: deposit() should decrease user balance of sp tokens
         // by exact amount of assets passed
         fl.eq(
             _afterASP.spUserBalance,
@@ -421,7 +420,7 @@ contract Properties is BeforeAfter {
     }
 
     function invariant_POD_37(uint256 assets) internal {
-        // AutoCompoundingPodLP: withdraw() should increase user balance of sp tokens 
+        // AutoCompoundingPodLP: withdraw() should increase user balance of sp tokens
         // by exact amount of assets passed
         fl.eq(
             _afterASP.spUserBalance,
@@ -432,11 +431,7 @@ contract Properties is BeforeAfter {
 
     function invariant_POD_38() internal {
         // AutoCompoundingPodLP: mint/deposit/redeem/withdraw()  spToken total supply should never decrease
-        fl.gte(
-            _afterASP.spTotalSupply,
-            _beforeASP.spTotalSupply,
-            "POD-38: spToken totalSupply should never decrease"
-        );
+        fl.gte(_afterASP.spTotalSupply, _beforeASP.spTotalSupply, "POD-38: spToken totalSupply should never decrease");
     }
 
     function invariant_POD_39() internal {
@@ -451,7 +446,10 @@ contract Properties is BeforeAfter {
 
     function invariant_POD_41() internal {
         // AutoCompoundingPodLP: redeem/withdraw() should never get an InsufficientBalance or underflow/overflow revert
-        fl.t(false, "POD-41: AutoCompoundingPodLP: redeem/withdraw() should never get an InsufficientBalance or underflow/overflow revert");
+        fl.t(
+            false,
+            "POD-41: AutoCompoundingPodLP: redeem/withdraw() should never get an InsufficientBalance or underflow/overflow revert"
+        );
     }
 
     function invariant_POD_42(address lendingPair) internal {
@@ -462,7 +460,7 @@ contract Properties is BeforeAfter {
             "POD-42: custodian position is solvent after adding leverage and removing leverage"
         );
     }
-    
+
     function invariant_POD_43() public {
         // TokenReward: global:  getUnpaid() <= balanceOf reward token
         for (uint256 i; i < _pods.length; i++) {
@@ -475,8 +473,8 @@ contract Properties is BeforeAfter {
                 );
             }
         }
-    } 
-    
+    }
+
     function invariant_POD_44() public {
         // user aspTKN Asset -> aspTKN
         // fl.eq(

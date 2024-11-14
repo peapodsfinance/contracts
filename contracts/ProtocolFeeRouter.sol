@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import '@openzeppelin/contracts/access/Ownable.sol';
-import './interfaces/IProtocolFees.sol';
-import './interfaces/IProtocolFeeRouter.sol';
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./interfaces/IProtocolFees.sol";
+import "./interfaces/IProtocolFeeRouter.sol";
 
 contract ProtocolFeeRouter is IProtocolFeeRouter, Ownable {
-  IProtocolFees public override protocolFees;
+    event SetProtocolFees(address newProtocolFees, address oldProtocolFees);
 
-  constructor(IProtocolFees _fees) {
-    protocolFees = _fees;
-  }
+    IProtocolFees public override protocolFees;
 
-  function setProtocolFees(IProtocolFees _protocolFees) external onlyOwner {
-    protocolFees = _protocolFees;
-  }
+    constructor(IProtocolFees _fees) {
+        protocolFees = _fees;
+    }
+
+    function setProtocolFees(IProtocolFees _protocolFees) external onlyOwner {
+        address _oldFees = address(protocolFees);
+        protocolFees = _protocolFees;
+        emit SetProtocolFees(address(_protocolFees), _oldFees);
+    }
 }

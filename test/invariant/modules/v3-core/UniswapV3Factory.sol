@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity >=0.8.12;
 
-import {IUniswapV3Factory} from
-    "./interfaces/IUniswapV3Factory.sol";
+import {IUniswapV3Factory} from "./interfaces/IUniswapV3Factory.sol";
 
 import {UniswapV3PoolDeployer} from "./UniswapV3PoolDeployer.sol";
 import {NoDelegateCall} from "./NoDelegateCall.sol";
@@ -33,11 +32,12 @@ contract UniswapV3Factory is IUniswapV3Factory, UniswapV3PoolDeployer, NoDelegat
     }
 
     /// @inheritdoc IUniswapV3Factory
-    function createPool(
-        address tokenA,
-        address tokenB,
-        uint24 fee
-    ) external override noDelegateCall returns (address pool) {
+    function createPool(address tokenA, address tokenB, uint24 fee)
+        external
+        override
+        noDelegateCall
+        returns (address pool)
+    {
         require(tokenA != tokenB);
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(token0 != address(0));

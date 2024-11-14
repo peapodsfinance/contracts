@@ -7,7 +7,7 @@ pragma solidity >=0.8.0;
 library AddressStringUtil {
     // converts an address to the uppercase hex string, extracting only len bytes (up to 20, multiple of 2)
     function toAsciiString(address addr, uint256 len) internal pure returns (string memory) {
-        require(len % 2 == 0 && len > 0 && len <= 40, 'AddressStringUtil: INVALID_LEN');
+        require(len % 2 == 0 && len > 0 && len <= 40, "AddressStringUtil: INVALID_LEN");
 
         bytes memory s = new bytes(len);
         uint256 addrNum = uint256(uint160(addr));

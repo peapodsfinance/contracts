@@ -29,9 +29,5 @@ interface ITemporarilyPausable {
     function getPausedState()
         external
         view
-        returns (
-            bool paused,
-            uint256 pauseWindowEndTime,
-            uint256 bufferPeriodEndTime
-        );
+        returns (bool paused, uint256 pauseWindowEndTime, uint256 bufferPeriodEndTime);
 }

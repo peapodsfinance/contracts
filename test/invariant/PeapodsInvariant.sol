@@ -9,15 +9,15 @@ import {LendingAssetVaultHandler} from "./handlers/LendingAssetVaultHandler.sol"
 import {FraxlendPairHandler} from "./handlers/FraxlendPairHandler.sol";
 import {UniswapV2Handler} from "./handlers/UniswapV2Handler.sol";
 
-contract PeapodsInvariant is 
-PodHandler,
-LeverageManagerHandler,
-AutoCompoundingPodLpHandler,
-StakingPoolHandler,
-LendingAssetVaultHandler,
-FraxlendPairHandler,
-UniswapV2Handler
- {
+contract PeapodsInvariant is
+    PodHandler,
+    LeverageManagerHandler,
+    AutoCompoundingPodLpHandler,
+    StakingPoolHandler,
+    LendingAssetVaultHandler,
+    FraxlendPairHandler,
+    UniswapV2Handler
+{
     constructor() payable {
         setup();
     }

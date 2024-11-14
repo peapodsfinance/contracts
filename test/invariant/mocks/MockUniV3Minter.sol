@@ -12,43 +12,30 @@ import {LiquidityManagement} from "v3-periphery/base/LiquidityManagement.sol";
 import {PeripheryPayments} from "v3-periphery/base/PeripheryPayments.sol";
 import {PoolAddress} from "v3-periphery/libraries/PoolAddress.sol";
 
-
 // mocks
 import {WETH9} from "./WETH.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockERC20} from "./MockERC20.sol";
 
 contract MockUniV3Minter is IUniswapV3MintCallback {
-
-
     constructor() {}
+
     function V3addLiquidity(UniswapV3Pool _pool, uint256 amount) public {
-        PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
-            token0: _pool.token0(),
-            token1: _pool.token1(),
-            fee: _pool.fee()
-        });
+        PoolAddress.PoolKey memory poolKey =
+            PoolAddress.PoolKey({token0: _pool.token0(), token1: _pool.token1(), fee: _pool.fee()});
         _pool.mint(
             msg.sender,
             -887200,
             887200,
             uint128(amount),
-            abi.encode(LiquidityManagement.MintCallbackData({
-                poolKey: poolKey,
-                payer: address(this)
-                })
-            )
+            abi.encode(LiquidityManagement.MintCallbackData({poolKey: poolKey, payer: address(this)}))
         );
     }
 
     event MessageUint(string a, uint256 b);
     event MessageAddress(string a, address b);
 
-    function uniswapV3MintCallback(
-        uint256 amount0Owed,
-        uint256 amount1Owed,
-        bytes calldata data
-    ) external override {
+    function uniswapV3MintCallback(uint256 amount0Owed, uint256 amount1Owed, bytes calldata data) external override {
         emit MessageUint("amount0Owed", amount0Owed);
         emit MessageUint("amount1Owed", amount1Owed);
 

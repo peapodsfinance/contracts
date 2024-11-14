@@ -25,7 +25,7 @@ pragma solidity ^0.8.19;
 
 // ====================================================================
 
-import { IRateCalculator } from "./interfaces/IRateCalculator.sol";
+import {IRateCalculator} from "./interfaces/IRateCalculator.sol";
 
 /// @title A formula for calculating interest rates linearly as a function of utilization
 /// @author Drake Evans github.com/drakeevans
@@ -50,10 +50,8 @@ contract LinearInterestRate is IRateCalculator {
     /// @notice The ```requireValidInitData``` function reverts if initialization data fails to be validated
     /// @param _initData abi.encode(uint256 _minInterest, uint256 _vertexInterest, uint256 _maxInterest, uint256 _vertexUtilization)
     function requireValidInitData(bytes calldata _initData) public pure {
-        (uint256 _minInterest, uint256 _vertexInterest, uint256 _maxInterest, uint256 _vertexUtilization) = abi.decode(
-            _initData,
-            (uint256, uint256, uint256, uint256)
-        );
+        (uint256 _minInterest, uint256 _vertexInterest, uint256 _maxInterest, uint256 _vertexUtilization) =
+            abi.decode(_initData, (uint256, uint256, uint256, uint256));
         require(
             _minInterest < MAX_INT && _minInterest <= _vertexInterest && _minInterest >= MIN_INT,
             "LinearInterestRate: _minInterest < MAX_INT && _minInterest <= _vertexInterest && _minInterest >= MIN_INT"
@@ -75,11 +73,9 @@ contract LinearInterestRate is IRateCalculator {
     /// @return _newRatePerSec The new interest rate per second, 1e18 precision
     function getNewRate(bytes calldata _data, bytes calldata _initData) external pure returns (uint64 _newRatePerSec) {
         requireValidInitData(_initData);
-        (, , uint256 _utilization, ) = abi.decode(_data, (uint64, uint256, uint256, uint256));
-        (uint256 _minInterest, uint256 _vertexInterest, uint256 _maxInterest, uint256 _vertexUtilization) = abi.decode(
-            _initData,
-            (uint256, uint256, uint256, uint256)
-        );
+        (,, uint256 _utilization,) = abi.decode(_data, (uint64, uint256, uint256, uint256));
+        (uint256 _minInterest, uint256 _vertexInterest, uint256 _maxInterest, uint256 _vertexUtilization) =
+            abi.decode(_initData, (uint256, uint256, uint256, uint256));
         if (_utilization < _vertexUtilization) {
             uint256 _slope = ((_vertexInterest - _minInterest) * UTIL_PREC) / _vertexUtilization;
             _newRatePerSec = uint64(_minInterest + ((_utilization * _slope) / UTIL_PREC));

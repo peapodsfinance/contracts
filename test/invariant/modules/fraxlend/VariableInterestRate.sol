@@ -21,8 +21,8 @@ pragma solidity ^0.8.19;
 
 // ====================================================================
 
-import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
-import { IRateCalculatorV2 } from "./interfaces/IRateCalculatorV2.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {IRateCalculatorV2} from "./interfaces/IRateCalculatorV2.sol";
 
 /// @title A formula for calculating interest rates as a function of utilization and time
 /// @author Drake Evans github.com/drakeevans
@@ -112,11 +112,11 @@ contract VariableInterestRate is IRateCalculatorV2 {
     /// @param _utilization The utilization %, given with 5 decimals of precision
     /// @param _fullUtilizationInterest The interest value when utilization is 100%, given with 18 decimals of precision
     /// @return _newFullUtilizationInterest The new maximum interest rate
-    function getFullUtilizationInterest(
-        uint256 _deltaTime,
-        uint256 _utilization,
-        uint64 _fullUtilizationInterest
-    ) internal view returns (uint64 _newFullUtilizationInterest) {
+    function getFullUtilizationInterest(uint256 _deltaTime, uint256 _utilization, uint64 _fullUtilizationInterest)
+        internal
+        view
+        returns (uint64 _newFullUtilizationInterest)
+    {
         if (_utilization < MIN_TARGET_UTIL) {
             // 18 decimals
             uint256 _deltaUtilization = ((MIN_TARGET_UTIL - _utilization) * 1e18) / MIN_TARGET_UTIL;
@@ -147,25 +147,24 @@ contract VariableInterestRate is IRateCalculatorV2 {
     /// @param _oldFullUtilizationInterest The interest value when utilization is 100%, given with 18 decimals of precision
     /// @return _newRatePerSec The new interest rate, 18 decimals of precision
     /// @return _newFullUtilizationInterest The new max interest rate, 18 decimals of precision
-    function getNewRate(
-        uint256 _deltaTime,
-        uint256 _utilization,
-        uint64 _oldFullUtilizationInterest
-    ) external view returns (uint64 _newRatePerSec, uint64 _newFullUtilizationInterest) {
+    function getNewRate(uint256 _deltaTime, uint256 _utilization, uint64 _oldFullUtilizationInterest)
+        external
+        view
+        returns (uint64 _newRatePerSec, uint64 _newFullUtilizationInterest)
+    {
         _newFullUtilizationInterest = getFullUtilizationInterest(_deltaTime, _utilization, _oldFullUtilizationInterest);
 
         // _vertexInterest is calculated as the percentage of the delta between min and max interest
-        uint256 _vertexInterest = (((_newFullUtilizationInterest - ZERO_UTIL_RATE) * VERTEX_RATE_PERCENT) / RATE_PREC) +
-            ZERO_UTIL_RATE;
+        uint256 _vertexInterest =
+            (((_newFullUtilizationInterest - ZERO_UTIL_RATE) * VERTEX_RATE_PERCENT) / RATE_PREC) + ZERO_UTIL_RATE;
         if (_utilization < VERTEX_UTILIZATION) {
             // For readability, the following formula is equivalent to:
             // uint256 _slope = ((_vertexInterest - ZERO_UTIL_RATE) * UTIL_PREC) / VERTEX_UTILIZATION;
             // _newRatePerSec = uint64(ZERO_UTIL_RATE + ((_utilization * _slope) / UTIL_PREC));
 
             // 18 decimals
-            _newRatePerSec = uint64(
-                ZERO_UTIL_RATE + (_utilization * (_vertexInterest - ZERO_UTIL_RATE)) / VERTEX_UTILIZATION
-            );
+            _newRatePerSec =
+                uint64(ZERO_UTIL_RATE + (_utilization * (_vertexInterest - ZERO_UTIL_RATE)) / VERTEX_UTILIZATION);
         } else {
             // For readability, the following formula is equivalent to:
             // uint256 _slope = (((_newFullUtilizationInterest - _vertexInterest) * UTIL_PREC) / (UTIL_PREC - VERTEX_UTILIZATION));
@@ -173,9 +172,9 @@ contract VariableInterestRate is IRateCalculatorV2 {
 
             // 18 decimals
             _newRatePerSec = uint64(
-                _vertexInterest +
-                    ((_utilization - VERTEX_UTILIZATION) * (_newFullUtilizationInterest - _vertexInterest)) /
-                    (UTIL_PREC - VERTEX_UTILIZATION)
+                _vertexInterest
+                    + ((_utilization - VERTEX_UTILIZATION) * (_newFullUtilizationInterest - _vertexInterest))
+                        / (UTIL_PREC - VERTEX_UTILIZATION)
             );
         }
     }
