@@ -127,9 +127,12 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
         IERC20(_pairedLpToken).safeIncreaseAllowance(
             _indexFundAddy, IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore
         );
+
+        // keeping 1 wei of each asset on the CA reduces transfer gas cost due to non-zero storage
+        // so worth it to keep 1 wei in the CA if there's not any here already
         _amountOut = _indexFund.addLiquidityV2(
-            IERC20(_indexFundAddy).balanceOf(address(this)) - _idxTokensBefore,
-            IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore,
+            IERC20(_indexFundAddy).balanceOf(address(this)) - (_idxTokensBefore == 0 ? 1 : _idxTokensBefore),
+            IERC20(_pairedLpToken).balanceOf(address(this)) - (_pairedLpTokenBefore == 0 ? 1 : _pairedLpTokenBefore),
             _slippage,
             _deadline
         );
@@ -137,7 +140,7 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
         IERC20(DEX_ADAPTER.getV2Pool(_indexFundAddy, _pairedLpToken)).safeIncreaseAllowance(
             _indexFund.lpStakingPool(), _amountOut
         );
-        IStakingPoolToken(_indexFund.lpStakingPool()).stake(_msgSender(), _amountOut);
+        _stakeLPForUserHandlingLeftoverCheck(_indexFund.lpStakingPool(), _msgSender(), _amountOut);
 
         // refunds if needed for index tokens and pairedLpToken
         if (address(this).balance > _ethBefore) {
@@ -185,6 +188,20 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
         for (uint256 _i; _i < _rl; _i++) {
             ITokenRewards(_rewards[_i]).claimReward(_msgSender());
         }
+    }
+
+    /// @dev the ERC20 approval for the input token to stake has already been approved
+    function _stakeLPForUserHandlingLeftoverCheck(address _stakingPool, address _receiver, uint256 _stakeAmount)
+        internal
+    {
+        if (IERC20(_stakingPool).balanceOf(address(this)) > 0) {
+            IStakingPoolToken(_stakingPool).stake(_receiver, _stakeAmount);
+            return;
+        }
+
+        IStakingPoolToken(_stakingPool).stake(address(this), _stakeAmount);
+        // leave 1 wei in the CA for future gas savings
+        IERC20(_stakingPool).safeTransfer(_receiver, IERC20(_stakingPool).balanceOf(address(this)) - 1);
     }
 
     function _swapNativeForTokensWeightedV2(

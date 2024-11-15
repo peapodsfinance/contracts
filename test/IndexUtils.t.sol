@@ -24,8 +24,7 @@ contract IndexUtilsTest is PodHelperTest {
 
     function test_addLPAndStake() public {
         // Get a pod to test with
-        address podToDup = IStakingPoolToken(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1) // spPDAI
-            .indexFund();
+        address podToDup = IStakingPoolToken(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
         address newPod = _dupPodAndSeedLp(podToDup, address(0), 0, 0);
         IDecentralizedIndex indexFund = IDecentralizedIndex(newPod);
 
@@ -75,17 +74,17 @@ contract IndexUtilsTest is PodHelperTest {
         assertLt(
             IERC20(address(indexFund)).balanceOf(address(this)), initialPodBalance, "Pod token balance should decrease"
         );
+        // the extra 1 wei is from the utils CA keeping back 1 wei to save gas for future operations
         assertEq(
             IERC20(indexFund.PAIRED_LP_TOKEN()).balanceOf(address(this)),
-            initialPairedBalance - pairedTokensToAdd,
+            initialPairedBalance - pairedTokensToAdd + 1,
             "Paired token balance should decrease"
         );
     }
 
     function test_addLPAndStake_WithEth() public {
         // Get a pod to test with
-        address podToDup = IStakingPoolToken(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1) // spPDAI
-            .indexFund();
+        address podToDup = IStakingPoolToken(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
         address newPod = _dupPodAndSeedLp(podToDup, address(0), 0, 0);
         IDecentralizedIndex indexFund = IDecentralizedIndex(newPod);
 
@@ -139,8 +138,7 @@ contract IndexUtilsTest is PodHelperTest {
 
     function test_bond_SingleAsset() public {
         // Get a pod with single asset
-        address podToDup = IStakingPoolToken(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1) // spPDAI
-            .indexFund();
+        address podToDup = IStakingPoolToken(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
         address newPod = _dupPodAndSeedLp(podToDup, address(0), 0, 0);
         IDecentralizedIndex indexFund = IDecentralizedIndex(newPod);
 
@@ -236,8 +234,7 @@ contract IndexUtilsTest is PodHelperTest {
 
     function test_bond_RefundsExcess() public {
         // Get a pod with single asset
-        address podToDup = IStakingPoolToken(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1) // spPDAI
-            .indexFund();
+        address podToDup = IStakingPoolToken(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
         address newPod = _dupPodAndSeedLp(podToDup, address(0), 0, 0);
         IDecentralizedIndex indexFund = IDecentralizedIndex(newPod);
 
