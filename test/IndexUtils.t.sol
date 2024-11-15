@@ -75,11 +75,19 @@ contract IndexUtilsTest is PodHelperTest {
             IERC20(address(indexFund)).balanceOf(address(this)), initialPodBalance, "Pod token balance should decrease"
         );
         // the extra 1 wei is from the utils CA keeping back 1 wei to save gas for future operations
-        assertEq(
+        assertApproxEqAbs(
             IERC20(indexFund.PAIRED_LP_TOKEN()).balanceOf(address(this)),
-            initialPairedBalance - pairedTokensToAdd + 1,
+            initialPairedBalance - pairedTokensToAdd,
+            1, // 1 wei error acceptance due to holding 1 wei behind before LPing
             "Paired token balance should decrease"
         );
+        assertEq(IERC20(address(indexFund)).balanceOf(address(utils)), 1, "pTKN balance of utils should be 1 wei");
+        assertEq(
+            IERC20(indexFund.PAIRED_LP_TOKEN()).balanceOf(address(utils)),
+            1,
+            "Paired token balance of utils should be 1 wei"
+        );
+        assertEq(IERC20(stakingPool).balanceOf(address(utils)), 1, "spTKN balance of utils should be 1 wei");
     }
 
     function test_addLPAndStake_WithEth() public {

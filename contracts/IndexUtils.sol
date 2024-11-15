@@ -147,8 +147,8 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
             (bool _s,) = payable(_msgSender()).call{value: address(this).balance - _ethBefore}("");
             require(_s && address(this).balance >= _ethBefore, "TOOMUCH");
         }
-        _checkAndRefundERC20(_msgSender(), _indexFundAddy, _idxTokensBefore);
-        _checkAndRefundERC20(_msgSender(), _pairedLpToken, _pairedLpTokenBefore);
+        _checkAndRefundERC20(_msgSender(), _indexFundAddy, _idxTokensBefore == 0 ? 1 : _idxTokensBefore);
+        _checkAndRefundERC20(_msgSender(), _pairedLpToken, _pairedLpTokenBefore == 0 ? 1 : _pairedLpTokenBefore);
     }
 
     function unstakeAndRemoveLP(
