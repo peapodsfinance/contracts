@@ -16,7 +16,7 @@ import {WeightedIndex} from "../../contracts/WeightedIndex.sol";
 import {StakingPoolToken} from "../../contracts/StakingPoolToken.sol";
 import {LendingAssetVault} from "../../contracts/LendingAssetVault.sol";
 import {IndexUtils} from "../../contracts/IndexUtils.sol";
-import {IIndexUtils_LEGACY} from "../../contracts/interfaces/IIndexUtils_LEGACY.sol";
+import {IIndexUtils} from "../../contracts/interfaces/IIndexUtils.sol";
 import {MockIndexUtils} from "./mocks/MockIndexUtils.sol";
 import {RewardsWhitelist} from "../../contracts/RewardsWhitelist.sol";
 import {TokenRewards} from "../../contracts/TokenRewards.sol";
@@ -982,7 +982,7 @@ contract FuzzSetup is Test, FuzzBase {
     }
 
     function _deployLeverageManager() internal {
-        _leverageManager = new LeverageManager("Test LM", "tLM", IIndexUtils_LEGACY(address(_indexUtils)));
+        _leverageManager = new LeverageManager("Test LM", "tLM", IIndexUtils(address(_indexUtils)));
 
         _leverageManager.setLendingPair(address(_pod1Peas), address(_fraxLPToken1Peas));
         _leverageManager.setLendingPair(address(_pod1Weth), address(_fraxLPToken1Weth));
@@ -1029,7 +1029,7 @@ contract FuzzSetup is Test, FuzzBase {
         return users[bound(seed, 0, users.length - 1)];
     }
 
-    function randomPod(uint256 seed) internal returns (WeightedIndex) {
+    function randomPod(uint256 seed) internal view returns (WeightedIndex) {
         return _pods[bound(seed, 0, _pods.length - 1)];
     }
 
@@ -1046,7 +1046,7 @@ contract FuzzSetup is Test, FuzzBase {
         return _fraxPairs[bound(seed, 0, _fraxPairs.length - 1)];
     }
 
-    function _approveIndexTokens(WeightedIndex pod, address user, uint256 amount) internal {
+    function _approveIndexTokens(WeightedIndex pod, address user, uint256) internal {
         IDecentralizedIndex.IndexAssetInfo[] memory indexTokens = pod.getAllAssets();
 
         for (uint256 i; i < indexTokens.length; i++) {
@@ -1057,6 +1057,7 @@ contract FuzzSetup is Test, FuzzBase {
 
     function _checkTokenBalances(WeightedIndex pod, address token, address user, uint256 amount)
         internal
+        view
         returns (bool hasEnough)
     {
         IDecentralizedIndex.IndexAssetInfo[] memory indexTokens = pod.getAllAssets();
@@ -1092,7 +1093,7 @@ contract FuzzSetup is Test, FuzzBase {
         _tokenCPriceFeed.updateAnswer(int256(_tokenCPrice));
     }
 
-    function randomPrice(uint256 seed, uint256 price) internal returns (uint256) {
+    function randomPrice(uint256 seed, uint256 price) internal pure returns (uint256) {
         uint256 newPrice;
         newPrice = bound(seed, (price * 9e18) / 10e18, (price * 11e18) / 10e18);
         return newPrice;

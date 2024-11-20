@@ -8,8 +8,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import "../interfaces/IDecentralizedIndex.sol";
 import "../interfaces/IDexAdapter.sol";
 import "../interfaces/IFlashLoanRecipient.sol";
-// import '../interfaces/IIndexUtils.sol';
-import "../interfaces/IIndexUtils_LEGACY.sol";
+import "../interfaces/IIndexUtils.sol";
 import "../interfaces/ILeverageManager.sol";
 import {VaultAccount, VaultAccountingLibrary} from "../libraries/VaultAccount.sol";
 import "../AutoCompoundingPodLp.sol";
@@ -21,7 +20,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
     using SafeERC20 for IERC20;
     using VaultAccountingLibrary for VaultAccount;
 
-    IIndexUtils_LEGACY public indexUtils;
+    IIndexUtils public indexUtils;
     LeveragePositions public positionNFT;
 
     uint16 public openFeePerc; // 1000 precision
@@ -48,7 +47,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         _;
     }
 
-    constructor(string memory _positionName, string memory _positionSymbol, IIndexUtils_LEGACY _idxUtils) {
+    constructor(string memory _positionName, string memory _positionSymbol, IIndexUtils _idxUtils) {
         indexUtils = _idxUtils;
         positionNFT = new LeveragePositions(_positionName, _positionSymbol);
     }
@@ -519,7 +518,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         return IFraxlendPair(positionProps[_positionId].lendingPair).collateralContract();
     }
 
-    function setIndexUtils(IIndexUtils_LEGACY _utils) external onlyOwner {
+    function setIndexUtils(IIndexUtils _utils) external onlyOwner {
         address _old = address(indexUtils);
         indexUtils = _utils;
         emit SetIndexUtils(_old, address(_utils));

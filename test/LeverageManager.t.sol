@@ -4,8 +4,8 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IDecentralizedIndex} from "../contracts/interfaces/IDecentralizedIndex.sol";
-import {IIndexUtils_LEGACY} from "../contracts/interfaces/IIndexUtils_LEGACY.sol";
 import {IIndexUtils} from "../contracts/interfaces/IIndexUtils.sol";
+import {IndexUtils} from "../contracts/IndexUtils.sol";
 import {AutoCompoundingPodLp} from "../contracts/AutoCompoundingPodLp.sol";
 import {RewardsWhitelist} from "../contracts/RewardsWhitelist.sol";
 import {WeightedIndex} from "../contracts/WeightedIndex.sol";
@@ -18,7 +18,7 @@ import {MockFraxlendPair} from "./mocks/MockFraxlendPair.sol";
 import "forge-std/console.sol";
 
 contract LeverageManagerTest is Test {
-    IIndexUtils_LEGACY public idxUtils;
+    IIndexUtils public idxUtils;
     BalancerFlashSource public flashSource;
     AutoCompoundingPodLp public aspTkn;
     LeverageManager public leverageManager;
@@ -47,8 +47,7 @@ contract LeverageManagerTest is Test {
             0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45, // Uniswap SwapRouter02
             false
         );
-        // idxUtils = new IndexUtils(twapUtils, dexAdapter);
-        idxUtils = IIndexUtils_LEGACY(0x9A103aB4FE2De5db16338B16FD7550D21d7b8DB6);
+        idxUtils = new IndexUtils(twapUtils, dexAdapter);
         IDecentralizedIndex.Config memory _c;
         IDecentralizedIndex.Fees memory _f;
         _f.bond = fee;
@@ -78,7 +77,7 @@ contract LeverageManagerTest is Test {
         );
 
         spTkn = pod.lpStakingPool();
-        aspTkn = new AutoCompoundingPodLp("aspTKN", "aspTKN", false, pod, dexAdapter, IIndexUtils(address(idxUtils)));
+        aspTkn = new AutoCompoundingPodLp("aspTKN", "aspTKN", false, pod, dexAdapter, idxUtils);
 
         // Deploy MockFraxlendPair
         mockFraxlendPair = new MockFraxlendPair(dai, address(aspTkn));

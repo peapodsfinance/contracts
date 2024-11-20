@@ -149,7 +149,7 @@ contract DualOracleChainlinkUniV3 is Timelock2Step {
         _priceHigh = _isBadData || _price1 > _price2 ? _price1 : _price2;
     }
 
-    function decimals() external returns (uint8) {
+    function decimals() external pure returns (uint8) {
         return DECIMALS;
     }
 }

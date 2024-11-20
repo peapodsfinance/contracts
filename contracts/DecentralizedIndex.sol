@@ -443,17 +443,5 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
         emit SetPartnerFee(_msgSender(), _fee);
     }
 
-    function rescueERC20(address _token) external lock {
-        // cannot withdraw tokens/assets that belong to the index
-        require(!isAsset(_token) && _token != address(this), "U");
-        IERC20(_token).safeTransfer(Ownable(address(V3_TWAP_UTILS)).owner(), IERC20(_token).balanceOf(address(this)));
-    }
-
-    function rescueETH() external lock {
-        require(address(this).balance > 0, "E");
-        (bool _sent,) = Ownable(address(V3_TWAP_UTILS)).owner().call{value: address(this).balance}("");
-        require(_sent, "S");
-    }
-
     receive() external payable {}
 }

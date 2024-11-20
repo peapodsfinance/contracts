@@ -140,7 +140,7 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
         IERC20(DEX_ADAPTER.getV2Pool(_indexFundAddy, _pairedLpToken)).safeIncreaseAllowance(
             _indexFund.lpStakingPool(), _amountOut
         );
-        _stakeLPForUserHandlingLeftoverCheck(_indexFund.lpStakingPool(), _msgSender(), _amountOut);
+        _amountOut = _stakeLPForUserHandlingLeftoverCheck(_indexFund.lpStakingPool(), _msgSender(), _amountOut);
 
         // refunds if needed for index tokens and pairedLpToken
         if (address(this).balance > _ethBefore) {
@@ -193,15 +193,18 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
     /// @dev the ERC20 approval for the input token to stake has already been approved
     function _stakeLPForUserHandlingLeftoverCheck(address _stakingPool, address _receiver, uint256 _stakeAmount)
         internal
+        returns (uint256 _finalAmountOut)
     {
+        _finalAmountOut = _stakeAmount;
         if (IERC20(_stakingPool).balanceOf(address(this)) > 0) {
             IStakingPoolToken(_stakingPool).stake(_receiver, _stakeAmount);
-            return;
+            return _finalAmountOut;
         }
 
         IStakingPoolToken(_stakingPool).stake(address(this), _stakeAmount);
         // leave 1 wei in the CA for future gas savings
-        IERC20(_stakingPool).safeTransfer(_receiver, IERC20(_stakingPool).balanceOf(address(this)) - 1);
+        _finalAmountOut = IERC20(_stakingPool).balanceOf(address(this)) - 1;
+        IERC20(_stakingPool).safeTransfer(_receiver, _finalAmountOut);
     }
 
     function _swapNativeForTokensWeightedV2(

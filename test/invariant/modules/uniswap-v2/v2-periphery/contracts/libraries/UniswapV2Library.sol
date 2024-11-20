@@ -7,7 +7,7 @@ library UniswapV2Library {
     using SafeMath for uint256;
 
     // returns sorted token addresses, used to handle return values from pairs sorted in this order
-    function sortTokens(address tokenA, address tokenB) internal view returns (address token0, address token1) {
+    function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
         require(tokenA != tokenB, "UniswapV2Library: IDENTICAL_ADDRESSES");
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(token0 != address(0), "UniswapV2Library: ZERO_ADDRESS");
@@ -69,6 +69,7 @@ library UniswapV2Library {
     // performs chained getAmountOut calculations on any number of pairs
     function getAmountsOut(address factory, uint256 amountIn, address[] memory path)
         internal
+        view
         returns (uint256[] memory amounts)
     {
         require(path.length >= 2, "UniswapV2Library: INVALID_PATH");
@@ -83,6 +84,7 @@ library UniswapV2Library {
     // performs chained getAmountIn calculations on any number of pairs
     function getAmountsIn(address factory, uint256 amountOut, address[] memory path)
         internal
+        view
         returns (uint256[] memory amounts)
     {
         require(path.length >= 2, "UniswapV2Library: INVALID_PATH");

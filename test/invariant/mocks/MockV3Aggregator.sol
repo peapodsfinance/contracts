@@ -46,6 +46,7 @@ contract MockV3Aggregator {
 
     function getRoundData(uint80 _roundId)
         external
+        view
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
     {
         return (_roundId, getAnswer[_roundId], getStartedAt[_roundId], getTimestamp[_roundId], _roundId);
@@ -53,6 +54,7 @@ contract MockV3Aggregator {
 
     function latestRoundData()
         external
+        view
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
     {
         return (
@@ -68,11 +70,11 @@ contract MockV3Aggregator {
         return address(this);
     }
 
-    function minAnswer() external view returns (int192) {
+    function minAnswer() external pure returns (int192) {
         return 0;
     }
 
-    function maxAnswer() external view returns (int192) {
+    function maxAnswer() external pure returns (int192) {
         return type(int192).max;
     }
 

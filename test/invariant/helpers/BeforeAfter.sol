@@ -173,12 +173,12 @@ contract BeforeAfter is FuzzSetup {
         _afterFrax.userLTV = _ltvGhost(lendingPair, user);
     }
 
-    function _cbrGhost() internal returns (uint256) {
+    function _cbrGhost() internal view returns (uint256) {
         uint256 totalSupply = _lendingAssetVault.totalSupply();
         return totalSupply == 0 ? PRECISION : (PRECISION * _lendingAssetVault.totalAssets()) / totalSupply;
     }
 
-    function _ltvGhost(address lendingPair, address borrower) internal returns (uint256) {
+    function _ltvGhost(address lendingPair, address borrower) internal view returns (uint256) {
         (,,,, uint256 highExchangeRate) = FraxlendPair(lendingPair).exchangeRateInfo();
 
         uint256 _borrowerAmount = VaultAccountingLibrary.toAmount(

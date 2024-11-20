@@ -43,16 +43,6 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
         POOL_REWARDS = address(new TokenRewards(INDEX_FUND, address(this), _leaveRewardsAsPairedLp, _immutables));
     }
 
-    /// @dev backwards compatibility
-    function indexFund() external view override returns (address) {
-        return INDEX_FUND;
-    }
-
-    /// @dev backwards compatibility
-    function poolRewards() external view override returns (address) {
-        return POOL_REWARDS;
-    }
-
     function stake(address _user, uint256 _amount) external override {
         require(stakingToken != address(0), "I");
         if (stakeUserRestriction != address(0)) {

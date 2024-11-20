@@ -22,10 +22,10 @@ contract MockTokenRewards {
 }
 
 contract MockStakingPoolToken is ERC20 {
-    address public poolRewards;
+    address public POOL_REWARDS;
 
     constructor(string memory name, string memory symbol, address _poolRewards) ERC20(name, symbol) {
-        poolRewards = _poolRewards;
+        POOL_REWARDS = _poolRewards;
         _mint(msg.sender, 1000000 * 10 ** 18);
     }
 }

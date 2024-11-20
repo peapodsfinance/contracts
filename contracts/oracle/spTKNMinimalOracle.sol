@@ -93,7 +93,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         }
         BASE_IN_CL = _baseInCl;
 
-        address _pod = IStakingPoolToken(SP_TKN).indexFund();
+        address _pod = IStakingPoolToken(SP_TKN).INDEX_FUND();
         IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_pod).getAllAssets();
         POD = _pod;
         UNDERLYING_TKN = _assets[0].token;

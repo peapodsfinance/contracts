@@ -87,7 +87,9 @@ contract UniswapV2Router01 {
         IWETH(WETH).deposit{value: amountETH}();
         assert(IWETH(WETH).transfer(pair, amountETH));
         liquidity = IUniswapV2Pair(pair).mint(to);
-        if (msg.value > amountETH) TransferHelper.safeTransferETH(msg.sender, msg.value - amountETH); // refund dust eth, if any
+        if (msg.value > amountETH) {
+            TransferHelper.safeTransferETH(msg.sender, msg.value - amountETH);
+        } // refund dust eth, if any
     }
 
     // **** REMOVE LIQUIDITY ****
@@ -269,7 +271,9 @@ contract UniswapV2Router01 {
         IWETH(WETH).deposit{value: amounts[0]}();
         assert(IWETH(WETH).transfer(UniswapV2Library.pairFor(factory, path[0], path[1]), amounts[0]));
         _swap(amounts, path, to);
-        if (msg.value > amounts[0]) TransferHelper.safeTransferETH(msg.sender, msg.value - amounts[0]); // refund dust eth, if any
+        if (msg.value > amounts[0]) {
+            TransferHelper.safeTransferETH(msg.sender, msg.value - amounts[0]);
+        } // refund dust eth, if any
     }
 
     function quote(uint256 amountA, uint256 reserveA, uint256 reserveB) public pure returns (uint256 amountB) {
@@ -292,11 +296,11 @@ contract UniswapV2Router01 {
         return UniswapV2Library.getAmountOut(amountOut, reserveIn, reserveOut);
     }
 
-    function getAmountsOut(uint256 amountIn, address[] memory path) public returns (uint256[] memory amounts) {
+    function getAmountsOut(uint256 amountIn, address[] memory path) public view returns (uint256[] memory amounts) {
         return UniswapV2Library.getAmountsOut(factory, amountIn, path);
     }
 
-    function getAmountsIn(uint256 amountOut, address[] memory path) public returns (uint256[] memory amounts) {
+    function getAmountsIn(uint256 amountOut, address[] memory path) public view returns (uint256[] memory amounts) {
         return UniswapV2Library.getAmountsIn(factory, amountOut, path);
     }
 }

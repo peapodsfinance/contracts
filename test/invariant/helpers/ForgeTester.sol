@@ -23,7 +23,7 @@ contract ForgeTest is
         setup();
     }
 
-    function test_invariant_setup() public {
+    function test_invariant_setup() public pure {
         assert(true);
     }
 

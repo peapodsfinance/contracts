@@ -34,7 +34,6 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
 
     uint256 constant FACTOR = 10 ** 18;
     uint24 constant REWARDS_POOL_FEE = 10000;
-    uint256 constant LP_SLIPPAGE = 80; // 8%
     uint256 constant REWARDS_SWAP_SLIPPAGE = 20; // 2%
 
     IDexAdapter immutable DEX_ADAPTER;
@@ -45,6 +44,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     ISPTknOracle public podOracle; // oracle to price pTKN per base for slippage
     bool public yieldConvEnabled = true;
     uint16 public protocolFee = 50; // 1000 precision
+    uint256 public lpSlippage = 300;
     // token in => token out => swap pool(s)
     mapping(address => mapping(address => Pools)) public swapMaps;
     // token in => max input amount to swap
@@ -189,7 +189,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         if (!yieldConvEnabled) {
             return _lpAmtOut;
         }
-        address[] memory _tokens = ITokenRewards(IStakingPoolToken(_asset()).poolRewards()).getAllRewardsTokens();
+        address[] memory _tokens = ITokenRewards(IStakingPoolToken(_asset()).POOL_REWARDS()).getAllRewardsTokens();
         uint256 _len = _tokens.length + 1;
         for (uint256 _i; _i < _len; _i++) {
             address _token = _i == _tokens.length ? pod.lpRewardsToken() : _tokens[_i];
@@ -289,7 +289,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
             IERC20(pod).safeIncreaseAllowance(address(indexUtils), _podAmountOut);
             IERC20(_pairedLpToken).safeIncreaseAllowance(address(indexUtils), _pairedRemaining);
             try indexUtils.addLPAndStake(
-                pod, _podAmountOut, _pairedLpToken, _pairedRemaining, _pairedRemaining, LP_SLIPPAGE, _deadline
+                pod, _podAmountOut, _pairedLpToken, _pairedRemaining, _pairedRemaining, lpSlippage, _deadline
             ) returns (uint256 _lpTknOut) {
                 _amountOut = _lpTknOut;
             } catch {
@@ -401,6 +401,11 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
 
     function setPodOracle(ISPTknOracle _oracle) external onlyOwner {
         podOracle = _oracle;
+    }
+
+    function setLpSlippage(uint256 _slippage) external onlyOwner {
+        require(_slippage <= 1000, "MAX");
+        lpSlippage = _slippage;
     }
 
     function setYieldConvEnabled(bool _enabled) external onlyOwner {

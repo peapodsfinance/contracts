@@ -362,15 +362,7 @@ contract MockStakingPoolToken is ERC20, IStakingPoolToken {
         return address(0);
     }
 
-    function indexFund() external pure override returns (address) {
-        return address(0);
-    }
-
     function POOL_REWARDS() external view override returns (address) {
-        return _poolRewards;
-    }
-
-    function poolRewards() external view override returns (address) {
         return _poolRewards;
     }
 

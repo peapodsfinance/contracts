@@ -311,12 +311,12 @@ contract LeverageManagerHandler is Properties {
     }
 
     function _solventCheckAfterRepay(
-        address borrower,
+        address,
         address lendingPair,
         uint256 sharesAvailable,
         uint256 repayShares,
         uint256 _collateralAmount
-    ) internal returns (bool isSolvent) {
+    ) internal view returns (bool isSolvent) {
         (,,,, uint256 highExchangeRate) = FraxlendPair(lendingPair).exchangeRateInfo();
 
         uint256 sharesAfterRepay = sharesAvailable - repayShares;

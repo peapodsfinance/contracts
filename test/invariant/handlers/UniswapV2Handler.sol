@@ -185,8 +185,8 @@ contract UniswapV2Handler is Properties {
         cache.pairBalanceToken0 = cache.pod.balanceOf(address(cache.pair));
         cache.pairBalanceToken1 = IERC20(cache.pairedToken).balanceOf(address(cache.pair));
 
-        uint256 amount0 = liquidity.mul(cache.pairBalanceToken0) / cache.pair.totalSupply();
-        uint256 amount1 = liquidity.mul(cache.pairBalanceToken1) / cache.pair.totalSupply();
+        // uint256 amount0 = liquidity.mul(cache.pairBalanceToken0) / cache.pair.totalSupply();
+        // uint256 amount1 = liquidity.mul(cache.pairBalanceToken1) / cache.pair.totalSupply();
 
         vm.prank(cache.from);
         cache.pair.approve(address(_v2SwapRouter), type(uint256).max);
@@ -235,7 +235,9 @@ contract UniswapV2Handler is Properties {
         if (cache.token == address(cache.pod)) {
             if (cache.pod.balanceOf(cache.from) < amount) return;
         } else {
-            if (IERC20(cache.pairedToken).balanceOf(cache.from) < amount) return;
+            if (IERC20(cache.pairedToken).balanceOf(cache.from) < amount) {
+                return;
+            }
         }
         // ACTION
         vm.prank(cache.from);

@@ -8,11 +8,7 @@ interface IStakingPoolToken {
 
     function INDEX_FUND() external view returns (address);
 
-    function indexFund() external view returns (address);
-
     function POOL_REWARDS() external view returns (address);
-
-    function poolRewards() external view returns (address);
 
     function stakingToken() external view returns (address);
 

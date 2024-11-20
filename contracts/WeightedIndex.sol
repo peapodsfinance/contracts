@@ -4,8 +4,6 @@
 pragma solidity ^0.8.19;
 
 import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
-import "./interfaces/IUniswapV2Pair.sol";
-import "./interfaces/IV3TwapUtilities.sol";
 import "./DecentralizedIndex.sol";
 
 contract WeightedIndex is DecentralizedIndex {
