@@ -135,6 +135,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
 
     function withdraw(uint256 _assets, address _receiver, address _owner) external override returns (uint256 _shares) {
+        _processRewardsToPodLp(0, block.timestamp);
         _shares = convertToShares(_assets);
         _withdraw(_assets, _shares, _msgSender(), _owner, _receiver);
     }
@@ -148,6 +149,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
 
     function redeem(uint256 _shares, address _receiver, address _owner) external override returns (uint256 _assets) {
+        _processRewardsToPodLp(0, block.timestamp);
         _assets = convertToAssets(_shares);
         _withdraw(_assets, _shares, _msgSender(), _owner, _receiver);
     }
@@ -166,8 +168,6 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         if (_caller != _owner) {
             _spendAllowance(_owner, _caller, _shares);
         }
-
-        _processRewardsToPodLp(0, block.timestamp);
 
         _totalAssets -= _assets;
         _burn(_owner, _shares);
