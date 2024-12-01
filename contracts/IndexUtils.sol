@@ -195,46 +195,6 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
         return _idxTokensGained;
     }
 
-    function _zapIndexTokensAndNative(
-        address _user,
-        IDecentralizedIndex _indexFund,
-        uint256 _amountTokens,
-        uint256 _amountETH,
-        uint256 _amtPairedLpTokenMin,
-        uint256 _slippage,
-        uint256 _deadline
-    ) internal {
-        address _pairedLpToken = _indexFund.PAIRED_LP_TOKEN();
-        uint256 _tokensBefore = IERC20(address(_indexFund)).balanceOf(address(this)) - _amountTokens;
-        uint256 _pairedLpTokenBefore = IERC20(_pairedLpToken).balanceOf(address(this));
-        address _stakingPool = _indexFund.lpStakingPool();
-
-        _zap(address(0), _pairedLpToken, _amountETH, _amtPairedLpTokenMin);
-
-        address _v2Pool = DEX_ADAPTER.getV2Pool(address(_indexFund), _pairedLpToken);
-        uint256 _lpTokensBefore = IERC20(_v2Pool).balanceOf(address(this));
-        IERC20(_pairedLpToken).safeIncreaseAllowance(
-            address(_indexFund), IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore
-        );
-        _indexFund.addLiquidityV2(
-            _amountTokens, IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore, _slippage, _deadline
-        );
-        IERC20(_v2Pool).safeIncreaseAllowance(_stakingPool, IERC20(_v2Pool).balanceOf(address(this)) - _lpTokensBefore);
-        IStakingPoolToken(_stakingPool).stake(_user, IERC20(_v2Pool).balanceOf(address(this)) - _lpTokensBefore);
-
-        // check & refund excess tokens from LPing as needed
-        if (IERC20(address(_indexFund)).balanceOf(address(this)) > _tokensBefore) {
-            IERC20(address(_indexFund)).safeTransfer(
-                _user, IERC20(address(_indexFund)).balanceOf(address(this)) - _tokensBefore
-            );
-        }
-        if (IERC20(_pairedLpToken).balanceOf(address(this)) > _pairedLpTokenBefore) {
-            IERC20(_pairedLpToken).safeTransfer(
-                _user, IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore
-            );
-        }
-    }
-
     function _checkAndRefundERC20(address _user, address _asset, uint256 _beforeBal) internal {
         uint256 _curBal = IERC20(_asset).balanceOf(address(this));
         if (_curBal > _beforeBal) {
