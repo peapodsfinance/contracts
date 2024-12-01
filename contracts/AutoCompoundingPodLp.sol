@@ -237,7 +237,11 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
 
         address _rewardsToken = pod.lpRewardsToken();
         if (_token != _rewardsToken) {
-            return _swap(_token, _swapOutputTkn, _amountIn, 0);
+            _amountOut = _swap(_token, _swapOutputTkn, _amountIn, 0);
+            if (IS_PAIRED_LENDING_PAIR) {
+                _amountOut = _depositIntoLendingPair(_pairedLpToken, _swapOutputTkn, _amountOut);
+            }
+            return _amountOut;
         }
         uint256 _amountInOverride = _tokenToPairedSwapAmountInOverride[_rewardsToken][_swapOutputTkn];
         if (_amountInOverride > 0) {
@@ -260,8 +264,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
             // if this is a self-lending pod, convert the received borrow token
             // into fTKN shares and use as the output since it's the pod paired LP token
             if (IS_PAIRED_LENDING_PAIR) {
-                IERC20(_swapOutputTkn).safeIncreaseAllowance(address(_pairedLpToken), _amountOut);
-                _amountOut = IFraxlendPair(_pairedLpToken).deposit(_amountOut, address(this));
+                _amountOut = _depositIntoLendingPair(_pairedLpToken, _swapOutputTkn, _amountOut);
             }
         } catch {
             _tokenToPairedSwapAmountInOverride[_rewardsToken][_swapOutputTkn] =
@@ -269,6 +272,14 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
             IERC20(_rewardsToken).safeDecreaseAllowance(address(DEX_ADAPTER), _amountIn);
             emit TokenToPairedLpSwapError(_rewardsToken, _swapOutputTkn, _amountIn);
         }
+    }
+
+    function _depositIntoLendingPair(address _lendingPair, address _pairAsset, uint256 _depositAmt)
+        internal
+        returns (uint256 _shares)
+    {
+        IERC20(_pairAsset).safeIncreaseAllowance(address(_lendingPair), _depositAmt);
+        _shares = IFraxlendPair(_lendingPair).deposit(_depositAmt, address(this));
     }
 
     function _pairedLpTokenToPodLp(uint256 _amountIn, uint256 _deadline) internal returns (uint256 _amountOut) {
