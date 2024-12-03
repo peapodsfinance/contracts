@@ -33,10 +33,12 @@ contract MockStakingPoolToken is ERC20 {
 contract MockDecentralizedIndex {
     address public lpRewardsToken;
     address public lpStakingPool;
+    address public PAIRED_LP_TOKEN;
 
-    constructor(address _lpRewardsToken, address _lpStakingPool) {
+    constructor(address _lpRewardsToken, address _lpStakingPool, address _pairedLpTkn) {
         lpRewardsToken = _lpRewardsToken;
         lpStakingPool = _lpStakingPool;
+        PAIRED_LP_TOKEN = _pairedLpTkn;
     }
 }
 
@@ -64,7 +66,7 @@ contract AutoCompoundingPodLpFactoryTest is Test {
         rewardsToken = new MockERC20("Test Token2", "TEST2");
         tokenRewards = new MockTokenRewards();
         stakingPoolToken = new MockStakingPoolToken("Staking Pool Token", "SPT", address(tokenRewards));
-        pod = new MockDecentralizedIndex(address(rewardsToken), address(stakingPoolToken));
+        pod = new MockDecentralizedIndex(address(rewardsToken), address(stakingPoolToken), address(asset));
         dexAdapter = new MockDexAdapter();
         indexUtils = new MockIndexUtils();
         factory = new AutoCompoundingPodLpFactory();

@@ -29,6 +29,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
     uint256 constant PRECISION = 10 ** 27;
 
     address immutable _asset;
+    uint8 immutable _decimals;
     uint256 _totalAssets;
     uint256 _totalAssetsUtilized;
 
@@ -52,6 +53,11 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
 
     constructor(string memory _name, string memory _symbol, address __asset) ERC20(_name, _symbol) ERC20Permit(_name) {
         _asset = __asset;
+        _decimals = IERC20Metadata(__asset).decimals();
+    }
+
+    function decimals() public view override(IERC20Metadata, ERC20) returns (uint8) {
+        return _decimals;
     }
 
     function asset() external view override returns (address) {
