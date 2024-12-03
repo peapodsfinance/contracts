@@ -193,7 +193,8 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         uint256 _len = _tokens.length + 1;
         for (uint256 _i; _i < _len; _i++) {
             address _token = _i == _tokens.length ? pod.lpRewardsToken() : _tokens[_i];
-            uint256 _bal = IERC20(_token).balanceOf(address(this));
+            uint256 _bal =
+                IERC20(_token).balanceOf(address(this)) - (_token == pod.PAIRED_LP_TOKEN() ? _protocolFees : 0);
             if (_bal == 0) {
                 continue;
             }
