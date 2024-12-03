@@ -23,7 +23,7 @@ contract IndexManager is IIndexManager, Context, Ownable {
         return indexes;
     }
 
-    function setAuthorized(address _auth, bool _isAuthed) external onlyAuthorized {
+    function setAuthorized(address _auth, bool _isAuthed) external onlyOwner {
         require(authorized[_auth] != _isAuthed, "CHANGE");
         authorized[_auth] = _isAuthed;
     }
