@@ -86,10 +86,10 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         bytes memory _config
     ) external override workflow(true) {
         address _sender = _msgSender();
-        address _owner = _positionId == 0 ? _sender : positionNFT.ownerOf(_positionId);
         if (_positionId == 0) {
             _positionId = _initializePosition(_pod, _sender, address(0), _selfLendingPairPod);
         } else {
+            address _owner = positionNFT.ownerOf(_positionId);
             require(
                 _owner == _sender || positionNFT.getApproved(_positionId) == _sender
                     || positionNFT.isApprovedForAll(_owner, _sender),
