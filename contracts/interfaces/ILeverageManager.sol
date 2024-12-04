@@ -10,7 +10,8 @@ interface ILeverageManager {
     struct LeverageFlashProps {
         FlashCallbackMethod method;
         uint256 positionId;
-        address user;
+        address owner;
+        address sender;
         uint256 pTknAmt;
         uint256 pairedLpDesired;
         bytes config;
