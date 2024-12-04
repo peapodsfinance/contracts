@@ -31,6 +31,8 @@ interface IFraxlendPair is IERC20 {
 
     function convertToAssets(uint256 shares) external view returns (uint256 assets);
 
+    function convertToShares(uint256 assets) external view returns (uint256 shares);
+
     function userCollateralBalance(address user) external view returns (uint256); // amount of collateral each user is backed
 
     function userBorrowShares(address user) external view returns (uint256); // represents the shares held by individuals

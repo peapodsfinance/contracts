@@ -380,7 +380,10 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         if (_borrowAmtNeededToSwap > 0) {
             if (_isPodSelfLending(_props.positionId)) {
                 _podAmtRemaining = _swapPodForBorrowToken(
-                    _pod, positionProps[_props.positionId].lendingPair, _podAmtReceived, _borrowAmtNeededToSwap
+                    _pod,
+                    positionProps[_props.positionId].lendingPair,
+                    _podAmtReceived,
+                    IFraxlendPair(positionProps[_props.positionId].lendingPair).convertToShares(_borrowAmtNeededToSwap)
                 );
                 IFraxlendPair(positionProps[_props.positionId].lendingPair).redeem(
                     IERC20(positionProps[_props.positionId].lendingPair).balanceOf(address(this)),
