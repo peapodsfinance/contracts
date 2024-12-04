@@ -382,8 +382,10 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
                 _podAmtRemaining = _swapPodForBorrowToken(
                     _pod, positionProps[_props.positionId].lendingPair, _podAmtReceived, _borrowAmtNeededToSwap
                 );
-                _podAmtRemaining = IFraxlendPair(positionProps[_props.positionId].lendingPair).redeem(
-                    _podAmtRemaining, address(this), address(this)
+                IFraxlendPair(positionProps[_props.positionId].lendingPair).redeem(
+                    IERC20(positionProps[_props.positionId].lendingPair).balanceOf(address(this)),
+                    address(this),
+                    address(this)
                 );
             } else {
                 _podAmtRemaining = _swapPodForBorrowToken(_pod, _borrowToken, _podAmtReceived, _borrowAmtNeededToSwap);
