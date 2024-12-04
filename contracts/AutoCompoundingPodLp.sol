@@ -298,6 +298,9 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         try DEX_ADAPTER.swapV2Single(_pairedLpToken, address(pod), _pairedSwapAmt, _minPtknOut, address(this)) returns (
             uint256 _podAmountOut
         ) {
+            // reset here to local balances to accommodate any residual leftover from previous runs
+            _podAmountOut = pod.balanceOf(address(this));
+            _pairedRemaining = IERC20(_pairedLpToken).balanceOf(address(this)) - _protocolFees;
             IERC20(pod).safeIncreaseAllowance(address(indexUtils), _podAmountOut);
             IERC20(_pairedLpToken).safeIncreaseAllowance(address(indexUtils), _pairedRemaining);
             try indexUtils.addLPAndStake(
