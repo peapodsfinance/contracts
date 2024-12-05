@@ -101,6 +101,7 @@ contract WeightedIndex is DecentralizedIndex {
         } else {
             _shares = (_totalSupply * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
         }
+        _shares -= ((_shares * fees.bond) / DEN);
     }
 
     /// @notice The ```convertToAssets``` function returns the number of TKN returned based on burning _shares pTKN excluding fees
@@ -114,6 +115,7 @@ contract WeightedIndex is DecentralizedIndex {
         } else {
             _assets = (_totalAssets[indexTokens[0].token] * _percSharesX96_2) / 2 ** (96 / 2);
         }
+        _assets -= ((_assets * fees.debond) / DEN);
     }
 
     /// @notice The ```bond``` function wraps a user into a pod and mints new pTKN
