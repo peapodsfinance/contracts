@@ -78,7 +78,9 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         V2_RESERVES = IV2Reserves(_v2Reserves);
 
         // only one (or neither) of the base conversion config should be populated
-        require(BASE_CONVERSION_CHAINLINK_FEED == address(0) || BASE_CONVERSION_CL_POOL == address(0), "CONV");
+        address _baseConvFinal =
+            BASE_CONVERSION_DIA_FEED != address(0) ? BASE_CONVERSION_DIA_FEED : BASE_CONVERSION_CL_POOL;
+        require(BASE_CONVERSION_CHAINLINK_FEED == address(0) || _baseConvFinal == address(0), "CONV");
 
         if (CHAINLINK_QUOTE_PRICE_FEED != address(0)) {
             require(CHAINLINK_BASE_PRICE_FEED != address(0), "BCLF");

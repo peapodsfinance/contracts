@@ -72,10 +72,10 @@ contract AutoCompoundingPodLpTest is Test {
     function testSetYieldConvEnabled() public {
         assertEq(autoCompoundingPodLp.yieldConvEnabled(), true);
 
-        autoCompoundingPodLp.setYieldConvEnabled(false);
+        autoCompoundingPodLp.setYieldConvEnabled(false, false, 0, 0);
         assertEq(autoCompoundingPodLp.yieldConvEnabled(), false);
 
-        autoCompoundingPodLp.setYieldConvEnabled(true);
+        autoCompoundingPodLp.setYieldConvEnabled(true, false, 0, 0);
         assertEq(autoCompoundingPodLp.yieldConvEnabled(), true);
     }
 
