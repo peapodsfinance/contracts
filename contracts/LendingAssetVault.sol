@@ -35,6 +35,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
 
     uint8 public maxVaults = 20;
     mapping(address => bool) public vaultWhitelist;
+    mapping(address => uint256) public override vaultDeposits;
     mapping(address => uint256) public override vaultUtilization;
     mapping(address => uint256) public override vaultMaxAllocation;
     mapping(address => uint256) _vaultWhitelistCbr;
@@ -79,9 +80,8 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
     function totalAvailableAssetsForVault(address _vault) public view override returns (uint256 _totalVaultAvailable) {
         uint256 _overallAvailable = totalAvailableAssets();
 
-        _totalVaultAvailable = vaultMaxAllocation[_vault] > vaultUtilization[_vault]
-            ? vaultMaxAllocation[_vault] - vaultUtilization[_vault]
-            : 0;
+        _totalVaultAvailable =
+            vaultMaxAllocation[_vault] > vaultDeposits[_vault] ? vaultMaxAllocation[_vault] - vaultDeposits[_vault] : 0;
 
         _totalVaultAvailable = _overallAvailable < _totalVaultAvailable ? _overallAvailable : _totalVaultAvailable;
     }
@@ -227,6 +227,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
 
         // validate max after doing vault accounting above
         require(totalAvailableAssetsForVault(_vault) >= _assetAmt, "MAX");
+        vaultDeposits[_vault] += _assetAmt;
         vaultUtilization[_vault] += _assetAmt;
         _totalAssetsUtilized += _assetAmt;
         IERC20(_asset).safeTransfer(_vault, _assetAmt);
@@ -239,6 +240,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
     function whitelistDeposit(uint256 _assetAmt) external override onlyWhitelist {
         address _vault = _msgSender();
         _updateAssetMetadataFromVault(_vault);
+        vaultDeposits[_vault] -= _assetAmt > vaultDeposits[_vault] ? vaultDeposits[_vault] : _assetAmt;
         vaultUtilization[_vault] -= _assetAmt;
         _totalAssetsUtilized -= _assetAmt;
         IERC20(_asset).safeTransferFrom(_vault, address(this), _assetAmt);
@@ -286,6 +288,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
         IERC20(_asset).safeIncreaseAllowance(_vault, _amountAssets);
         uint256 _amountShares = IERC4626(_vault).deposit(_amountAssets, address(this));
         require(totalAvailableAssetsForVault(_vault) >= _amountAssets, "MAX");
+        vaultDeposits[_vault] += _amountAssets;
         vaultUtilization[_vault] += _amountAssets;
         _totalAssetsUtilized += _amountAssets;
         emit DepositToVault(_vault, _amountAssets, _amountShares);
@@ -299,6 +302,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
         _amountShares = _amountShares == 0 ? IERC20(_vault).balanceOf(address(this)) : _amountShares;
         uint256 _amountAssets = IERC4626(_vault).redeem(_amountShares, address(this), address(this));
         uint256 _redeemAmt = vaultUtilization[_vault] < _amountAssets ? vaultUtilization[_vault] : _amountAssets;
+        vaultDeposits[_vault] -= _redeemAmt > vaultDeposits[_vault] ? vaultDeposits[_vault] : _redeemAmt;
         vaultUtilization[_vault] -= _redeemAmt;
         _totalAssetsUtilized -= _redeemAmt;
         emit RedeemFromVault(_vault, _amountShares, _redeemAmt);
