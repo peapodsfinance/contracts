@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
@@ -81,11 +82,11 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
 
     function convertToShares(uint256 _assets) public view override returns (uint256 _shares) {
-        return (_assets * FACTOR) / _cbr();
+        return Math.mulDiv(_assets, FACTOR, _cbr(), Math.Rounding.Down);
     }
 
     function convertToAssets(uint256 _shares) public view override returns (uint256 _assets) {
-        return (_shares * _cbr()) / FACTOR;
+        return Math.mulDiv(_shares, _cbr(), FACTOR, Math.Rounding.Up);
     }
 
     function maxDeposit(address) external pure override returns (uint256 maxAssets) {
