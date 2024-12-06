@@ -29,9 +29,25 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
 
     event AddLpAndStakeV2SwapError(address pairedLpToken, address pod, uint256 amountIn);
 
+    event SetIndexUtils(address indexUtils);
+
+    event SetLpSlippage(uint256 slippage);
+
+    event SetMaxSwap(address tokenIn, uint256 maxSwap);
+
+    event SetPod(address pod);
+
+    event SetPodOracle(address oracle);
+
     event SetProtocolFee(uint16 oldFee, uint16 newFee);
 
+    event SetSwapMap(address tokenIn, address tokenOut);
+
+    event SetYieldConvEnabled(bool enabled);
+
     event TokenToPairedLpSwapError(address rewardsToken, address pairedLpToken, uint256 amountIn);
+
+    event WithdrawProtocolFees(uint256 feesToPay);
 
     uint256 constant FACTOR = 10 ** 18;
     uint24 constant REWARDS_POOL_FEE = 10000;
@@ -388,14 +404,17 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         uint256 _feesToPay = _protocolFees;
         _protocolFees = 0;
         IERC20(pod.PAIRED_LP_TOKEN()).safeTransfer(_msgSender(), _feesToPay);
+        emit WithdrawProtocolFees(_feesToPay);
     }
 
     function setSwapMap(address _in, address _out, Pools memory _pools) external onlyOwner {
         swapMaps[_in][_out] = _pools;
+        emit SetSwapMap(_in, _out);
     }
 
     function setMaxSwap(address _in, uint256 _amt) external onlyOwner {
         maxSwap[_in] = _amt;
+        emit SetMaxSwap(_in, _amt);
     }
 
     function setPod(IDecentralizedIndex _pod) external onlyOwner {
@@ -409,24 +428,33 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         }
         require(address(pod) == address(0), "S");
         pod = _pod;
+        emit SetPod(address(_pod));
     }
 
     function setIndexUtils(IIndexUtils _utils) external onlyOwner {
         indexUtils = _utils;
+        emit SetIndexUtils(address(_utils));
     }
 
     function setPodOracle(ISPTknOracle _oracle) external onlyOwner {
         podOracle = _oracle;
+        emit SetPodOracle(address(_oracle));
     }
 
     function setLpSlippage(uint256 _slippage) external onlyOwner {
         require(_slippage <= 1000, "MAX");
         lpSlippage = _slippage;
+        emit SetLpSlippage(_slippage);
     }
 
-    function setYieldConvEnabled(bool _enabled) external onlyOwner {
+    function setYieldConvEnabled(bool _enabled, bool _triggerRewards, uint256 _lpMinOut, uint256 _deadline)
+        external
+        onlyOwner
+    {
         require(yieldConvEnabled != _enabled, "T");
+        if (_triggerRewards) _processRewardsToPodLp(_lpMinOut, _deadline);
         yieldConvEnabled = _enabled;
+        emit SetYieldConvEnabled(_enabled);
     }
 
     function setProtocolFee(uint16 _newFee, uint256 _lpMinOut, uint256 _deadline) external onlyOwner {
