@@ -82,11 +82,11 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
 
     function convertToShares(uint256 _assets) public view override returns (uint256 _shares) {
-        return Math.mulDiv(_assets, FACTOR, _cbr(), Math.Rounding.Down);
+        return Math.mulDiv(_assets, FACTOR, _cbr(), Math.Rounding.Up);
     }
 
     function convertToAssets(uint256 _shares) public view override returns (uint256 _assets) {
-        return Math.mulDiv(_shares, _cbr(), FACTOR, Math.Rounding.Up);
+        return Math.mulDiv(_shares, _cbr(), FACTOR, Math.Rounding.Down);
     }
 
     function maxDeposit(address) external pure override returns (uint256 maxAssets) {
