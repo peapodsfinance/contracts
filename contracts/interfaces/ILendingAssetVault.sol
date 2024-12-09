@@ -18,7 +18,7 @@ interface ILendingAssetVault {
 
     event SetVaultMaxAllocation(address indexed vault, uint256 allocation);
 
-    event UpdateAssetMetadataFromVault(address indexed vault);
+    event UpdateAssetMetadataFromVault(address indexed vault, uint256 totalAssets, uint256 assetsUtilized);
 
     event WhitelistDeposit(address indexed user, uint256 amount);
 
