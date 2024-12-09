@@ -64,7 +64,10 @@ contract WeightedIndex is DecentralizedIndex {
             (address _pairedLpToken,,,,,, address _dexAdapter) =
                 abi.decode(_immutables, (address, address, address, address, address, address, address));
             if (_config.blacklistTKNpTKNPoolV2 && _tokens[_i] != _pairedLpToken) {
-                address _blkPool = IDexAdapter(_dexAdapter).createV2Pool(address(this), _tokens[_i]);
+                address _blkPool = IDexAdapter(_dexAdapter).getV2Pool(address(this), _tokens[_i]);
+                if (_blkPool == address(0)) {
+                    _blkPool = IDexAdapter(_dexAdapter).createV2Pool(address(this), _tokens[_i]);
+                }
                 _blacklist[_blkPool] = true;
             }
         }
