@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "forge-std/Script.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "../contracts/interfaces/IDecentralizedIndex.sol";
+import "../contracts/interfaces/IDexAdapter.sol";
+import "../contracts/interfaces/IIndexUtils.sol";
+import "../contracts/AutoCompoundingPodLp.sol";
+
+contract DeployAutoCompoundingPodLp is Script {
+    function run() external {
+        vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
+
+        address pod = vm.envAddress("POD");
+        address dexAdapter = vm.envAddress("ADAPTER");
+        address indexUtils = vm.envAddress("UTILS");
+
+        address asp = address(
+            new AutoCompoundingPodLp(
+                string.concat("Auto Compounding LP for ", IERC20Metadata(pod).name()),
+                string.concat("as", IERC20Metadata(pod).symbol()),
+                false,
+                IDecentralizedIndex(pod),
+                IDexAdapter(dexAdapter),
+                IIndexUtils(indexUtils)
+            )
+        );
+
+        vm.stopBroadcast();
+
+        console.log("aspTKN deployed to:", address(asp));
+    }
+}
