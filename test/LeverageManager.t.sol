@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -15,9 +15,10 @@ import {UniswapDexAdapter} from "../contracts/dex/UniswapDexAdapter.sol";
 import {BalancerFlashSource} from "../contracts/flash/BalancerFlashSource.sol";
 import {LeverageManager} from "../contracts/lvf/LeverageManager.sol";
 import {MockFraxlendPair} from "./mocks/MockFraxlendPair.sol";
+import {PodHelperTest} from "./helpers/PodHelper.t.sol";
 import "forge-std/console.sol";
 
-contract LeverageManagerTest is Test {
+contract LeverageManagerTest is PodHelperTest {
     IIndexUtils public idxUtils;
     BalancerFlashSource public flashSource;
     AutoCompoundingPodLp public aspTkn;
@@ -36,7 +37,8 @@ contract LeverageManagerTest is Test {
     address public constant BOB = address(0x2);
     uint256 public constant INITIAL_BALANCE = 1000000 * 1e18;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         uint16 fee = 100;
         peas = PEAS(0x02f92800F57BCD74066F5709F1Daa1A4302Df875);
         whitelister = new RewardsWhitelist();
@@ -56,14 +58,14 @@ contract LeverageManagerTest is Test {
         _t[0] = address(peas);
         uint256[] memory _w = new uint256[](1);
         _w[0] = 100;
-        pod = new WeightedIndex(
+        address _pod = _createPod(
             "Test",
             "pTEST",
             _c,
             _f,
             _t,
             _w,
-            false,
+            address(0),
             false,
             abi.encode(
                 dai,
@@ -75,6 +77,7 @@ contract LeverageManagerTest is Test {
                 dexAdapter
             )
         );
+        pod = WeightedIndex(payable(_pod));
 
         spTkn = pod.lpStakingPool();
         aspTkn = new AutoCompoundingPodLp("aspTKN", "aspTKN", false, pod, dexAdapter, idxUtils);

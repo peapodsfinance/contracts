@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import "../contracts/voting/VotingPool.sol";
@@ -8,8 +8,9 @@ import "../contracts/interfaces/IRewardsWhitelister.sol";
 import "../contracts/interfaces/IDexAdapter.sol";
 import "../contracts/interfaces/IV3TwapUtilities.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {PodHelperTest} from "./helpers/PodHelper.t.sol";
 
-contract VotingPoolTest is Test {
+contract VotingPoolTest is PodHelperTest {
     VotingPool public votingPool;
     MockERC20 public pairedLpToken;
     MockERC20 public rewardsToken;
@@ -21,7 +22,8 @@ contract VotingPoolTest is Test {
     address public bob = address(0x2);
     uint256 public constant INITIAL_BALANCE = 1000 * 1e18;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         pairedLpToken = new MockERC20("Paired LP Token", "PLP");
         rewardsToken = new MockERC20("Reward Token", "RWD");
         mockFeeRouter = new MockProtocolFeeRouter();
@@ -29,7 +31,11 @@ contract VotingPoolTest is Test {
         mockDexAdapter = new MockDexAdapter();
         mockV3TwapUtilities = new MockV3TwapUtilities();
 
+        (,, address tokenRewardsImpl,,, address tokenRewardsBeacon) = _podDeployerSub.deployedContracts();
+
         votingPool = new VotingPool(
+            tokenRewardsBeacon,
+            tokenRewardsImpl,
             abi.encode(
                 address(pairedLpToken),
                 address(rewardsToken),

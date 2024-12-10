@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import "../contracts/AutoCompoundingPodLpFactory.sol";
@@ -177,7 +177,7 @@ contract AutoCompoundingPodLpFactoryTest is Test {
 
         // Try to create an AutoCompoundingPodLp as a non-owner
         vm.prank(user);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user));
         factory.create(
             name,
             symbol,

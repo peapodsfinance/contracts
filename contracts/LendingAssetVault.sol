@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -52,7 +52,11 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
         _;
     }
 
-    constructor(string memory _name, string memory _symbol, address __asset) ERC20(_name, _symbol) ERC20Permit(_name) {
+    constructor(string memory _name, string memory _symbol, address __asset)
+        ERC20(_name, _symbol)
+        ERC20Permit(_name)
+        Ownable(_msgSender())
+    {
         _asset = __asset;
         _decimals = IERC20Metadata(__asset).decimals();
     }
@@ -271,12 +275,12 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
             : _currentAssetsUtilized + _changeUtilizedState;
         _totalAssetsUtilized = _totalAssetsUtilized - _currentAssetsUtilized + vaultUtilization[_vault];
         _totalAssets = _totalAssets - _currentAssetsUtilized + vaultUtilization[_vault];
-        emit UpdateAssetMetadataFromVault(_vault);
+        emit UpdateAssetMetadataFromVault(_vault, _totalAssets, _totalAssetsUtilized);
     }
 
-    function _transfer(address _from, address _to, uint256 _amount) internal override {
+    function _update(address _from, address _to, uint256 _value) internal override {
         _lastDeposit[_to] = block.number;
-        super._transfer(_from, _to, _amount);
+        super._update(_from, _to, _value);
     }
 
     /// @notice The ```depositToVault``` function deposits assets to a specific vault

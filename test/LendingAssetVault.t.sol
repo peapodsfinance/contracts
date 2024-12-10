@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
@@ -275,7 +275,7 @@ contract LendingAssetVaultTest is Test {
 
         address notOwner = makeAddr("notOwner");
         vm.startPrank(notOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
         _lendingAssetVault.depositToVault(address(_testVault), _extDepAmt);
         vm.stopPrank();
     }

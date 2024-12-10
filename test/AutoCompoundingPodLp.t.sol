@@ -133,6 +133,8 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
 
     constructor() ERC20("Test Pod", "ptPOD") {}
 
+    function setup() external {}
+
     function setLpStakingPool(address newLpStakingPool) external {
         _lpStakingPool = newLpStakingPool;
     }
@@ -346,6 +348,7 @@ contract MockERC20 is ERC20 {
 }
 
 contract MockStakingPoolToken is ERC20, IStakingPoolToken {
+    address private _stakingPoolToken;
     address private _poolRewards;
     uint256 private constant _CONVERSION_FACTOR = 1e18;
     uint256 private constant _REWARDS_DURATION = 7 days;
@@ -354,8 +357,12 @@ contract MockStakingPoolToken is ERC20, IStakingPoolToken {
 
     constructor() ERC20("Mock Staking Pool Token", "MSPT") {}
 
-    function setPoolRewards(address newPoolRewards) external {
+    function setPoolRewards(address newPoolRewards) external override {
         _poolRewards = newPoolRewards;
+    }
+
+    function setStakingToken(address __stakingToken) external override {
+        _stakingPoolToken = __stakingToken;
     }
 
     function INDEX_FUND() external pure override returns (address) {

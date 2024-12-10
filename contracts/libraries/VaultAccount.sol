@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: ISC
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 struct VaultAccount {
     uint128 amount; // Total amount, analogous to market cap

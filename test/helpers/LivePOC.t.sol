@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -38,9 +38,11 @@ import "../../contracts/interfaces/IUniswapV2Pair.sol";
 import "../../contracts/interfaces/IUniswapV2Router02.sol";
 import "../../contracts/interfaces/IV3TwapUtilities.sol";
 
+import {PodHelperTest} from "./PodHelper.t.sol";
+
 import {console} from "forge-std/console.sol";
 
-contract LivePOC is Test {
+contract LivePOC is PodHelperTest {
     FraxlendPairDeployer deployer;
     FraxlendPair pair;
     ERC20 DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
@@ -84,8 +86,9 @@ contract LivePOC is Test {
     address public attacker = makeAddr("attacker");
     address public user;
 
-    function setUp() public {
+    function setUp() public override {
         // vm.createSelectFork(vm.envString("RPC"));
+        super.setUp();
 
         peas = PEAS(0x02f92800F57BCD74066F5709F1Daa1A4302Df875);
         weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -118,14 +121,14 @@ contract LivePOC is Test {
         uint256[] memory _w = new uint256[](1);
         _w[0] = 100;
         vm.label(address(idxUtils), "IndexUtils");
-        pod = new WeightedIndex(
+        address _pod = _createPod(
             "Test",
             "pTEST",
             _c,
             _f,
             _t,
             _w,
-            false,
+            address(0),
             false,
             abi.encode(
                 address(DAI), // _pairedLpToken
@@ -137,6 +140,7 @@ contract LivePOC is Test {
                 dexAdapter // _dexAdapter
             )
         );
+        pod = WeightedIndex(payable(_pod));
         vm.label(address(pod), "Pod");
 
         // mocking some liquidity in the pool
@@ -211,14 +215,14 @@ contract LivePOC is Test {
         _t[0] = address(DAI);
         uint256[] memory _w = new uint256[](1);
         _w[0] = 100;
-        selfLendingPod = new WeightedIndex(
+        address _pod = _createPod(
             "Test",
             "pTEST",
             _c,
             _f,
             _t,
             _w,
-            false,
+            address(0),
             false,
             abi.encode(
                 address(pair), // fDAI is the _pairedLPToken
@@ -230,6 +234,7 @@ contract LivePOC is Test {
                 dexAdapter // _dexAdapter
             )
         );
+        selfLendingPod = WeightedIndex(payable(_pod));
         vm.label(address(selfLendingPod), "SelfLendingPod");
 
         // mocking some liquidity in the pool

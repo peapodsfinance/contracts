@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
@@ -13,6 +13,8 @@ import "../libraries/TickMath.sol";
 
 contract V3TwapKimUtilities is IV3TwapUtilities, Ownable {
     uint32 constant INTERVAL = 10 minutes;
+
+    constructor() Ownable(_msgSender()) {}
 
     function getV3Pool(address _v3Factory, address _t0, address _t1) external view override returns (address) {
         (address _token0, address _token1) = _t0 < _t1 ? (_t0, _t1) : (_t1, _t0);

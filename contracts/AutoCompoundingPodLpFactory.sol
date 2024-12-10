@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -14,6 +14,8 @@ contract AutoCompoundingPodLpFactory is Ownable {
     event Create(address newAspTkn);
 
     event SetMinimumDepositAtCreation(uint256 olfFee, uint256 newFee);
+
+    constructor() Ownable(_msgSender()) {}
 
     function create(
         string memory _name,
@@ -36,7 +38,7 @@ contract AutoCompoundingPodLpFactory is Ownable {
     function _depositMin(address _aspAddy, IDecentralizedIndex _pod) internal {
         address _lpToken = _pod.lpStakingPool();
         IERC20(_lpToken).safeTransferFrom(_msgSender(), address(this), minimumDepositAtCreation);
-        IERC20(_lpToken).safeApprove(_aspAddy, minimumDepositAtCreation);
+        IERC20(_lpToken).safeIncreaseAllowance(_aspAddy, minimumDepositAtCreation);
         AutoCompoundingPodLp(_aspAddy).deposit(minimumDepositAtCreation, _msgSender());
     }
 

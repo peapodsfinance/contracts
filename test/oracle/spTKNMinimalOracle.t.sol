@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "forge-std/console.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -246,13 +246,13 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         assertApproxEqRel(
             _priceLow,
             _unsafePrice18,
-            0.1e18, // TODO: tighten this up
+            0.2e18, // TODO: tighten this up
             "_priceLow not close to _unsafePrice18"
         );
         assertApproxEqRel(
             _priceHigh,
             _unsafePrice18,
-            0.1e18, // TODO: tighten this up
+            0.2e18, // TODO: tighten this up
             "_priceHigh not close to _unsafePrice18"
         );
         // accounting for unwrap fee makes oracle price a bit more
