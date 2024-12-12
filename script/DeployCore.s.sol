@@ -17,8 +17,22 @@ contract DeployCore is Script {
         uint256 twapUtilsType = vm.envUint("TWAP_TYPE");
         vm.startBroadcast(deployerPrivateKey);
 
-        WeightedIndexFactory podDeployer = new WeightedIndexFactory();
-        IndexManager indexManager = new IndexManager(podDeployer);
+        WeightedIndexFactory podFactory = new WeightedIndexFactory();
+
+        try vm.envAddress("POD_IMPL") returns (address _podImpl) {
+            podFactory.setImplementationsAndBeacons(
+                _podImpl,
+                vm.envAddress("SP_IMPL"),
+                vm.envAddress("REWARDS_IMPL"),
+                vm.envAddress("POD_BEACON"),
+                vm.envAddress("SP_BEACON"),
+                vm.envAddress("REWARDS_BEACON")
+            );
+        } catch {
+            console.log("No implementations/beacons to set in podFactory...");
+        }
+
+        IndexManager indexManager = new IndexManager(podFactory);
         ProtocolFees protocolFees = new ProtocolFees();
         ProtocolFeeRouter protocolFeeRouter = new ProtocolFeeRouter(protocolFees);
         RewardsWhitelist rewardsWhitelist = new RewardsWhitelist();
@@ -36,6 +50,7 @@ contract DeployCore is Script {
         vm.stopBroadcast();
 
         // Log the deployed addresses
+        console.log("WeightedIndexFactory deployed to:", address(podFactory));
         console.log("IndexManager deployed to:", address(indexManager));
         console.log("ProtocolFees deployed to:", address(protocolFees));
         console.log("ProtocolFeeRouter deployed to:", address(protocolFeeRouter));
