@@ -271,7 +271,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
             : _currentAssetsUtilized + _changeUtilizedState;
         _totalAssetsUtilized = _totalAssetsUtilized - _currentAssetsUtilized + vaultUtilization[_vault];
         _totalAssets = _totalAssets - _currentAssetsUtilized + vaultUtilization[_vault];
-        emit UpdateAssetMetadataFromVault(_vault);
+        emit UpdateAssetMetadataFromVault(_vault, _totalAssets, _totalAssetsUtilized);
     }
 
     function _transfer(address _from, address _to, uint256 _amount) internal override {
