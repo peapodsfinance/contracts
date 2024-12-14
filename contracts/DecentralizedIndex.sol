@@ -288,7 +288,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
     }
 
     /// @notice The ```processPreSwapFeesAndSwap``` function allows the rewards CA for the pod to process fees as needed
-    function processPreSwapFeesAndSwap() external override {
+    function processPreSwapFeesAndSwap() external override lock {
         require(_msgSender() == StakingPoolToken(lpStakingPool).POOL_REWARDS(), "R");
         _processPreSwapFeesAndSwap();
     }
