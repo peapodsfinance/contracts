@@ -207,7 +207,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
                 IERC20(_pod).safeTransfer(_posProps.owner, _ptknToUserAmt);
             }
             if (_pairedLpToUser > 0) {
-                IERC20(IDecentralizedIndex(_pod).PAIRED_LP_TOKEN()).safeTransfer(_posProps.owner, _pairedLpToUser);
+                IERC20(_getBorrowTknForPod(_posProps.positionId)).safeTransfer(_posProps.owner, _pairedLpToUser);
             }
         } else {
             require(false, "NI");
