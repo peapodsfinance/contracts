@@ -99,6 +99,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         }
         require(_getFlashSource(_positionId) != address(0), "FSV");
 
+        uint256 _pTknBalBefore = IERC20(_pod).balanceOf(address(this));
         IERC20(_pod).safeTransferFrom(_sender, address(this), _pTknAmt);
 
         if (_userProvidedDebtAmt > 0) {
@@ -112,7 +113,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
             _getBorrowTknForPod(_positionId),
             _pairedLpDesired - _userProvidedDebtAmt,
             address(this),
-            _getFlashDataAddLeverage(_positionId, _sender, _pTknAmt, _pairedLpDesired, _config)
+            _getFlashDataAddLeverage(_positionId, _sender, _pTknBalBefore, _pairedLpDesired, _config)
         );
     }
 
@@ -516,7 +517,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
     function _getFlashDataAddLeverage(
         uint256 _positionId,
         address _sender,
-        uint256 _pTknAmt,
+        uint256 _pTknBalBefore,
         uint256 _pairedLpDesired,
         bytes memory _config
     ) internal view returns (bytes memory) {
@@ -526,7 +527,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
                 positionId: _positionId,
                 owner: positionNFT.ownerOf(_positionId),
                 sender: _sender,
-                pTknAmt: _pTknAmt,
+                pTknAmt: IERC20(positionProps[_positionId].pod).balanceOf(address(this)) - _pTknBalBefore,
                 pairedLpDesired: _pairedLpDesired,
                 config: _config
             }),
