@@ -270,9 +270,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
             uint256 _currentAssetsUtilized = vaultUtilization[_vault];
             uint256 _changeUtilizedState = (_currentAssetsUtilized * _vaultAssetRatioChange) / PRECISION;
             uint256 _newAssetsUtilized = _prevVaultCbr > _newVaultCbr
-                ? _currentAssetsUtilized < _changeUtilizedState
-                    ? _currentAssetsUtilized
-                    : _currentAssetsUtilized - _changeUtilizedState
+                ? _currentAssetsUtilized < _changeUtilizedState ? 0 : _currentAssetsUtilized - _changeUtilizedState
                 : _currentAssetsUtilized + _changeUtilizedState;
             _previewTotalAssets = _previewTotalAssets - _currentAssetsUtilized + _newAssetsUtilized;
         }
@@ -296,9 +294,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
         uint256 _currentAssetsUtilized = vaultUtilization[_vault];
         uint256 _changeUtilizedState = (_currentAssetsUtilized * _vaultAssetRatioChange) / PRECISION;
         vaultUtilization[_vault] = _prevVaultCbr > _vaultWhitelistCbr[_vault]
-            ? _currentAssetsUtilized < _changeUtilizedState
-                ? _currentAssetsUtilized
-                : _currentAssetsUtilized - _changeUtilizedState
+            ? _currentAssetsUtilized < _changeUtilizedState ? 0 : _currentAssetsUtilized - _changeUtilizedState
             : _currentAssetsUtilized + _changeUtilizedState;
         _totalAssetsUtilized = _totalAssetsUtilized - _currentAssetsUtilized + vaultUtilization[_vault];
         _totalAssets = _totalAssets - _currentAssetsUtilized + vaultUtilization[_vault];

@@ -15,11 +15,7 @@ contract LendingAssetVaultTest is Test {
     function setUp() public {
         _asset = new TestERC20("Test Token", "tTEST");
         _testVault = new TestERC4626Vault(address(_asset));
-        _lendingAssetVault = new LendingAssetVault(
-            "Test LAV",
-            "tLAV",
-            address(_asset)
-        );
+        _lendingAssetVault = new LendingAssetVault("Test LAV", "tLAV", address(_asset));
 
         _asset.approve(address(_testVault), _asset.totalSupply());
         _asset.approve(address(_lendingAssetVault), _asset.totalSupply());
@@ -28,10 +24,7 @@ contract LendingAssetVaultTest is Test {
 
     function test_deposit() public {
         _lendingAssetVault.deposit(10e18, address(this));
-        assertEq(
-            _lendingAssetVault.totalSupply(),
-            _lendingAssetVault.balanceOf(address(this))
-        );
+        assertEq(_lendingAssetVault.totalSupply(), _lendingAssetVault.balanceOf(address(this)));
     }
 
     function test_withdrawNoCbrDiff() public {
@@ -40,14 +33,8 @@ contract LendingAssetVaultTest is Test {
         assertEq(_lendingAssetVault.totalSupply(), _depAmt);
         vm.roll(block.timestamp + 1);
         _lendingAssetVault.withdraw(_depAmt / 2, address(this), address(this));
-        assertEq(
-            _lendingAssetVault.totalSupply(),
-            _lendingAssetVault.balanceOf(address(this))
-        );
-        assertEq(
-            _asset.balanceOf(address(this)),
-            _asset.totalSupply() - _depAmt / 2
-        );
+        assertEq(_lendingAssetVault.totalSupply(), _lendingAssetVault.balanceOf(address(this)));
+        assertEq(_asset.balanceOf(address(this)), _asset.totalSupply() - _depAmt / 2);
     }
 
     function test_redeemNoCbrDiff() public {
@@ -56,14 +43,8 @@ contract LendingAssetVaultTest is Test {
         assertEq(_lendingAssetVault.totalSupply(), _depAmt);
         vm.roll(block.timestamp + 1);
         _lendingAssetVault.redeem(_depAmt / 2, address(this), address(this));
-        assertEq(
-            _lendingAssetVault.totalSupply(),
-            _lendingAssetVault.balanceOf(address(this))
-        );
-        assertEq(
-            _asset.balanceOf(address(this)),
-            _asset.totalSupply() - _depAmt / 2
-        );
+        assertEq(_lendingAssetVault.totalSupply(), _lendingAssetVault.balanceOf(address(this)));
+        assertEq(_asset.balanceOf(address(this)), _asset.totalSupply() - _depAmt / 2);
     }
 
     function test_vaultDepositAndWithdrawNoCbrChange() public {
@@ -78,29 +59,13 @@ contract LendingAssetVaultTest is Test {
         _lendingAssetVault.deposit(_lavDepAmt, address(this));
         assertEq(_lendingAssetVault.totalSupply(), _lavDepAmt);
 
-        _testVault.depositFromLendingAssetVault(
-            address(_lendingAssetVault),
-            _extDepAmt
-        );
-        _testVault.withdrawToLendingAssetVault(
-            address(_lendingAssetVault),
-            _extDepAmt
-        );
+        _testVault.depositFromLendingAssetVault(address(_lendingAssetVault), _extDepAmt);
+        _testVault.withdrawToLendingAssetVault(address(_lendingAssetVault), _extDepAmt);
 
         vm.roll(block.timestamp + 1);
-        _lendingAssetVault.withdraw(
-            _lavDepAmt / 2,
-            address(this),
-            address(this)
-        );
-        assertEq(
-            _lendingAssetVault.totalSupply(),
-            _lendingAssetVault.balanceOf(address(this))
-        );
-        assertEq(
-            _asset.balanceOf(address(this)),
-            _asset.totalSupply() - _lavDepAmt / 2
-        );
+        _lendingAssetVault.withdraw(_lavDepAmt / 2, address(this), address(this));
+        assertEq(_lendingAssetVault.totalSupply(), _lendingAssetVault.balanceOf(address(this)));
+        assertEq(_asset.balanceOf(address(this)), _asset.totalSupply() - _lavDepAmt / 2);
     }
 
     function test_vaultDepositAndWithdrawWithCbrChange() public {
@@ -115,40 +80,21 @@ contract LendingAssetVaultTest is Test {
         _lendingAssetVault.deposit(_lavDepAmt, address(this));
         assertEq(_lendingAssetVault.totalSupply(), _lavDepAmt);
 
-        _testVault.depositFromLendingAssetVault(
-            address(_lendingAssetVault),
-            _extDepAmt
-        );
+        _testVault.depositFromLendingAssetVault(address(_lendingAssetVault), _extDepAmt);
         _asset.transfer(address(_testVault), _extDepAmt);
-        _testVault.withdrawToLendingAssetVault(
-            address(_lendingAssetVault),
-            _extDepAmt
-        );
+        _testVault.withdrawToLendingAssetVault(address(_lendingAssetVault), _extDepAmt);
 
         vm.roll(block.timestamp + 1);
-        _lendingAssetVault.withdraw(
-            _lavDepAmt / 2,
-            address(this),
-            address(this)
-        );
+        _lendingAssetVault.withdraw(_lavDepAmt / 2, address(this), address(this));
 
-        uint256 _optimalBal = _asset.totalSupply() -
-            _lavDepAmt /
-            2 -
-            _extDepAmt;
+        uint256 _optimalBal = _asset.totalSupply() - _lavDepAmt / 2 - _extDepAmt;
         assertEq(_asset.balanceOf(address(this)), _optimalBal);
 
         _testVault.withdrawToLendingAssetVault(
-            address(_lendingAssetVault),
-            _lendingAssetVault.vaultUtilization(address(_testVault))
+            address(_lendingAssetVault), _lendingAssetVault.vaultUtilization(address(_testVault))
         );
         assertEq(_lendingAssetVault.vaultUtilization(address(_testVault)), 0);
-        assertApproxEqAbs(
-            _lendingAssetVault.totalAssets(),
-            _lavDepAmt,
-            1e2,
-            "final totalAssets not valid"
-        );
+        assertApproxEqAbs(_lendingAssetVault.totalAssets(), _lavDepAmt, 1e2, "final totalAssets not valid");
     }
 
     function test_redeemFromVaultAll() public {
@@ -161,13 +107,10 @@ contract LendingAssetVaultTest is Test {
         percentages[0] = 10e18;
         _lendingAssetVault.setVaultMaxAllocation(vaults, percentages);
 
-        _testVault.depositFromLendingAssetVault(
-            address(_lendingAssetVault),
-            _extDepAmt
-        );
+        _testVault.depositFromLendingAssetVault(address(_lendingAssetVault), _extDepAmt);
 
-        uint256 _initialTotalAssetsUtilized = _lendingAssetVault.totalAssets() -
-            _lendingAssetVault.totalAvailableAssets();
+        uint256 _initialTotalAssetsUtilized =
+            _lendingAssetVault.totalAssets() - _lendingAssetVault.totalAvailableAssets();
 
         // vm.expectEmit(true, true, true, true);
         // emit ILendingAssetVault.RedeemFromVault(
@@ -180,8 +123,7 @@ contract LendingAssetVaultTest is Test {
 
         assertEq(_lendingAssetVault.vaultUtilization(address(_testVault)), 0);
         assertEq(
-            _lendingAssetVault.totalAssets() -
-                _lendingAssetVault.totalAvailableAssets(),
+            _lendingAssetVault.totalAssets() - _lendingAssetVault.totalAvailableAssets(),
             _initialTotalAssetsUtilized - _extDepAmt
         );
         assertEq(_asset.balanceOf(address(_lendingAssetVault)), _lavDepAmt);
@@ -197,21 +139,14 @@ contract LendingAssetVaultTest is Test {
         percentages[0] = 10e18;
         _lendingAssetVault.setVaultMaxAllocation(vaults, percentages);
 
-        _testVault.depositFromLendingAssetVault(
-            address(_lendingAssetVault),
-            _extDepAmt
-        );
+        _testVault.depositFromLendingAssetVault(address(_lendingAssetVault), _extDepAmt);
 
-        uint256 _redeemShares = _testVault.balanceOf(
-            address(_lendingAssetVault)
-        ) / 2;
+        uint256 _redeemShares = _testVault.balanceOf(address(_lendingAssetVault)) / 2;
         uint256 _expectedAssets = _testVault.convertToAssets(_redeemShares);
 
-        uint256 _initialVaultUtilization = _lendingAssetVault.vaultUtilization(
-            address(_testVault)
-        );
-        uint256 _initialTotalAssetsUtilized = _lendingAssetVault.totalAssets() -
-            _lendingAssetVault.totalAvailableAssets();
+        uint256 _initialVaultUtilization = _lendingAssetVault.vaultUtilization(address(_testVault));
+        uint256 _initialTotalAssetsUtilized =
+            _lendingAssetVault.totalAssets() - _lendingAssetVault.totalAvailableAssets();
 
         // vm.expectEmit(true, true, true, true);
         // emit ILendingAssetVault.RedeemFromVault(
@@ -222,19 +157,12 @@ contract LendingAssetVaultTest is Test {
 
         _lendingAssetVault.redeemFromVault(address(_testVault), _redeemShares);
 
+        assertEq(_lendingAssetVault.vaultUtilization(address(_testVault)), _initialVaultUtilization - _expectedAssets);
         assertEq(
-            _lendingAssetVault.vaultUtilization(address(_testVault)),
-            _initialVaultUtilization - _expectedAssets
-        );
-        assertEq(
-            _lendingAssetVault.totalAssets() -
-                _lendingAssetVault.totalAvailableAssets(),
+            _lendingAssetVault.totalAssets() - _lendingAssetVault.totalAvailableAssets(),
             _initialTotalAssetsUtilized - _expectedAssets
         );
-        assertEq(
-            _asset.balanceOf(address(_lendingAssetVault)),
-            _lavDepAmt - _extDepAmt + _expectedAssets
-        );
+        assertEq(_asset.balanceOf(address(_lendingAssetVault)), _lavDepAmt - _extDepAmt + _expectedAssets);
     }
 
     function test_redeemFromVaultZeroShares() public {
@@ -247,17 +175,12 @@ contract LendingAssetVaultTest is Test {
         percentages[0] = 10e18;
         _lendingAssetVault.setVaultMaxAllocation(vaults, percentages);
 
-        _testVault.depositFromLendingAssetVault(
-            address(_lendingAssetVault),
-            _extDepAmt
-        );
+        _testVault.depositFromLendingAssetVault(address(_lendingAssetVault), _extDepAmt);
 
-        uint256 _initialTotalAssetsUtilized = _lendingAssetVault.totalAssets() -
-            _lendingAssetVault.totalAvailableAssets();
+        uint256 _initialTotalAssetsUtilized =
+            _lendingAssetVault.totalAssets() - _lendingAssetVault.totalAvailableAssets();
 
-        uint256 _expectedShares = _testVault.balanceOf(
-            address(_lendingAssetVault)
-        );
+        uint256 _expectedShares = _testVault.balanceOf(address(_lendingAssetVault));
         uint256 _expectedAssets = _testVault.convertToAssets(_expectedShares);
 
         // vm.expectEmit(true, true, true, true);
@@ -271,8 +194,7 @@ contract LendingAssetVaultTest is Test {
 
         assertEq(_lendingAssetVault.vaultUtilization(address(_testVault)), 0);
         assertEq(
-            _lendingAssetVault.totalAssets() -
-                _lendingAssetVault.totalAvailableAssets(),
+            _lendingAssetVault.totalAssets() - _lendingAssetVault.totalAvailableAssets(),
             _initialTotalAssetsUtilized - _expectedAssets
         );
         assertEq(_asset.balanceOf(address(_lendingAssetVault)), _lavDepAmt);
@@ -288,21 +210,13 @@ contract LendingAssetVaultTest is Test {
         percentages[0] = 10e18;
         _lendingAssetVault.setVaultMaxAllocation(vaults, percentages);
 
-        _testVault.depositFromLendingAssetVault(
-            address(_lendingAssetVault),
-            _extDepAmt
-        );
+        _testVault.depositFromLendingAssetVault(address(_lendingAssetVault), _extDepAmt);
 
-        uint256 _availableShares = _testVault.balanceOf(
-            address(_lendingAssetVault)
-        );
+        uint256 _availableShares = _testVault.balanceOf(address(_lendingAssetVault));
         uint256 _moreThanAvailable = _availableShares + 1e18;
 
         vm.expectRevert();
-        _lendingAssetVault.redeemFromVault(
-            address(_testVault),
-            _moreThanAvailable
-        );
+        _lendingAssetVault.redeemFromVault(address(_testVault), _moreThanAvailable);
     }
 
     function test_depositToVault() public {
@@ -315,14 +229,10 @@ contract LendingAssetVaultTest is Test {
         percentages[0] = 10e18;
         _lendingAssetVault.setVaultMaxAllocation(vaults, percentages);
 
-        uint256 initialVaultUtilization = _lendingAssetVault.vaultUtilization(
-            address(_testVault)
-        );
-        uint256 initialTotalAssetsUtilized = _lendingAssetVault.totalAssets() -
-            _lendingAssetVault.totalAvailableAssets();
-        uint256 initialVaultShares = _testVault.balanceOf(
-            address(_lendingAssetVault)
-        );
+        uint256 initialVaultUtilization = _lendingAssetVault.vaultUtilization(address(_testVault));
+        uint256 initialTotalAssetsUtilized =
+            _lendingAssetVault.totalAssets() - _lendingAssetVault.totalAvailableAssets();
+        uint256 initialVaultShares = _testVault.balanceOf(address(_lendingAssetVault));
 
         _lendingAssetVault.depositToVault(address(_testVault), _extDepAmt);
 
@@ -332,16 +242,11 @@ contract LendingAssetVaultTest is Test {
             "Vault utilization should increase"
         );
         assertEq(
-            _lendingAssetVault.totalAssets() -
-                _lendingAssetVault.totalAvailableAssets(),
+            _lendingAssetVault.totalAssets() - _lendingAssetVault.totalAvailableAssets(),
             initialTotalAssetsUtilized + _extDepAmt,
             "Total assets utilized should increase"
         );
-        assertGt(
-            _testVault.balanceOf(address(_lendingAssetVault)),
-            initialVaultShares,
-            "Vault shares should increase"
-        );
+        assertGt(_testVault.balanceOf(address(_lendingAssetVault)), initialVaultShares, "Vault shares should increase");
     }
 
     function test_depositToVault_ZeroAmount() public {
@@ -397,21 +302,14 @@ contract LendingAssetVaultTest is Test {
         vm.stopPrank();
 
         // test vault borrows the funds from the lending asset vault
-        _testVault.depositFromLendingAssetVault(
-            address(_lendingAssetVault),
-            amount / 2
-        );
+        _testVault.depositFromLendingAssetVault(address(_lendingAssetVault), amount / 2);
 
         // simulate some profit in the test vault
         uint256 PRECISION = 100;
         uint256 convertToAssets = _testVault.convertToAssets(PRECISION);
         uint256 profit = 1 ether;
         _asset.transfer(address(_testVault), profit);
-        assertGt(
-            _testVault.convertToAssets(PRECISION),
-            convertToAssets,
-            "Profit not recorded"
-        );
+        assertGt(_testVault.convertToAssets(PRECISION), convertToAssets, "Profit not recorded");
 
         // fund attacker
         address attacker = makeAddr("attacker");
@@ -422,24 +320,13 @@ contract LendingAssetVaultTest is Test {
         vm.startPrank(attacker);
         _asset.approve(address(_lendingAssetVault), attackerInitialAmount);
         _lendingAssetVault.deposit(attackerInitialAmount, attacker);
-        _testVault.withdrawToLendingAssetVault(
-            address(_lendingAssetVault),
-            amount / 2
-        );
+        _testVault.withdrawToLendingAssetVault(address(_lendingAssetVault), amount / 2);
 
         // attacker and user have the same amount of shares
-        assertNotEq(
-            _lendingAssetVault.balanceOf(attacker),
-            _lendingAssetVault.balanceOf(user),
-            "Not equal shares"
-        );
+        assertNotEq(_lendingAssetVault.balanceOf(attacker), _lendingAssetVault.balanceOf(user), "Not equal shares");
 
         vm.roll(block.timestamp + 1);
-        _lendingAssetVault.redeem(
-            _lendingAssetVault.balanceOf(attacker),
-            attacker,
-            attacker
-        );
+        _lendingAssetVault.redeem(_lendingAssetVault.balanceOf(attacker), attacker, attacker);
         // uint256 attackerBalance = _asset.balanceOf(attacker);
         // assertLe(
         //   attackerBalance,
@@ -529,10 +416,7 @@ contract LendingAssetVaultTest is Test {
         uint256 balanceInVault = _asset.balanceOf(address(_lendingAssetVault));
         assertEq(maxWithdraw, balanceInVault);
 
-        _testVault.depositFromLendingAssetVault(
-            address(_lendingAssetVault),
-            _extDepAmt
-        );
+        _testVault.depositFromLendingAssetVault(address(_lendingAssetVault), _extDepAmt);
 
         maxWithdraw = _lendingAssetVault.maxWithdraw(address(this));
         balanceInVault = _asset.balanceOf(address(_lendingAssetVault));
@@ -557,25 +441,12 @@ contract LendingAssetVaultTest is Test {
 
         // Since there are no whitelisted vaults, previewMint should be a simple calculation
         // based on current totalSupply and totalAssets
-        uint256 expectedAssets = (sharesToMint *
-            _lendingAssetVault.totalAssets()) /
-            _lendingAssetVault.totalSupply();
-        assertEq(
-            assetsNeeded,
-            expectedAssets,
-            "Preview mint calculation incorrect without whitelisted vaults"
-        );
+        uint256 expectedAssets = (sharesToMint * _lendingAssetVault.totalAssets()) / _lendingAssetVault.totalSupply();
+        assertEq(assetsNeeded, expectedAssets, "Preview mint calculation incorrect without whitelisted vaults");
 
         // Verify by actually minting
-        uint256 actualAssets = _lendingAssetVault.mint(
-            sharesToMint,
-            address(this)
-        );
-        assertEq(
-            actualAssets,
-            assetsNeeded,
-            "Actual mint differs from preview"
-        );
+        uint256 actualAssets = _lendingAssetVault.mint(sharesToMint, address(this));
+        assertEq(actualAssets, assetsNeeded, "Actual mint differs from preview");
     }
 
     // function test_previewMint_WithWhitelistedVaultAndInterest() public {
@@ -629,21 +500,10 @@ contract LendingAssetVaultTest is Test {
         uint256 assetsNeeded = _lendingAssetVault.previewMint(sharesToMint);
 
         // When totalSupply is 0, 1 share should equal 1 asset (PRECISION)
-        assertEq(
-            assetsNeeded,
-            sharesToMint,
-            "Preview mint with zero total supply should return same amount"
-        );
+        assertEq(assetsNeeded, sharesToMint, "Preview mint with zero total supply should return same amount");
 
         // Verify by actually minting
-        uint256 actualAssets = _lendingAssetVault.mint(
-            sharesToMint,
-            address(this)
-        );
-        assertEq(
-            actualAssets,
-            assetsNeeded,
-            "Actual mint differs from preview"
-        );
+        uint256 actualAssets = _lendingAssetVault.mint(sharesToMint, address(this));
+        assertEq(actualAssets, assetsNeeded, "Actual mint differs from preview");
     }
 }
