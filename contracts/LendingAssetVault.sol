@@ -32,9 +32,6 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
     // vault address => idx in _vaultWhitelistAry
     mapping(address => uint256) _vaultWhitelistAryIdx;
 
-    bool _lastDepEnabled = true;
-    mapping(address => uint256) _lastDeposit;
-
     modifier onlyWhitelist() {
         require(vaultWhitelist[_msgSender()], "WL");
         _;
@@ -157,7 +154,6 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
     function _deposit(uint256 _assets, uint256 _shares, address _receiver) internal {
         require(_assets != 0 && _shares != 0, "M");
         _totalAssets += _assets;
-        _lastDeposit[_receiver] = block.number;
         _mint(_receiver, _shares);
         IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _assets);
         emit Deposit(_msgSender(), _receiver, _assets, _shares);
@@ -177,7 +173,6 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
         _totalAssets -= _assets;
 
         require(_totalAvailable >= _assets, "AV");
-        require(!_lastDepEnabled || block.number > _lastDeposit[_owner], "MIN");
         _burn(_owner, _shares);
         IERC20(_asset).safeTransfer(_receiver, _assets);
         emit Withdraw(_owner, _receiver, _receiver, _assets, _shares);
@@ -301,11 +296,6 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
         emit UpdateAssetMetadataFromVault(_vault, _totalAssets, _totalAssetsUtilized);
     }
 
-    function _transfer(address _from, address _to, uint256 _amount) internal override {
-        _lastDeposit[_to] = block.number;
-        super._transfer(_from, _to, _amount);
-    }
-
     /// @notice The ```depositToVault``` function deposits assets to a specific vault
     /// @param _vault The vault to deposit assets to
     /// @param _amountAssets The amount of assets to deposit
@@ -365,12 +355,6 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
             delete vaultMaxAllocation[_vault];
         }
         emit SetVaultWhitelist(_vault, _allowed);
-    }
-
-    function setLastDepEnabled(bool _isEnabled) external onlyOwner {
-        require(_lastDepEnabled != _isEnabled, "T");
-        _lastDepEnabled = _isEnabled;
-        emit SetLastDepEnabled(_isEnabled);
     }
 
     /// @notice The ```setVaultMaxAllocation``` function sets the maximum amount of vault assets allowed to be allocated to a whitelisted vault
