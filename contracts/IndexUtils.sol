@@ -85,6 +85,7 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
             _slippage,
             _deadline
         );
+        require(_amountOut > 0, "LPM");
 
         IERC20(DEX_ADAPTER.getV2Pool(_indexFundAddy, _pairedLpToken)).safeIncreaseAllowance(
             _indexFund.lpStakingPool(), _amountOut
