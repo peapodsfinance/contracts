@@ -314,6 +314,7 @@ contract TokenRewards is ITokenRewards, Context {
     }
 
     function claimReward(address _wallet) external override {
+        _processFeesIfApplicable();
         _distributeReward(_wallet);
         emit ClaimReward(_wallet);
     }
