@@ -58,6 +58,7 @@ interface ILeverageManager {
         uint256 _collateralAssetAmtRemove,
         uint256 _podAmtMin,
         uint256 _pairedAssetAmtMin,
+        uint256 _podSwapAmtOutMin,
         uint256 _userProvidedDebtAmtMax
     ) external;
 }

@@ -261,7 +261,7 @@ contract LeverageManagerHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try _leverageManager.removeLeverage(cache.positionId, borrowAssets, collateralAmount, 0, 0, userDebtRepay) {
+        try _leverageManager.removeLeverage(cache.positionId, borrowAssets, collateralAmount, 0, 0, 0, userDebtRepay) {
             // POST-CONDITIONS
             __afterLM(
                 cache.lendingPair,
