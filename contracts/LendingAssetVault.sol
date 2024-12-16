@@ -8,23 +8,11 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/ILendingAssetVault.sol";
 import "./interfaces/IFraxlendPair.sol";
-import {VaultAccount} from "./libraries/VaultAccount.sol";
-
-interface IVaultInterestUpdate {
-    function addInterest(bool)
-        external
-        returns (
-            uint256,
-            uint256,
-            uint256,
-            IFraxlendPair.CurrentRateInfo memory,
-            VaultAccount memory,
-            VaultAccount memory
-        );
-}
+import {VaultAccount, VaultAccountingLibrary} from "./libraries/VaultAccount.sol";
 
 contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, Ownable {
     using SafeERC20 for IERC20;
+    using VaultAccountingLibrary for VaultAccount;
 
     uint256 constant PRECISION = 10 ** 27;
 
@@ -94,12 +82,20 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
         _assets = (_shares * _cbr()) / PRECISION;
     }
 
+    function _previewConvertToShares(uint256 _assets) internal view returns (uint256 _shares) {
+        _shares = (_assets * PRECISION) / _previewCbr();
+    }
+
+    function _previewConvertToAssets(uint256 _shares) internal view returns (uint256 _assets) {
+        _assets = (_shares * _previewCbr()) / PRECISION;
+    }
+
     function maxDeposit(address) external pure override returns (uint256 maxAssets) {
         maxAssets = type(uint256).max;
     }
 
     function previewDeposit(uint256 _assets) external view override returns (uint256 _shares) {
-        _shares = convertToShares(_assets);
+        _shares = _previewConvertToShares(_assets);
     }
 
     function deposit(uint256 _assets, address _receiver) external override returns (uint256 _shares) {
@@ -113,7 +109,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
     }
 
     function previewMint(uint256 _shares) external view override returns (uint256 _assets) {
-        _assets = convertToAssets(_shares);
+        _assets = _previewConvertToAssets(_shares);
     }
 
     function mint(uint256 _shares, address _receiver) external override returns (uint256 _assets) {
@@ -124,12 +120,12 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
 
     function maxWithdraw(address _owner) external view override returns (uint256 _maxAssets) {
         uint256 _totalAvailable = totalAvailableAssets();
-        uint256 _ownerMax = (balanceOf(_owner) * _cbr()) / PRECISION;
+        uint256 _ownerMax = (balanceOf(_owner) * _previewCbr()) / PRECISION;
         _maxAssets = _ownerMax > _totalAvailable ? _totalAvailable : _ownerMax;
     }
 
     function previewWithdraw(uint256 _assets) external view override returns (uint256 _shares) {
-        _shares = convertToShares(_assets);
+        _shares = _previewConvertToShares(_assets);
     }
 
     function withdraw(uint256 _assets, address _receiver, address _owner) external override returns (uint256 _shares) {
@@ -139,13 +135,13 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
     }
 
     function maxRedeem(address _owner) external view override returns (uint256 _maxShares) {
-        uint256 _totalAvailableShares = convertToShares(totalAvailableAssets());
+        uint256 _totalAvailableShares = _previewConvertToShares(totalAvailableAssets());
         uint256 _ownerMax = balanceOf(_owner);
         _maxShares = _ownerMax > _totalAvailableShares ? _totalAvailableShares : _ownerMax;
     }
 
     function previewRedeem(uint256 _shares) external view override returns (uint256 _assets) {
-        return convertToAssets(_shares);
+        return _previewConvertToAssets(_shares);
     }
 
     function redeem(uint256 _shares, address _receiver, address _owner) external override returns (uint256 _assets) {
@@ -188,6 +184,13 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
     }
 
     /// @notice Assumes underlying vault asset has decimals == 18
+    function _previewCbr() internal view returns (uint256) {
+        uint256 _supply = totalSupply();
+        uint256 _previewTotalAssets = _previewAddInterestAndMdInAllVaults();
+        return _supply == 0 ? PRECISION : (PRECISION * _previewTotalAssets) / _supply;
+    }
+
+    /// @notice Assumes underlying vault asset has decimals == 18
     function _cbr() internal view returns (uint256) {
         uint256 _supply = totalSupply();
         return _supply == 0 ? PRECISION : (PRECISION * _totalAssets) / _supply;
@@ -202,7 +205,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
             if (_vault == _vaultToExclude) {
                 continue;
             }
-            (uint256 _interestEarned,,,,,) = IVaultInterestUpdate(_vault).addInterest(false);
+            (uint256 _interestEarned,,,,,) = IFraxlendPair(_vault).addInterest(false);
             if (_interestEarned > 0) {
                 _updateAssetMetadataFromVault(_vault);
             }
@@ -245,6 +248,34 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
         _totalAssetsUtilized -= _assetAmt;
         IERC20(_asset).safeTransferFrom(_vault, address(this), _assetAmt);
         emit WhitelistDeposit(_vault, _assetAmt);
+    }
+
+    function _previewAddInterestAndMdInAllVaults() internal view returns (uint256 _previewTotalAssets) {
+        _previewTotalAssets = _totalAssets;
+        uint256 _l = _vaultWhitelistAry.length;
+        for (uint256 _i; _i < _l; _i++) {
+            address _vault = _vaultWhitelistAry[_i];
+            uint256 _prevVaultCbr = _vaultWhitelistCbr[_vault];
+            if (_prevVaultCbr == 0) {
+                continue;
+            }
+
+            // the following effectively simulates addInterest + convertToAssets
+            (,,,, VaultAccount memory _totalAsset,) = IFraxlendPair(_vault).previewAddInterest();
+            uint256 _newVaultCbr = _totalAsset.toAmount(PRECISION, false);
+
+            uint256 _vaultAssetRatioChange = _prevVaultCbr > _newVaultCbr
+                ? ((PRECISION * _prevVaultCbr) / _newVaultCbr) - PRECISION
+                : ((PRECISION * _newVaultCbr) / _prevVaultCbr) - PRECISION;
+            uint256 _currentAssetsUtilized = vaultUtilization[_vault];
+            uint256 _changeUtilizedState = (_currentAssetsUtilized * _vaultAssetRatioChange) / PRECISION;
+            uint256 _newAssetsUtilized = _prevVaultCbr > _newVaultCbr
+                ? _currentAssetsUtilized < _changeUtilizedState
+                    ? _currentAssetsUtilized
+                    : _currentAssetsUtilized - _changeUtilizedState
+                : _currentAssetsUtilized + _changeUtilizedState;
+            _previewTotalAssets = _previewTotalAssets - _currentAssetsUtilized + _newAssetsUtilized;
+        }
     }
 
     /// @notice The ```_updateAssetMetadataFromVault``` function updates _totalAssets based on  the current ratio

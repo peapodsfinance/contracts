@@ -318,7 +318,7 @@ contract IndexUtilsTest is PodHelperTest {
         indexFund.flashMint(address(this), 0, data);
     }
 
-    // NOTE: required for test_reentrancyFlashMint
+    // NOTE: required for test_preventReentrancyFlashMint
     function callback(bytes calldata data) external {
         (, address stakingPool, uint256 lpAmount) = abi.decode(data, (address, address, uint256));
         address _podV2Pool = IStakingPoolToken(stakingPool).stakingToken();
