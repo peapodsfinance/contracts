@@ -2,14 +2,16 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
+import "../contracts/AutoCompoundingPodLpFactory.sol";
 import "../contracts/IndexManager.sol";
+import "../contracts/LendingAssetVaultFactory.sol";
 import "../contracts/ProtocolFees.sol";
 import "../contracts/ProtocolFeeRouter.sol";
 import "../contracts/RewardsWhitelist.sol";
 import "../contracts/WeightedIndexFactory.sol";
-import "../contracts/twaputils/V3TwapCamelotUtilities.sol";
-import "../contracts/twaputils/V3TwapKimUtilities.sol";
-import "../contracts/twaputils/V3TwapUtilities.sol";
+import {V3TwapCamelotUtilities} from "../contracts/twaputils/V3TwapCamelotUtilities.sol";
+import {V3TwapKimUtilities} from "../contracts/twaputils/V3TwapKimUtilities.sol";
+import {V3TwapUtilities} from "../contracts/twaputils/V3TwapUtilities.sol";
 
 contract DeployCore is Script {
     function run() external {
@@ -17,6 +19,8 @@ contract DeployCore is Script {
         uint256 twapUtilsType = vm.envUint("TWAP_TYPE");
         vm.startBroadcast(deployerPrivateKey);
 
+        AutoCompoundingPodLpFactory aspFactory = new AutoCompoundingPodLpFactory();
+        LendingAssetVaultFactory lavFactory = new LendingAssetVaultFactory();
         WeightedIndexFactory podFactory = new WeightedIndexFactory();
 
         try vm.envAddress("POD_IMPL") returns (address _podImpl) {
@@ -50,6 +54,8 @@ contract DeployCore is Script {
         vm.stopBroadcast();
 
         // Log the deployed addresses
+        console.log("AutoCompoundingPodLpFactory deployed to:", address(aspFactory));
+        console.log("LendingAssetVaultFactory deployed to:", address(lavFactory));
         console.log("WeightedIndexFactory deployed to:", address(podFactory));
         console.log("IndexManager deployed to:", address(indexManager));
         console.log("ProtocolFees deployed to:", address(protocolFees));

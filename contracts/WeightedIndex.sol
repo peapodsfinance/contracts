@@ -112,7 +112,7 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
         } else {
             _shares = (_totalSupply * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
         }
-        _shares -= ((_shares * fees.bond) / DEN);
+        _shares -= ((_shares * _fees.bond) / DEN);
     }
 
     /// @notice The ```convertToAssets``` function returns the number of TKN returned based on burning _shares pTKN excluding fees
@@ -126,7 +126,7 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
         } else {
             _assets = (_totalAssets[indexTokens[0].token] * _percSharesX96_2) / 2 ** (96 / 2);
         }
-        _assets -= ((_assets * fees.debond) / DEN);
+        _assets -= ((_assets * _fees.debond) / DEN);
     }
 
     /// @notice The ```bond``` function wraps a user into a pod and mints new pTKN
@@ -150,7 +150,7 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
         } else {
             _tokensMinted = (_totalSupply * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
         }
-        uint256 _feeTokens = _canWrapFeeFree(_user) ? 0 : (_tokensMinted * fees.bond) / DEN;
+        uint256 _feeTokens = _canWrapFeeFree(_user) ? 0 : (_tokensMinted * _fees.bond) / DEN;
         require(_tokensMinted - _feeTokens >= _amountMintMin, "M");
         _totalSupply += _tokensMinted;
         _mint(_user, _tokensMinted - _feeTokens);
@@ -176,7 +176,7 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
     function debond(uint256 _amount, address[] memory, uint8[] memory) external override lock noSwapOrFee {
         uint256 _amountAfterFee = _isLastOut(_amount) || REWARDS_WHITELIST.isWhitelistedFromDebondFee(_msgSender())
             ? _amount
-            : (_amount * (DEN - fees.debond)) / DEN;
+            : (_amount * (DEN - _fees.debond)) / DEN;
         uint256 _percSharesX96 = (_amountAfterFee * FixedPoint96.Q96) / _totalSupply;
         super._transfer(_msgSender(), address(this), _amount);
         _totalSupply -= _amountAfterFee;

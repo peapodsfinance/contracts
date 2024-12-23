@@ -47,7 +47,7 @@ abstract contract FraxlendPairAccessControl is Timelock2Step, Ownable2Step, Frax
     bool public isInterestAccessControlRevoked;
     /// @param _immutables abi.encode(address _circuitBreakerAddress, address _comptrollerAddress, address _timelockAddress)
 
-    constructor(bytes memory _immutables) Timelock2Step() Ownable2Step() {
+    constructor(bytes memory _immutables) Timelock2Step() Ownable(msg.sender) {
         // Handle Immutables Configuration
         (address _circuitBreakerAddress, address _comptrollerAddress, address _timelockAddress) =
             abi.decode(_immutables, (address, address, address));

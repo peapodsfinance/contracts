@@ -17,8 +17,12 @@ contract LendingAssetVaultFactory is Ownable {
 
     constructor() Ownable(_msgSender()) {}
 
-    function create(string memory _name, string memory _symbol, address _asset, uint96 _salt) external onlyOwner {
-        address _vault = _deploy(getBytecode(_name, _symbol, _asset), _getFullSalt(_salt));
+    function create(string memory _name, string memory _symbol, address _asset, uint96 _salt)
+        external
+        onlyOwner
+        returns (address _vault)
+    {
+        _vault = _deploy(getBytecode(_name, _symbol, _asset), _getFullSalt(_salt));
         if (minimumDepositAtCreation > 0) {
             _depositMin(_vault, _asset);
         }

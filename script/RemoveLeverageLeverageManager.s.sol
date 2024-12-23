@@ -17,7 +17,7 @@ contract RemoveLeverageLeverageManager is Script {
 
         (, address lendingPair,,,) = LeverageManager(payable(lvf)).positionProps(positionId);
         IERC20(IERC4626(lendingPair).asset()).approve(lvf, 1000e18);
-        LeverageManager(payable(lvf)).removeLeverage(positionId, borrowAmt, collateralAmt, 0, 0, 1000e18);
+        LeverageManager(payable(lvf)).removeLeverage(positionId, borrowAmt, collateralAmt, 0, 0, 0, 1000e18);
 
         vm.stopBroadcast();
 

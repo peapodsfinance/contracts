@@ -310,7 +310,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     function test_getPrices_BTCUSDC_BTCWETHClPool() public {
         address _usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
         address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 20, 0); // $20 pOHM, $1 USDC, 20/1 = 20
+        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 18, 0); // $18 pOHM, $1 USDC, 18/1 = 18
         spTKNMinimalOracle oracleBTCUSDC1 = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),

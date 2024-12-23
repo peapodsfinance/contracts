@@ -147,6 +147,10 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
         _lpRewardsToken = newLpRewardsToken;
     }
 
+    function config() external view override returns (IDecentralizedIndex.Config memory _c) {}
+
+    function fees() external view override returns (IDecentralizedIndex.Fees memory _f) {}
+
     function lpStakingPool() external view override returns (address) {
         return _lpStakingPool;
     }

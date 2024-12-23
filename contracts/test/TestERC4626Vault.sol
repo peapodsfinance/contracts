@@ -21,6 +21,21 @@ contract TestERC4626Vault is IERC4626, ERC20, ERC20Permit {
     }
 
     // Needed for LendingAssetVault
+    // Simulates interest that would be added without actually adding it
+    function previewAddInterest()
+        external
+        view
+        returns (
+            uint256 interestEarned,
+            uint256,
+            uint256,
+            IFraxlendPair.CurrentRateInfo memory _currentRateInfo,
+            VaultAccount memory _totalAsset,
+            VaultAccount memory _totalBorrow
+        )
+    {}
+
+    // Needed for LendingAssetVault
     function addInterest(bool)
         external
         returns (

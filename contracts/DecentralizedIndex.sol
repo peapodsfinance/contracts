@@ -34,14 +34,15 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     address WETH;
     address V2_POOL;
 
+    Config _config;
+    Fees _fees;
+
     IndexType public indexType;
     uint256 public created;
     address public lpRewardsToken;
     address public override lpStakingPool;
     uint8 public override unlocked;
 
-    Config public config;
-    Fees public fees;
     IndexAssetInfo[] public indexTokens;
     mapping(address => bool) _isTokenInIndex;
     mapping(address => uint8) _fundTokenIdx;
@@ -66,7 +67,7 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     }
 
     modifier onlyPartner() {
-        require(_msgSender() == config.partner, "P");
+        require(_msgSender() == _config.partner, "P");
         _;
     }
 
@@ -83,8 +84,8 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
         string memory _name,
         string memory _symbol,
         IndexType _idxType,
-        Config memory _config,
-        Fees memory _fees,
+        Config memory __config,
+        Fees memory __fees,
         bytes memory _immutables
     ) internal onlyInitializing {
         __ERC20_init(_name, _symbol);
@@ -94,17 +95,18 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
         unlocked = 1;
         _swapAndFeeOn = 1;
 
-        require(_fees.buy <= (uint256(DEN) * 20) / 100);
-        require(_fees.sell <= (uint256(DEN) * 20) / 100);
-        require(_fees.burn <= (uint256(DEN) * 70) / 100);
-        require(_fees.bond <= (uint256(DEN) * 99) / 100);
-        require(_fees.debond <= (uint256(DEN) * 99) / 100);
-        require(_fees.partner <= (uint256(DEN) * 5) / 100);
+        require(__fees.buy <= (uint256(DEN) * 20) / 100);
+        require(__fees.sell <= (uint256(DEN) * 20) / 100);
+        require(__fees.burn <= (uint256(DEN) * 70) / 100);
+        require(__fees.bond <= (uint256(DEN) * 99) / 100);
+        require(__fees.debond <= (uint256(DEN) * 99) / 100);
+        require(__fees.partner <= (uint256(DEN) * 5) / 100);
 
         indexType = _idxType;
         created = block.timestamp;
-        fees = _fees;
-        config = _config;
+        _fees = __fees;
+        _config = __config;
+        _config.debondCooldown = __config.debondCooldown == 0 ? 60 days : __config.debondCooldown;
 
         (
             address _pairedLpToken,
@@ -130,18 +132,8 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
         emit Create(address(this), _msgSender());
     }
 
+    /// @notice The ```setup``` function initialized a new LP pair for the pod + pairedLpAsset
     function setup() external override {
-        _setup();
-    }
-
-    /// @notice The ```totalSupply``` function returns the total pTKN supply minted, excluding any used for _flashMint
-    /// @return _totalSupply Valid supply of pTKN excluding flashMinted pTKNs
-    function totalSupply() public view override(IERC20, ERC20Upgradeable) returns (uint256) {
-        return _totalSupply;
-    }
-
-    /// @notice The ```_setup``` function initialized a new LP pair for the pod + pairedLpAsset
-    function _setup() internal {
         require(!_isSetup, "O");
         _isSetup = true;
         address _v2Pool = DEX_HANDLER.getV2Pool(address(this), PAIRED_LP_TOKEN);
@@ -152,6 +144,12 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
         Ownable(lpStakingPool).renounceOwnership();
         V2_POOL = _v2Pool;
         emit Initialize(_msgSender(), _v2Pool);
+    }
+
+    /// @notice The ```totalSupply``` function returns the total pTKN supply minted, excluding any used for _flashMint
+    /// @return _totalSupply Valid supply of pTKN excluding flashMinted pTKNs
+    function totalSupply() public view override(IERC20, ERC20Upgradeable) returns (uint256) {
+        return _totalSupply;
     }
 
     /// @notice The ```_update``` function overrides the standard ERC20 _update to handle fee processing for a pod
@@ -167,13 +165,13 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
             if (_from != V2_POOL) {
                 _processPreSwapFeesAndSwap();
             }
-            if (_buy && fees.buy > 0) {
-                _fee = (_amount * fees.buy) / DEN;
+            if (_buy && _fees.buy > 0) {
+                _fee = (_amount * _fees.buy) / DEN;
                 super._update(_from, address(this), _fee);
-            } else if (_sell && fees.sell > 0) {
-                _fee = (_amount * fees.sell) / DEN;
+            } else if (_sell && _fees.sell > 0) {
+                _fee = (_amount * _fees.sell) / DEN;
                 super._update(_from, address(this), _fee);
-            } else if (!_buy && !_sell && config.hasTransferTax) {
+            } else if (!_buy && !_sell && _config.hasTransferTax) {
                 _fee = _amount / 10000; // 0.01%
                 _fee = _fee == 0 && _amount > 0 ? 1 : _fee;
                 super._update(_from, address(this), _fee);
@@ -204,9 +202,9 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
             _lastSwap = uint64(block.timestamp);
             uint256 _totalAmt = _bal > _max ? _max : _bal;
             uint256 _partnerAmt;
-            if (fees.partner > 0 && config.partner != address(0) && !_blacklist[config.partner]) {
-                _partnerAmt = (_totalAmt * fees.partner) / DEN;
-                super._update(address(this), config.partner, _partnerAmt);
+            if (_fees.partner > 0 && _config.partner != address(0) && !_blacklist[_config.partner]) {
+                _partnerAmt = (_totalAmt * _fees.partner) / DEN;
+                super._update(address(this), _config.partner, _partnerAmt);
             }
             _feeSwap(_totalAmt - _partnerAmt);
             _swapping = 0;
@@ -217,10 +215,10 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     /// @notice into a vault where holders have more underlying TKN to pTKN as burn fees process over time
     /// @param _amtToProcess Number of pTKN being burned
     function _processBurnFee(uint256 _amtToProcess) internal {
-        if (_amtToProcess == 0 || fees.burn == 0) {
+        if (_amtToProcess == 0 || _fees.burn == 0) {
             return;
         }
-        uint256 _burnAmt = (_amtToProcess * fees.burn) / DEN;
+        uint256 _burnAmt = (_amtToProcess * _fees.burn) / DEN;
         _totalSupply -= _burnAmt;
         _burn(address(this), _burnAmt);
     }
@@ -258,7 +256,7 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     /// @notice The ```_internalBond``` function should be called from external bond() to handle validation and partner logic
     function _internalBond() internal {
         require(_isSetup, "I");
-        if (_partnerFirstWrapped == 0 && _msgSender() == config.partner) {
+        if (_partnerFirstWrapped == 0 && _msgSender() == _config.partner) {
             _partnerFirstWrapped = uint64(block.timestamp);
         }
     }
@@ -268,7 +266,7 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     /// @return bool Whether the user can wrap fee free
     function _canWrapFeeFree(address _wrapper) internal view returns (bool) {
         return _isFirstIn()
-            || (_wrapper == config.partner && _partnerFirstWrapped == 0 && block.timestamp <= created + 7 days);
+            || (_wrapper == _config.partner && _partnerFirstWrapped == 0 && block.timestamp <= created + 7 days);
     }
 
     /// @notice The ```_isFirstIn``` function confirms if the user is the first to wrap
@@ -285,21 +283,29 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     }
 
     /// @notice The ```processPreSwapFeesAndSwap``` function allows the rewards CA for the pod to process fees as needed
-    function processPreSwapFeesAndSwap() external override {
+    function processPreSwapFeesAndSwap() external override lock {
         require(_msgSender() == IStakingPoolToken(lpStakingPool).POOL_REWARDS(), "R");
         _processPreSwapFeesAndSwap();
     }
 
     function partner() external view override returns (address) {
-        return config.partner;
+        return _config.partner;
     }
 
     function BOND_FEE() external view override returns (uint16) {
-        return fees.bond;
+        return _fees.bond;
     }
 
     function DEBOND_FEE() external view override returns (uint16) {
-        return fees.debond;
+        return _fees.debond;
+    }
+
+    function config() external view override returns (Config memory) {
+        return _config;
+    }
+
+    function fees() external view override returns (Fees memory) {
+        return _fees;
     }
 
     function isAsset(address _token) public view override returns (bool) {
@@ -430,13 +436,13 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     }
 
     function setPartner(address _partner) external onlyPartner {
-        config.partner = _partner;
+        _config.partner = _partner;
         emit SetPartner(_msgSender(), _partner);
     }
 
     function setPartnerFee(uint16 _fee) external onlyPartner {
-        require(_fee < fees.partner, "L");
-        fees.partner = _fee;
+        require(_fee < _fees.partner, "L");
+        _fees.partner = _fee;
         emit SetPartnerFee(_msgSender(), _fee);
     }
 

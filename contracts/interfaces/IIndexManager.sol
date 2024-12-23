@@ -3,8 +3,11 @@ pragma solidity ^0.8.28;
 
 interface IIndexManager {
     struct IIndexAndStatus {
-        address index;
-        bool verified;
+        address index; // aka pod
+        address creator;
+        bool verified; // whether it's a safe pod as confirmed by the protocol team
+        bool selfLending; // if it's an LVF pod, whether it's self-lending or not
+        bool makePublic; // whether it should show in the UI or not
     }
 
     event AddIndex(address indexed index, bool verified);
@@ -15,7 +18,7 @@ interface IIndexManager {
 
     function allIndexes() external view returns (IIndexAndStatus[] memory);
 
-    function addIndex(address index, bool verified) external;
+    function addIndex(address index, address _creator, bool verified, bool selfLending, bool makePublic) external;
 
     function removeIndex(uint256 idx) external;
 

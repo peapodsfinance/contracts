@@ -25,8 +25,8 @@ contract AutoCompoundingPodLpFactory is Ownable {
         IDexAdapter _dexAdapter,
         IIndexUtils _indexUtils,
         uint96 _salt
-    ) external onlyOwner {
-        address _aspAddy =
+    ) external onlyOwner returns (address _aspAddy) {
+        _aspAddy =
             _deploy(getBytecode(_name, _symbol, _isSelfLendingPod, _pod, _dexAdapter, _indexUtils), _getFullSalt(_salt));
         if (address(_pod) != address(0) && minimumDepositAtCreation > 0) {
             _depositMin(_aspAddy, _pod);

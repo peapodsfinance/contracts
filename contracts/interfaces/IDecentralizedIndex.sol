@@ -83,6 +83,10 @@ interface IDecentralizedIndex is IERC20 {
 
     function PAIRED_LP_TOKEN() external view returns (address);
 
+    function config() external view returns (Config calldata);
+
+    function fees() external view returns (Fees calldata);
+
     function unlocked() external view returns (uint8);
 
     function indexType() external view returns (IndexType);

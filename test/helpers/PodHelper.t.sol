@@ -108,9 +108,28 @@ contract PodHelperTest is Test {
             "Test",
             "pTEST",
             _getPodConfig(_oldPod),
-            _getPodFees(_oldPod),
+            IDecentralizedIndex(_oldPod).fees(),
             _t,
             _w,
+            address(0),
+            false,
+            _getImmutables(_pairedLpToken, 0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb)
+        );
+    }
+
+    function _duplicatePod(address _oldPod, address _pairedLpToken, address[] memory _tokens, uint256[] memory _weights)
+        internal
+        returns (address _underlying, address _newPod)
+    {
+        IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_oldPod).getAllAssets();
+        _underlying = _assets[0].token;
+        _newPod = _createPod(
+            "Test",
+            "pTEST",
+            _getPodConfig(_oldPod),
+            IDecentralizedIndex(_oldPod).fees(),
+            _tokens,
+            _weights,
             address(0),
             false,
             _getImmutables(_pairedLpToken, 0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb)
@@ -151,16 +170,6 @@ contract PodHelperTest is Test {
             0x024ff47D552cB222b265D68C7aeB26E586D5229D,
             _dexAdapter
         );
-    }
-
-    function _getPodFees(address _pod) internal view returns (IDecentralizedIndex.Fees memory _f) {
-        (uint16 _f0, uint16 _f1, uint16 _f2, uint16 _f3, uint16 _f4, uint16 _f5) = WeightedIndex(payable(_pod)).fees();
-        _f.burn = _f0;
-        _f.bond = _f1;
-        _f.debond = _f2;
-        _f.buy = _f3;
-        _f.sell = _f4;
-        _f.partner = _f5;
     }
 
     function _getPodConfig(address _pod) internal view returns (IDecentralizedIndex.Config memory _c) {
