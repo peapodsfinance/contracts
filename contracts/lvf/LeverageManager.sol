@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -11,7 +11,6 @@ import "../interfaces/IFlashLoanRecipient.sol";
 import "../interfaces/IIndexUtils.sol";
 import "../interfaces/ILeverageManager.sol";
 import {VaultAccount, VaultAccountingLibrary} from "../libraries/VaultAccount.sol";
-import "../AutoCompoundingPodLp.sol";
 import "./LeverageManagerAccessControl.sol";
 import "./LeveragePositions.sol";
 import "./LeveragePositionCustodian.sol";

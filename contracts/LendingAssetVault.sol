@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -37,7 +37,11 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
         _;
     }
 
-    constructor(string memory _name, string memory _symbol, address __asset) ERC20(_name, _symbol) ERC20Permit(_name) {
+    constructor(string memory _name, string memory _symbol, address __asset)
+        ERC20(_name, _symbol)
+        ERC20Permit(_name)
+        Ownable(_msgSender())
+    {
         _asset = __asset;
         _decimals = IERC20Metadata(__asset).decimals();
     }

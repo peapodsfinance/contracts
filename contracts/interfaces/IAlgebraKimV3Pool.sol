@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 interface IAlgebraKimV3Pool {
     function plugin() external view returns (address pluginAddress);

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {Test, console2} from "forge-std/Test.sol";
+import {console2} from "forge-std/Test.sol";
 import {PEAS} from "../contracts/PEAS.sol";
 import {RewardsWhitelist} from "../contracts/RewardsWhitelist.sol";
 import {V3TwapUtilities} from "../contracts/twaputils/V3TwapUtilities.sol";
@@ -11,9 +11,10 @@ import {IDecentralizedIndex} from "../contracts/interfaces/IDecentralizedIndex.s
 import {IStakingPoolToken} from "../contracts/interfaces/IStakingPoolToken.sol";
 import {WeightedIndex} from "../contracts/WeightedIndex.sol";
 import {MockFlashMintRecipient} from "./mocks/MockFlashMintRecipient.sol";
+import {PodHelperTest} from "./helpers/PodHelper.t.sol";
 import "forge-std/console.sol";
 
-contract WeightedIndexTest is Test {
+contract WeightedIndexTest is PodHelperTest {
     PEAS public peas;
     RewardsWhitelist public rewardsWhitelist;
     V3TwapUtilities public twapUtils;
@@ -39,7 +40,8 @@ contract WeightedIndexTest is Test {
 
     event RemoveLiquidity(address indexed user, uint256 lpTokens);
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         peas = PEAS(0x02f92800F57BCD74066F5709F1Daa1A4302Df875);
         twapUtils = new V3TwapUtilities();
         rewardsWhitelist = new RewardsWhitelist();
@@ -57,14 +59,14 @@ contract WeightedIndexTest is Test {
         _t[0] = address(peas);
         uint256[] memory _w = new uint256[](1);
         _w[0] = 100;
-        pod = new WeightedIndex(
+        address _pod = _createPod(
             "Test",
             "pTEST",
             _c,
             _f,
             _t,
             _w,
-            false,
+            address(0),
             false,
             abi.encode(
                 dai,
@@ -76,6 +78,7 @@ contract WeightedIndexTest is Test {
                 dexAdapter
             )
         );
+        pod = WeightedIndex(payable(_pod));
 
         flashMintRecipient = new MockFlashMintRecipient();
 

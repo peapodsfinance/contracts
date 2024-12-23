@@ -1,48 +1,56 @@
 // https://peapods.finance
 
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
+import "./interfaces/IInitializeSelector.sol";
 import "./DecentralizedIndex.sol";
 
-contract WeightedIndex is DecentralizedIndex {
+contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex {
     using SafeERC20 for IERC20;
 
-    uint256 _totalWeights;
+    uint256 private _totalWeights;
 
-    /// @notice The ```constructor``` initializes a new WeightedIndex pod
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @notice The ```initialize``` function initializes a new WeightedIndex pod
     /// @param _name The name of the ERC20 token of the pod
     /// @param _symbol The symbol/ticker of the ERC20 token of the pod
     /// @param _config A struct containing some pod-level, one off configuration for the pod
     /// @param _fees A struct holding all pod-level fees
     /// @param _tokens The ERC20 token addresses that make up the pod
     /// @param _weights The weights that each ERC20 token makes up in the pod, defined by token amount
-    /// @param _stakeRestriction If present, only he pod creator can add LP and stake in the pod
-    /// @param _leaveRewardsAsPairedLp If present, don't convert rewards to rewardsToken, leave and be claimable as pairedLpToken
     /// @param _immutables A number of immutable options/addresses to help the pod function properly on the current network, see DecentralizedIndex for unpacking info
-    constructor(
+    function initialize(
         string memory _name,
         string memory _symbol,
         Config memory _config,
         Fees memory _fees,
         address[] memory _tokens,
         uint256[] memory _weights,
-        bool _stakeRestriction,
-        bool _leaveRewardsAsPairedLp,
         bytes memory _immutables
-    )
-        DecentralizedIndex(
-            _name,
-            _symbol,
-            IndexType.WEIGHTED,
-            _config,
-            _fees,
-            _stakeRestriction,
-            _leaveRewardsAsPairedLp,
-            _immutables
-        )
-    {
+    ) public initializer {
+        __DecentralizedIndex_init(_name, _symbol, IndexType.WEIGHTED, _config, _fees, _immutables);
+        __WeightedIndex_init(_config, _tokens, _weights, _immutables);
+    }
+
+    function initializeSelector() external pure override returns (bytes4) {
+        return this.initialize.selector;
+    }
+
+    function __WeightedIndex_init(
+        Config memory _config,
+        address[] memory _tokens,
+        uint256[] memory _weights,
+        bytes memory _immutables
+    ) internal {
         require(_tokens.length == _weights.length, "V");
         uint256 _tl = _tokens.length;
         for (uint8 _i; _i < _tl; _i++) {
@@ -104,7 +112,7 @@ contract WeightedIndex is DecentralizedIndex {
         } else {
             _shares = (_totalSupply * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
         }
-        _shares -= ((_shares * fees.bond) / DEN);
+        _shares -= ((_shares * _fees.bond) / DEN);
     }
 
     /// @notice The ```convertToAssets``` function returns the number of TKN returned based on burning _shares pTKN excluding fees
@@ -118,7 +126,7 @@ contract WeightedIndex is DecentralizedIndex {
         } else {
             _assets = (_totalAssets[indexTokens[0].token] * _percSharesX96_2) / 2 ** (96 / 2);
         }
-        _assets -= ((_assets * fees.debond) / DEN);
+        _assets -= ((_assets * _fees.debond) / DEN);
     }
 
     /// @notice The ```bond``` function wraps a user into a pod and mints new pTKN
@@ -142,7 +150,7 @@ contract WeightedIndex is DecentralizedIndex {
         } else {
             _tokensMinted = (_totalSupply * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
         }
-        uint256 _feeTokens = _canWrapFeeFree(_user) ? 0 : (_tokensMinted * fees.bond) / DEN;
+        uint256 _feeTokens = _canWrapFeeFree(_user) ? 0 : (_tokensMinted * _fees.bond) / DEN;
         require(_tokensMinted - _feeTokens >= _amountMintMin, "M");
         _totalSupply += _tokensMinted;
         _mint(_user, _tokensMinted - _feeTokens);
@@ -168,7 +176,7 @@ contract WeightedIndex is DecentralizedIndex {
     function debond(uint256 _amount, address[] memory, uint8[] memory) external override lock noSwapOrFee {
         uint256 _amountAfterFee = _isLastOut(_amount) || REWARDS_WHITELIST.isWhitelistedFromDebondFee(_msgSender())
             ? _amount
-            : (_amount * (DEN - fees.debond)) / DEN;
+            : (_amount * (DEN - _fees.debond)) / DEN;
         uint256 _percSharesX96 = (_amountAfterFee * FixedPoint96.Q96) / _totalSupply;
         super._transfer(_msgSender(), address(this), _amount);
         _totalSupply -= _amountAfterFee;

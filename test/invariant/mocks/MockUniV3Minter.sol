@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 // uniswap-v3-core
 import {UniswapV3Factory} from "v3-core/UniswapV3Factory.sol";

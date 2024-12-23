@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -55,7 +55,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
 
     event SetTwapInterval(uint32 oldMax, uint32 newMax);
 
-    constructor(bytes memory _requiredImmutables, bytes memory _optionalImmutables) {
+    constructor(bytes memory _requiredImmutables, bytes memory _optionalImmutables) Ownable(_msgSender()) {
         address _v2Reserves;
         (
             CHAINLINK_SINGLE_PRICE_ORACLE,

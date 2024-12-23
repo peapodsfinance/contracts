@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./IDexAdapter.sol";
@@ -83,6 +83,10 @@ interface IDecentralizedIndex is IERC20 {
 
     function PAIRED_LP_TOKEN() external view returns (address);
 
+    function config() external view returns (Config calldata);
+
+    function fees() external view returns (Fees calldata);
+
     function unlocked() external view returns (uint8);
 
     function indexType() external view returns (IndexType);
@@ -111,6 +115,8 @@ interface IDecentralizedIndex is IERC20 {
 
     function convertToAssets(uint256 shares) external view returns (uint256 assets);
 
+    function setup() external;
+
     function bond(address token, uint256 amount, uint256 amountMintMin) external;
 
     function debond(uint256 amount, address[] memory token, uint8[] memory percentage) external;
@@ -124,4 +130,6 @@ interface IDecentralizedIndex is IERC20 {
     function flash(address recipient, address token, uint256 amount, bytes calldata data) external;
 
     function flashMint(address recipient, uint256 amount, bytes calldata data) external;
+
+    function setLpStakingPool(address lpStakingPool) external;
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -82,7 +82,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         IDecentralizedIndex _pod,
         IDexAdapter _dexAdapter,
         IIndexUtils _utils
-    ) ERC20(_name, _symbol) ERC20Permit(_name) {
+    ) ERC20(_name, _symbol) ERC20Permit(_name) Ownable(_msgSender()) {
         _setPod(_pod);
         IS_PAIRED_LENDING_PAIR = _isSelfLendingPod;
         DEX_ADAPTER = _dexAdapter;
@@ -98,11 +98,11 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
 
     function convertToShares(uint256 _assets) public view override returns (uint256 _shares) {
-        return Math.mulDiv(_assets, FACTOR, _cbr(), Math.Rounding.Up);
+        return Math.mulDiv(_assets, FACTOR, _cbr(), Math.Rounding.Ceil);
     }
 
     function convertToAssets(uint256 _shares) public view override returns (uint256 _assets) {
-        return Math.mulDiv(_shares, _cbr(), FACTOR, Math.Rounding.Down);
+        return Math.mulDiv(_shares, _cbr(), FACTOR, Math.Rounding.Floor);
     }
 
     function maxDeposit(address) external pure override returns (uint256 maxAssets) {

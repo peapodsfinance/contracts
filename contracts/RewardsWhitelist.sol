@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IRewardsWhitelister.sol";
@@ -13,6 +13,8 @@ contract RewardsWhitelist is IRewardsWhitelister, Ownable {
     mapping(address => bool) public override whitelist;
     address[] public _whitelistAry;
     mapping(address => uint256) _whitelistAryIdx;
+
+    constructor() Ownable(_msgSender()) {}
 
     function getFullWhitelist() external view override returns (address[] memory) {
         return _whitelistAry;

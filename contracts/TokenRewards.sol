@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity 0.8.28;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
 import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
 import "./interfaces/IDecentralizedIndex.sol";
 import "./interfaces/IDexAdapter.sol";
+import "./interfaces/IInitializeSelector.sol";
 import "./interfaces/IPEAS.sol";
 import "./interfaces/IRewardsWhitelister.sol";
 import "./interfaces/IProtocolFees.sol";
@@ -15,7 +17,7 @@ import "./interfaces/IProtocolFeeRouter.sol";
 import "./interfaces/ITokenRewards.sol";
 import "./interfaces/IV3TwapUtilities.sol";
 
-contract TokenRewards is ITokenRewards, Context {
+contract TokenRewards is Initializable, IInitializeSelector, ContextUpgradeable, ITokenRewards {
     using SafeERC20 for IERC20;
 
     uint256 constant PRECISION = 10 ** 27;
@@ -23,40 +25,45 @@ contract TokenRewards is ITokenRewards, Context {
     uint24 constant REWARDS_POOL_FEE = 10000; // 1%
     int24 constant REWARDS_TICK_SPACING = 200;
 
-    uint256 immutable REWARDS_SWAP_OVERRIDE_MIN;
-    address immutable INDEX_FUND;
-    address immutable PAIRED_LP_TOKEN;
-    bool immutable LEAVE_AS_PAIRED_LP_TOKEN;
-    IProtocolFeeRouter immutable PROTOCOL_FEE_ROUTER;
-    IRewardsWhitelister immutable REWARDS_WHITELISTER;
-    IDexAdapter immutable DEX_ADAPTER;
-    IV3TwapUtilities immutable V3_TWAP_UTILS;
+    uint256 REWARDS_SWAP_OVERRIDE_MIN;
+    address INDEX_FUND;
+    address PAIRED_LP_TOKEN;
+    bool LEAVE_AS_PAIRED_LP_TOKEN;
+    IProtocolFeeRouter PROTOCOL_FEE_ROUTER;
+    IRewardsWhitelister REWARDS_WHITELISTER;
+    IDexAdapter DEX_ADAPTER;
+    IV3TwapUtilities V3_TWAP_UTILS;
 
     struct Reward {
         uint256 excluded;
         uint256 realized;
     }
 
-    address public immutable override trackingToken;
-    address public immutable override rewardsToken; // main rewards token
+    address public override trackingToken;
+    address public override rewardsToken;
     uint256 public override totalShares;
     uint256 public override totalStakers;
     mapping(address => uint256) public shares;
-    // reward token => user => Reward
     mapping(address => mapping(address => Reward)) public rewards;
 
     uint256 _rewardsSwapAmountInOverride;
-    // reward token => amount
     mapping(address => uint256) _rewardsPerShare;
-    // reward token => amount
     mapping(address => uint256) public rewardsDistributed;
-    // reward token => amount
     mapping(address => uint256) public rewardsDeposited;
-    // all deposited rewards tokens
     address[] _allRewardsTokens;
     mapping(address => bool) _depositedRewardsToken;
 
-    constructor(address _indexFund, address _trackingToken, bool _leaveAsPaired, bytes memory _immutables) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _indexFund, address _trackingToken, bool _leaveAsPaired, bytes memory _immutables)
+        public
+        initializer
+    {
+        __Context_init();
+
         (
             address _pairedLpToken,
             address _lpRewardsToken,
@@ -81,6 +88,10 @@ contract TokenRewards is ITokenRewards, Context {
         uint8 _pd = IERC20Metadata(_pairedLpToken).decimals();
         uint256 _minSwap = 10 ** (_pd / 2);
         REWARDS_SWAP_OVERRIDE_MIN = _minSwap == 0 ? 10 ** _pd : _minSwap;
+    }
+
+    function initializeSelector() external pure override returns (bytes4) {
+        return this.initialize.selector;
     }
 
     function setShares(address _wallet, uint256 _amount, bool _sharesRemoving) external override {
@@ -138,8 +149,6 @@ contract TokenRewards is ITokenRewards, Context {
         uint256 _adminAmt = _getAdminFeeFromAmount(_amountTkn);
         _amountTkn -= _adminAmt;
 
-        // if we want to leave rewards for this pod as the paired LP token without
-        // swapping into rewardsToken, simply deposit them here for stakers to claim
         if (LEAVE_AS_PAIRED_LP_TOKEN) {
             (, uint256 _yieldBurnFee) = _getYieldFees();
             uint256 _burnAmount = (_amountTkn * _yieldBurnFee) / PROTOCOL_FEE_ROUTER.protocolFees().DEN();
@@ -188,7 +197,7 @@ contract TokenRewards is ITokenRewards, Context {
         }
         uint256 _adminAmt = _getAdminFeeFromAmount(_finalAmt);
         if (_adminAmt > 0) {
-            IERC20(_token).safeTransfer(Ownable(address(V3_TWAP_UTILS)).owner(), _adminAmt);
+            IERC20(_token).safeTransfer(OwnableUpgradeable(address(V3_TWAP_UTILS)).owner(), _adminAmt);
             _finalAmt -= _adminAmt;
         }
         _depositRewards(_token, _finalAmt);
@@ -310,7 +319,7 @@ contract TokenRewards is ITokenRewards, Context {
     }
 
     function _processAdminFee(uint256 _amount) internal {
-        IERC20(PAIRED_LP_TOKEN).safeTransfer(Ownable(address(V3_TWAP_UTILS)).owner(), _amount);
+        IERC20(PAIRED_LP_TOKEN).safeTransfer(OwnableUpgradeable(address(V3_TWAP_UTILS)).owner(), _amount);
     }
 
     function claimReward(address _wallet) external override {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -41,7 +41,7 @@ contract Zapper is IZapper, Context, Ownable {
     // curve pool => token => idx
     mapping(address => mapping(address => int128)) public curveTokenIdx;
 
-    constructor(IV3TwapUtilities _v3TwapUtilities, IDexAdapter _dexAdapter) {
+    constructor(IV3TwapUtilities _v3TwapUtilities, IDexAdapter _dexAdapter) Ownable(_msgSender()) {
         V2_ROUTER = _dexAdapter.V2_ROUTER();
         V3_TWAP_UTILS = _v3TwapUtilities;
         DEX_ADAPTER = _dexAdapter;

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
-import "forge-std/console.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "../contracts/IndexUtils.sol";
 import "../contracts/WeightedIndex.sol";
@@ -194,18 +193,16 @@ contract IndexUtilsTest is PodHelperTest {
         IDecentralizedIndex.Config memory config;
         IDecentralizedIndex.Fees memory fees;
 
-        address newPod = address(
-            new WeightedIndex(
-                "Test Multi",
-                "tMULTI",
-                config,
-                fees,
-                tokens,
-                weights,
-                false,
-                false,
-                _getImmutables(dai, 0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb)
-            )
+        address newPod = _createPod(
+            "Test Multi",
+            "tMULTI",
+            config,
+            fees,
+            tokens,
+            weights,
+            address(0),
+            false,
+            _getImmutables(dai, 0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb)
         );
         IDecentralizedIndex indexFund = IDecentralizedIndex(newPod);
 
