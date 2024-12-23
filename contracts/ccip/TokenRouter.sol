@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/ICCIPTokenRouter.sol";
@@ -10,6 +10,8 @@ contract TokenRouter is ICCIPTokenRouter, Ownable {
 
     // source token => target chain selector => config
     mapping(address => mapping(uint64 => TokenConfig)) _configs;
+
+    constructor() Ownable(_msgSender()) {}
 
     function getConfig(address _sourceToken, uint64 _targetChainSelector)
         external

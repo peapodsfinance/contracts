@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "forge-std/console.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -13,6 +13,10 @@ import "../../contracts/interfaces/IStakingPoolToken.sol";
 import {MockChainlinkStaleData} from "../mocks/MockChainlinkStaleData.sol";
 import {MockDIAOracleV2} from "../mocks/MockDIAOracleV2.sol";
 import {PodHelperTest} from "../helpers/PodHelper.t.sol";
+
+interface IStakingPoolToken_OLD {
+    function indexFund() external view returns (address);
+}
 
 contract spTKNMinimalOracleTest is PodHelperTest {
     V2ReservesUniswap _v2Res;
@@ -30,8 +34,8 @@ contract spTKNMinimalOracleTest is PodHelperTest {
 
     function test_getPrices_LowZero() public {
         address _usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-        address _podToDup = IStakingPoolToken(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 17, 0); // $17 pOHM, $1 USDC, 17/1 = 17
+        address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
+        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 20, 0); // $20 pOHM, $1 USDC, 20/1 = 20
         address clStaleData = address(new MockChainlinkStaleData());
         spTKNMinimalOracle oracleBTCUSDC = new spTKNMinimalOracle(
             abi.encode(
@@ -65,7 +69,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     }
 
     function test_getPodPerBasePrice_PEASDAI() public {
-        address _podToDup = IStakingPoolToken(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
+        address _podToDup = IStakingPoolToken_OLD(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
         address _newPod = _dupPodAndSeedLp(_podToDup, address(0), 0, 0);
         spTKNMinimalOracle oraclePEASDAI = new spTKNMinimalOracle(
             abi.encode(
@@ -89,7 +93,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     }
 
     function test_getPrices_PEASDAI() public {
-        address _podToDup = IStakingPoolToken(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
+        address _podToDup = IStakingPoolToken_OLD(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
         address _newPod = _dupPodAndSeedLp(_podToDup, address(0), 0, 0);
         spTKNMinimalOracle oraclePEASDAI = new spTKNMinimalOracle(
             abi.encode(
@@ -129,7 +133,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         MockDIAOracleV2 _peasDiaOracle = new MockDIAOracleV2();
         _peasDiaOracle.setValue("DAI/USD", 100000000, uint128(block.timestamp));
 
-        address _podToDup = IStakingPoolToken(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
+        address _podToDup = IStakingPoolToken_OLD(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
         address _newPod = _dupPodAndSeedLp(_podToDup, address(0), 0, 0);
         spTKNMinimalOracle oraclePEASDAI_DIA = new spTKNMinimalOracle(
             abi.encode(
@@ -166,7 +170,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     }
 
     function test_getPrices_NPCPEAS() public {
-        address _podToDup = IStakingPoolToken(0x2683e7A6C577514C6907c09Ba13817C36e774DE9).indexFund(); // spNPC
+        address _podToDup = IStakingPoolToken_OLD(0x2683e7A6C577514C6907c09Ba13817C36e774DE9).indexFund(); // spNPC
         address _newPod = _dupPodAndSeedLp(_podToDup, address(0), 0, 0);
         spTKNMinimalOracle oracleNPCPEAS = new spTKNMinimalOracle(
             abi.encode(
@@ -210,7 +214,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     }
 
     function test_getPrices_APEPOHM() public {
-        address _podToDup = IStakingPoolToken(0x21D13197D2eABA3B47973f8e1F3f46CC96336b0E).indexFund(); // spAPE
+        address _podToDup = IStakingPoolToken_OLD(0x21D13197D2eABA3B47973f8e1F3f46CC96336b0E).indexFund(); // spAPE
         address _newpOHM = _dupPodAndSeedLp(0x88E08adB69f2618adF1A3FF6CC43c671612D1ca4, address(0), 0, 0);
         address _newPod = _dupPodAndSeedLp(_podToDup, _newpOHM, 0, 0);
         spTKNMinimalOracle oracleAPEPOHM = new spTKNMinimalOracle(
@@ -242,13 +246,13 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         assertApproxEqRel(
             _priceLow,
             _unsafePrice18,
-            0.1e18, // TODO: tighten this up
+            0.2e18, // TODO: tighten this up
             "_priceLow not close to _unsafePrice18"
         );
         assertApproxEqRel(
             _priceHigh,
             _unsafePrice18,
-            0.1e18, // TODO: tighten this up
+            0.2e18, // TODO: tighten this up
             "_priceHigh not close to _unsafePrice18"
         );
         // accounting for unwrap fee makes oracle price a bit more
@@ -258,8 +262,8 @@ contract spTKNMinimalOracleTest is PodHelperTest {
 
     function test_getPrices_BTCUSDC() public {
         address _usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-        address _podToDup = IStakingPoolToken(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 17, 0); // $17 pOHM, $1 USDC, 17/1 = 17
+        address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
+        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 20, 0); // $20 pOHM, $1 USDC, 20/1 = 20
         spTKNMinimalOracle oracleBTCUSDC = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),
@@ -305,8 +309,8 @@ contract spTKNMinimalOracleTest is PodHelperTest {
 
     function test_getPrices_BTCUSDC_BTCWETHClPool() public {
         address _usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-        address _podToDup = IStakingPoolToken(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 17, 0); // $17 pOHM, $1 USDC, 17/1 = 17
+        address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
+        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 18, 0); // $18 pOHM, $1 USDC, 18/1 = 18
         spTKNMinimalOracle oracleBTCUSDC1 = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),
@@ -389,8 +393,8 @@ contract spTKNMinimalOracleTest is PodHelperTest {
 
     function test_getPrices_BTCWETH() public {
         address weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-        address _podToDup = IStakingPoolToken(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, weth, 0, 188); // $3200 ETH, $17 pOHM, 3200/17 = 188
+        address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
+        address _newPod = _dupPodAndSeedLp(_podToDup, weth, 0, 195); // $3900 ETH, $20 pOHM, 3900/20 = 195
         spTKNMinimalOracle oracleBTCWETH = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),

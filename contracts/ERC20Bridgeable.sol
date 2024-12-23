@@ -1,7 +1,7 @@
 // https://peapods.finance
 
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -22,7 +22,11 @@ contract ERC20Bridgeable is ERC20, ERC20Permit, IERC20Bridgeable, Ownable {
         _;
     }
 
-    constructor(string memory _name, string memory _symbol) ERC20(_name, _symbol) ERC20Permit(_name) {}
+    constructor(string memory _name, string memory _symbol)
+        ERC20(_name, _symbol)
+        ERC20Permit(_name)
+        Ownable(_msgSender())
+    {}
 
     function burn(uint256 _amount) external override {
         _burn(_msgSender(), _amount);

@@ -1,56 +1,71 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./interfaces/IDexAdapter.sol";
+import "./interfaces/IInitializeSelector.sol";
 import "./interfaces/IRewardsWhitelister.sol";
 import "./interfaces/IProtocolFeeRouter.sol";
 import "./interfaces/IStakingPoolToken.sol";
 import "./TokenRewards.sol";
 
-contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
+contract StakingPoolToken is
+    Initializable,
+    IInitializeSelector,
+    IStakingPoolToken,
+    ERC20Upgradeable,
+    OwnableUpgradeable
+{
     using SafeERC20 for IERC20;
 
-    address public immutable override INDEX_FUND;
-    address public immutable override POOL_REWARDS;
+    uint256 INITIALIZED;
+
+    address public override INDEX_FUND;
+    address public override POOL_REWARDS;
 
     address public override stakeUserRestriction;
     address public override stakingToken;
 
-    IDexAdapter immutable DEX_ADAPTER;
-    IV3TwapUtilities immutable V3_TWAP_UTILS;
+    IDexAdapter public DEX_ADAPTER;
+    IV3TwapUtilities public V3_TWAP_UTILS;
 
     modifier onlyRestricted() {
         require(_msgSender() == stakeUserRestriction, "R");
         _;
     }
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         string memory _name,
         string memory _symbol,
+        address _indexFund,
         address _stakeUserRestriction,
-        bool _leaveRewardsAsPairedLp,
         bytes memory _immutables
-    ) ERC20(_name, _symbol) {
+    ) public initializer {
+        __ERC20_init(_name, _symbol);
+        __Ownable_init(_msgSender());
+
+        INITIALIZED = block.number;
+
         stakeUserRestriction = _stakeUserRestriction;
-        INDEX_FUND = _msgSender();
+        INDEX_FUND = _indexFund;
+
         (,,,,, address _v3TwapUtilities, address _dexAdapter) =
             abi.decode(_immutables, (address, address, address, address, address, address, address));
+
         DEX_ADAPTER = IDexAdapter(_dexAdapter);
         V3_TWAP_UTILS = IV3TwapUtilities(_v3TwapUtilities);
-        POOL_REWARDS = address(new TokenRewards(INDEX_FUND, address(this), _leaveRewardsAsPairedLp, _immutables));
     }
 
-    /// @dev backwards compatibility
-    function indexFund() external view override returns (address) {
-        return INDEX_FUND;
-    }
-
-    /// @dev backwards compatibility
-    function poolRewards() external view override returns (address) {
-        return POOL_REWARDS;
+    function initializeSelector() external pure override returns (bytes4) {
+        return this.initialize.selector;
     }
 
     function stake(address _user, uint256 _amount) external override {
@@ -69,6 +84,11 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
         emit Unstake(_msgSender(), _amount);
     }
 
+    function setPoolRewards(address _rewards) external onlyOwner {
+        require(block.number == INITIALIZED && POOL_REWARDS == address(0), "I");
+        POOL_REWARDS = _rewards;
+    }
+
     function setStakingToken(address _stakingToken) external onlyOwner {
         require(stakingToken == address(0), "S");
         stakingToken = _stakingToken;
@@ -82,12 +102,13 @@ contract StakingPoolToken is IStakingPoolToken, ERC20, Ownable {
         stakeUserRestriction = _user;
     }
 
-    function _afterTokenTransfer(address _from, address _to, uint256 _amount) internal override {
+    function _update(address _from, address _to, uint256 _value) internal override {
+        super._update(_from, _to, _value);
         if (_from != address(0)) {
-            TokenRewards(POOL_REWARDS).setShares(_from, _amount, true);
+            TokenRewards(POOL_REWARDS).setShares(_from, _value, true);
         }
         if (_to != address(0) && _to != address(0xdead)) {
-            TokenRewards(POOL_REWARDS).setShares(_to, _amount, false);
+            TokenRewards(POOL_REWARDS).setShares(_to, _value, false);
         }
     }
 }

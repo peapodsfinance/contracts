@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 interface IV3TwapUtilities {
     function getV3Pool(address v3Factory, address token0, address token1) external view returns (address);

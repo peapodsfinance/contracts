@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -29,7 +29,9 @@ contract Zapper is IZapper, Context, Ownable {
     IV3TwapUtilities immutable V3_TWAP_UTILS;
     IDexAdapter immutable DEX_ADAPTER;
 
-    uint256 _slippage = 30; // 3%
+    // pool => slippage (1 == 0.1%, 1000 == 100%)
+    mapping(address => uint256) _slippage;
+    uint256 _defaultSlippage = 30; // 3%
 
     address public OHM = 0x64aa3364F17a4D01c6f1751Fd97C2BD3D7e7f1D5;
     address public pOHM;
@@ -39,7 +41,7 @@ contract Zapper is IZapper, Context, Ownable {
     // curve pool => token => idx
     mapping(address => mapping(address => int128)) public curveTokenIdx;
 
-    constructor(IV3TwapUtilities _v3TwapUtilities, IDexAdapter _dexAdapter) {
+    constructor(IV3TwapUtilities _v3TwapUtilities, IDexAdapter _dexAdapter) Ownable(_msgSender()) {
         V2_ROUTER = _dexAdapter.V2_ROUTER();
         V3_TWAP_UTILS = _v3TwapUtilities;
         DEX_ADAPTER = _dexAdapter;
@@ -153,13 +155,13 @@ contract Zapper is IZapper, Context, Ownable {
         internal
         returns (uint256)
     {
+        address _v3Pool;
+        try DEX_ADAPTER.getV3Pool(_in, _out, uint24(10000)) returns (address __v3Pool) {
+            _v3Pool = __v3Pool;
+        } catch {
+            _v3Pool = DEX_ADAPTER.getV3Pool(_in, _out, int24(200));
+        }
         if (_amountOutMin == 0) {
-            address _v3Pool;
-            try DEX_ADAPTER.getV3Pool(_in, _out, uint24(10000)) returns (address __v3Pool) {
-                _v3Pool = __v3Pool;
-            } catch {
-                _v3Pool = DEX_ADAPTER.getV3Pool(_in, _out, int24(200));
-            }
             address _token0 = _in < _out ? _in : _out;
             uint256 _poolPriceX96 =
                 V3_TWAP_UTILS.priceX96FromSqrtPriceX96(V3_TWAP_UTILS.sqrtPriceX96FromPoolAndInterval(_v3Pool));
@@ -169,8 +171,11 @@ contract Zapper is IZapper, Context, Ownable {
         }
 
         uint256 _outBefore = IERC20(_out).balanceOf(address(this));
+        uint256 _finalSlip = _slippage[_v3Pool] > 0 ? _slippage[_v3Pool] : _defaultSlippage;
         IERC20(_in).safeIncreaseAllowance(address(DEX_ADAPTER), _amountIn);
-        DEX_ADAPTER.swapV3Single(_in, _out, _fee, _amountIn, (_amountOutMin * (1000 - _slippage)) / 1000, address(this));
+        DEX_ADAPTER.swapV3Single(
+            _in, _out, _fee, _amountIn, (_amountOutMin * (1000 - _finalSlip)) / 1000, address(this)
+        );
         return IERC20(_out).balanceOf(address(this)) - _outBefore;
     }
 
@@ -264,9 +269,14 @@ contract Zapper is IZapper, Context, Ownable {
         pOHM = _pOHM == address(0) ? pOHM : _pOHM;
     }
 
-    function setSlippage(uint256 _slip) external onlyOwner {
-        require(_slip >= 0 && _slip <= 1000, "BOUNDS");
-        _slippage = _slip;
+    function setPoolSlippage(address _pool, uint256 _slip) external onlyOwner {
+        require(_slip >= 0 && _slip <= 1000, "B");
+        _slippage[_pool] = _slip;
+    }
+
+    function setDefaultSlippage(uint256 _slip) external onlyOwner {
+        require(_slip >= 0 && _slip <= 1000, "B");
+        _defaultSlippage = _slip;
     }
 
     function setZapMap(address _in, address _out, Pools memory _pools) external onlyOwner {

@@ -1,45 +1,48 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IDecentralizedIndex.sol";
 import "./interfaces/IDexAdapter.sol";
 import "./interfaces/IFlashLoanRecipient.sol";
 import "./interfaces/IProtocolFeeRouter.sol";
 import "./interfaces/IRewardsWhitelister.sol";
+import "./interfaces/IStakingPoolToken.sol";
 import "./interfaces/ITokenRewards.sol";
-import "./StakingPoolToken.sol";
+import "./interfaces/IV3TwapUtilities.sol";
 
-abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit {
+abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20PermitUpgradeable, IDecentralizedIndex {
     using SafeERC20 for IERC20;
 
     uint16 constant DEN = 10000;
     uint8 constant SWAP_DELAY = 20; // seconds
 
-    IProtocolFeeRouter immutable PROTOCOL_FEE_ROUTER;
-    IRewardsWhitelister immutable REWARDS_WHITELIST;
-    IDexAdapter public immutable override DEX_HANDLER;
-    IV3TwapUtilities immutable V3_TWAP_UTILS;
+    IProtocolFeeRouter PROTOCOL_FEE_ROUTER;
+    IRewardsWhitelister REWARDS_WHITELIST;
+    IDexAdapter public override DEX_HANDLER;
+    IV3TwapUtilities V3_TWAP_UTILS;
 
-    uint256 public immutable override FLASH_FEE_AMOUNT_DAI; // 10 DAI
-    address public immutable override PAIRED_LP_TOKEN;
-    address immutable V2_ROUTER;
-    address immutable V3_ROUTER;
-    address immutable DAI;
-    address immutable WETH;
+    uint256 public FLASH_FEE_AMOUNT_DAI; // 10 DAI
+    address public PAIRED_LP_TOKEN;
+    uint256 INITIALIZED;
+    address V2_ROUTER;
+    address V3_ROUTER;
+    address DAI;
+    address WETH;
     address V2_POOL;
 
-    IndexType public immutable override indexType;
-    uint256 public immutable override created;
-    address public immutable override lpRewardsToken;
-    address public override lpStakingPool;
-    uint8 public override unlocked = 1;
+    Config _config;
+    Fees _fees;
 
-    Config public config;
-    Fees public fees;
+    IndexType public indexType;
+    uint256 public created;
+    address public lpRewardsToken;
+    address public override lpStakingPool;
+    uint8 public override unlocked;
+
     IndexAssetInfo[] public indexTokens;
     mapping(address => bool) _isTokenInIndex;
     mapping(address => uint8) _fundTokenIdx;
@@ -49,12 +52,11 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
     uint64 _partnerFirstWrapped;
     uint64 _lastSwap;
     uint8 _swapping;
-    uint8 _swapAndFeeOn = 1;
+    uint8 _swapAndFeeOn;
     uint8 _shortCircuitRewards;
-    bool _initialized;
+    bool _isSetup;
 
     event FlashLoan(address indexed executor, address indexed recipient, address token, uint256 amount);
-
     event FlashMint(address indexed executor, address indexed recipient, uint256 amount);
 
     modifier lock() {
@@ -65,7 +67,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
     }
 
     modifier onlyPartner() {
-        require(_msgSender() == config.partner, "P");
+        require(_msgSender() == _config.partner, "P");
         _;
     }
 
@@ -75,27 +77,36 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
         _swapAndFeeOn = 1;
     }
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() initializer {}
+
+    function __DecentralizedIndex_init(
         string memory _name,
         string memory _symbol,
         IndexType _idxType,
-        Config memory _config,
-        Fees memory _fees,
-        bool _stakeRestriction,
-        bool _leaveRewardsAsPairedLp,
+        Config memory __config,
+        Fees memory __fees,
         bytes memory _immutables
-    ) ERC20(_name, _symbol) ERC20Permit(_name) {
-        require(_fees.buy <= (uint256(DEN) * 20) / 100);
-        require(_fees.sell <= (uint256(DEN) * 20) / 100);
-        require(_fees.burn <= (uint256(DEN) * 70) / 100);
-        require(_fees.bond <= (uint256(DEN) * 99) / 100);
-        require(_fees.debond <= (uint256(DEN) * 99) / 100);
-        require(_fees.partner <= (uint256(DEN) * 5) / 100);
+    ) internal onlyInitializing {
+        __ERC20_init(_name, _symbol);
+        __ERC20Permit_init(_name);
+
+        INITIALIZED = block.number;
+        unlocked = 1;
+        _swapAndFeeOn = 1;
+
+        require(__fees.buy <= (uint256(DEN) * 20) / 100);
+        require(__fees.sell <= (uint256(DEN) * 20) / 100);
+        require(__fees.burn <= (uint256(DEN) * 70) / 100);
+        require(__fees.bond <= (uint256(DEN) * 99) / 100);
+        require(__fees.debond <= (uint256(DEN) * 99) / 100);
+        require(__fees.partner <= (uint256(DEN) * 5) / 100);
 
         indexType = _idxType;
         created = block.timestamp;
-        fees = _fees;
-        config = _config;
+        _fees = __fees;
+        _config = __config;
+        _config.debondCooldown = __config.debondCooldown == 0 ? 60 days : __config.debondCooldown;
 
         (
             address _pairedLpToken,
@@ -117,51 +128,35 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
         V3_ROUTER = DEX_HANDLER.V3_ROUTER();
         PAIRED_LP_TOKEN = _pairedLpToken;
         FLASH_FEE_AMOUNT_DAI = 10 * 10 ** IERC20Metadata(_dai).decimals(); // 10 DAI
-        lpStakingPool = address(
-            new StakingPoolToken(
-                string.concat("Staked ", _name),
-                string.concat("s", _symbol),
-                _stakeRestriction ? _msgSender() : address(0),
-                _leaveRewardsAsPairedLp,
-                _immutables
-            )
-        );
-        if (!DEX_HANDLER.ASYNC_INITIALIZE()) {
-            _initialize();
-        }
-        WETH = IDexAdapter(_dexAdapter).WETH();
+        WETH = DEX_HANDLER.WETH();
         emit Create(address(this), _msgSender());
     }
 
-    function initialize() external {
-        _initialize();
-    }
-
-    /// @notice The ```totalSupply``` function returns the total pTKN supply minted, excluding any used for _flashMint
-    /// @return _totalSupply Valid supply of pTKN excluding flashMinted pTKNs
-    function totalSupply() public view override(IERC20, ERC20) returns (uint256) {
-        return _totalSupply;
-    }
-
-    /// @notice The ```_initialize``` function initialized a new LP pair for the pod + pairedLpAsset
-    function _initialize() internal {
-        require(!_initialized, "O");
-        _initialized = true;
+    /// @notice The ```setup``` function initialized a new LP pair for the pod + pairedLpAsset
+    function setup() external override {
+        require(!_isSetup, "O");
+        _isSetup = true;
         address _v2Pool = DEX_HANDLER.getV2Pool(address(this), PAIRED_LP_TOKEN);
         if (_v2Pool == address(0)) {
             _v2Pool = DEX_HANDLER.createV2Pool(address(this), PAIRED_LP_TOKEN);
         }
-        StakingPoolToken(lpStakingPool).setStakingToken(_v2Pool);
-        StakingPoolToken(lpStakingPool).renounceOwnership();
+        IStakingPoolToken(lpStakingPool).setStakingToken(_v2Pool);
+        Ownable(lpStakingPool).renounceOwnership();
         V2_POOL = _v2Pool;
         emit Initialize(_msgSender(), _v2Pool);
     }
 
-    /// @notice The ```_transfer``` function overrides the standard ERC20 _transfer to handle fee processing for a pod
+    /// @notice The ```totalSupply``` function returns the total pTKN supply minted, excluding any used for _flashMint
+    /// @return _totalSupply Valid supply of pTKN excluding flashMinted pTKNs
+    function totalSupply() public view override(IERC20, ERC20Upgradeable) returns (uint256) {
+        return _totalSupply;
+    }
+
+    /// @notice The ```_update``` function overrides the standard ERC20 _update to handle fee processing for a pod
     /// @param _from Where pTKN are being transferred from
     /// @param _to Where pTKN are being transferred to
     /// @param _amount Amount of pTKN being transferred
-    function _transfer(address _from, address _to, uint256 _amount) internal virtual override {
+    function _update(address _from, address _to, uint256 _amount) internal override {
         require(!_blacklist[_to], "BK");
         bool _buy = _from == V2_POOL && _to != V2_ROUTER;
         bool _sell = _to == V2_POOL;
@@ -170,20 +165,20 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
             if (_from != V2_POOL) {
                 _processPreSwapFeesAndSwap();
             }
-            if (_buy && fees.buy > 0) {
-                _fee = (_amount * fees.buy) / DEN;
-                super._transfer(_from, address(this), _fee);
-            } else if (_sell && fees.sell > 0) {
-                _fee = (_amount * fees.sell) / DEN;
-                super._transfer(_from, address(this), _fee);
-            } else if (!_buy && !_sell && config.hasTransferTax) {
+            if (_buy && _fees.buy > 0) {
+                _fee = (_amount * _fees.buy) / DEN;
+                super._update(_from, address(this), _fee);
+            } else if (_sell && _fees.sell > 0) {
+                _fee = (_amount * _fees.sell) / DEN;
+                super._update(_from, address(this), _fee);
+            } else if (!_buy && !_sell && _config.hasTransferTax) {
                 _fee = _amount / 10000; // 0.01%
                 _fee = _fee == 0 && _amount > 0 ? 1 : _fee;
-                super._transfer(_from, address(this), _fee);
+                super._update(_from, address(this), _fee);
             }
         }
         _processBurnFee(_fee);
-        super._transfer(_from, _to, _amount - _fee);
+        super._update(_from, _to, _amount - _fee);
     }
 
     /// @notice The ```_processPreSwapFeesAndSwap``` function processes fees that could be pending for a pod
@@ -207,9 +202,9 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
             _lastSwap = uint64(block.timestamp);
             uint256 _totalAmt = _bal > _max ? _max : _bal;
             uint256 _partnerAmt;
-            if (fees.partner > 0 && config.partner != address(0) && !_blacklist[config.partner]) {
-                _partnerAmt = (_totalAmt * fees.partner) / DEN;
-                super._transfer(address(this), config.partner, _partnerAmt);
+            if (_fees.partner > 0 && _config.partner != address(0) && !_blacklist[_config.partner]) {
+                _partnerAmt = (_totalAmt * _fees.partner) / DEN;
+                super._update(address(this), _config.partner, _partnerAmt);
             }
             _feeSwap(_totalAmt - _partnerAmt);
             _swapping = 0;
@@ -220,10 +215,10 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
     /// @notice into a vault where holders have more underlying TKN to pTKN as burn fees process over time
     /// @param _amtToProcess Number of pTKN being burned
     function _processBurnFee(uint256 _amtToProcess) internal {
-        if (_amtToProcess == 0 || fees.burn == 0) {
+        if (_amtToProcess == 0 || _fees.burn == 0) {
             return;
         }
-        uint256 _burnAmt = (_amtToProcess * fees.burn) / DEN;
+        uint256 _burnAmt = (_amtToProcess * _fees.burn) / DEN;
         _totalSupply -= _burnAmt;
         _burn(address(this), _burnAmt);
     }
@@ -232,7 +227,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
     /// @param _amount Number of pTKN being processed for yield
     function _feeSwap(uint256 _amount) internal {
         _approve(address(this), address(DEX_HANDLER), _amount);
-        address _rewards = StakingPoolToken(lpStakingPool).POOL_REWARDS();
+        address _rewards = IStakingPoolToken(lpStakingPool).POOL_REWARDS();
         uint256 _pairedLpBalBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(_rewards);
         DEX_HANDLER.swapV2Single(address(this), PAIRED_LP_TOKEN, _amount, 0, _rewards);
 
@@ -260,8 +255,8 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
 
     /// @notice The ```_internalBond``` function should be called from external bond() to handle validation and partner logic
     function _internalBond() internal {
-        require(_initialized, "I");
-        if (_partnerFirstWrapped == 0 && _msgSender() == config.partner) {
+        require(_isSetup, "I");
+        if (_partnerFirstWrapped == 0 && _msgSender() == _config.partner) {
             _partnerFirstWrapped = uint64(block.timestamp);
         }
     }
@@ -271,7 +266,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
     /// @return bool Whether the user can wrap fee free
     function _canWrapFeeFree(address _wrapper) internal view returns (bool) {
         return _isFirstIn()
-            || (_wrapper == config.partner && _partnerFirstWrapped == 0 && block.timestamp <= created + 7 days);
+            || (_wrapper == _config.partner && _partnerFirstWrapped == 0 && block.timestamp <= created + 7 days);
     }
 
     /// @notice The ```_isFirstIn``` function confirms if the user is the first to wrap
@@ -288,21 +283,29 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
     }
 
     /// @notice The ```processPreSwapFeesAndSwap``` function allows the rewards CA for the pod to process fees as needed
-    function processPreSwapFeesAndSwap() external override {
-        require(_msgSender() == StakingPoolToken(lpStakingPool).POOL_REWARDS(), "R");
+    function processPreSwapFeesAndSwap() external override lock {
+        require(_msgSender() == IStakingPoolToken(lpStakingPool).POOL_REWARDS(), "R");
         _processPreSwapFeesAndSwap();
     }
 
     function partner() external view override returns (address) {
-        return config.partner;
+        return _config.partner;
     }
 
     function BOND_FEE() external view override returns (uint16) {
-        return fees.bond;
+        return _fees.bond;
     }
 
     function DEBOND_FEE() external view override returns (uint16) {
-        return fees.debond;
+        return _fees.debond;
+    }
+
+    function config() external view override returns (Config memory) {
+        return _config;
+    }
+
+    function fees() external view override returns (Fees memory) {
+        return _fees;
     }
 
     function isAsset(address _token) public view override returns (bool) {
@@ -335,7 +338,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
         uint256 _idxTokensBefore = balanceOf(address(this));
         uint256 _pairedBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
 
-        super._transfer(_msgSender(), address(this), _pTKNLPTokens);
+        super._update(_msgSender(), address(this), _pTKNLPTokens);
         _approve(address(this), address(DEX_HANDLER), _pTKNLPTokens);
 
         IERC20(PAIRED_LP_TOKEN).safeTransferFrom(_msgSender(), address(this), _pairedLPTokens);
@@ -352,11 +355,11 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
             _msgSender(),
             _deadline
         );
-        IERC20(PAIRED_LP_TOKEN).safeApprove(address(DEX_HANDLER), 0);
+        IERC20(PAIRED_LP_TOKEN).safeIncreaseAllowance(address(DEX_HANDLER), 0);
 
         // check & refund excess tokens from LPing
         if (balanceOf(address(this)) > _idxTokensBefore) {
-            super._transfer(address(this), _msgSender(), balanceOf(address(this)) - _idxTokensBefore);
+            super._update(address(this), _msgSender(), balanceOf(address(this)) - _idxTokensBefore);
         }
         if (IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) > _pairedBefore) {
             IERC20(PAIRED_LP_TOKEN).safeTransfer(
@@ -396,7 +399,7 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
     /// @param _data Any data the recipient wants to be passed on the flash loan callback
     function flash(address _recipient, address _token, uint256 _amount, bytes calldata _data) external override lock {
         require(_isTokenInIndex[_token], "X");
-        address _rewards = StakingPoolToken(lpStakingPool).POOL_REWARDS();
+        address _rewards = IStakingPoolToken(lpStakingPool).POOL_REWARDS();
         address _feeRecipient = lpRewardsToken == DAI
             ? address(this)
             : PAIRED_LP_TOKEN == DAI ? _rewards : Ownable(address(V3_TWAP_UTILS)).owner();
@@ -433,26 +436,19 @@ abstract contract DecentralizedIndex is IDecentralizedIndex, ERC20, ERC20Permit 
     }
 
     function setPartner(address _partner) external onlyPartner {
-        config.partner = _partner;
+        _config.partner = _partner;
         emit SetPartner(_msgSender(), _partner);
     }
 
     function setPartnerFee(uint16 _fee) external onlyPartner {
-        require(_fee < fees.partner, "L");
-        fees.partner = _fee;
+        require(_fee < _fees.partner, "L");
+        _fees.partner = _fee;
         emit SetPartnerFee(_msgSender(), _fee);
     }
 
-    function rescueERC20(address _token) external lock {
-        // cannot withdraw tokens/assets that belong to the index
-        require(!isAsset(_token) && _token != address(this), "U");
-        IERC20(_token).safeTransfer(Ownable(address(V3_TWAP_UTILS)).owner(), IERC20(_token).balanceOf(address(this)));
-    }
-
-    function rescueETH() external lock {
-        require(address(this).balance > 0, "E");
-        (bool _sent,) = Ownable(address(V3_TWAP_UTILS)).owner().call{value: address(this).balance}("");
-        require(_sent, "S");
+    function setLpStakingPool(address _pool) external {
+        require(block.number == INITIALIZED && lpStakingPool == address(0), "I");
+        lpStakingPool = _pool;
     }
 
     receive() external payable {}

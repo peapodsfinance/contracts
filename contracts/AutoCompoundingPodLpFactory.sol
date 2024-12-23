@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -15,6 +15,8 @@ contract AutoCompoundingPodLpFactory is Ownable {
 
     event SetMinimumDepositAtCreation(uint256 olfFee, uint256 newFee);
 
+    constructor() Ownable(_msgSender()) {}
+
     function create(
         string memory _name,
         string memory _symbol,
@@ -23,8 +25,8 @@ contract AutoCompoundingPodLpFactory is Ownable {
         IDexAdapter _dexAdapter,
         IIndexUtils _indexUtils,
         uint96 _salt
-    ) external onlyOwner {
-        address _aspAddy =
+    ) external onlyOwner returns (address _aspAddy) {
+        _aspAddy =
             _deploy(getBytecode(_name, _symbol, _isSelfLendingPod, _pod, _dexAdapter, _indexUtils), _getFullSalt(_salt));
         if (address(_pod) != address(0) && minimumDepositAtCreation > 0) {
             _depositMin(_aspAddy, _pod);
@@ -36,7 +38,7 @@ contract AutoCompoundingPodLpFactory is Ownable {
     function _depositMin(address _aspAddy, IDecentralizedIndex _pod) internal {
         address _lpToken = _pod.lpStakingPool();
         IERC20(_lpToken).safeTransferFrom(_msgSender(), address(this), minimumDepositAtCreation);
-        IERC20(_lpToken).safeApprove(_aspAddy, minimumDepositAtCreation);
+        IERC20(_lpToken).safeIncreaseAllowance(_aspAddy, minimumDepositAtCreation);
         AutoCompoundingPodLp(_aspAddy).deposit(minimumDepositAtCreation, _msgSender());
     }
 

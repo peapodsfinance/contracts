@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -55,7 +55,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
 
     event SetTwapInterval(uint32 oldMax, uint32 newMax);
 
-    constructor(bytes memory _requiredImmutables, bytes memory _optionalImmutables) {
+    constructor(bytes memory _requiredImmutables, bytes memory _optionalImmutables) Ownable(_msgSender()) {
         address _v2Reserves;
         (
             CHAINLINK_SINGLE_PRICE_ORACLE,
@@ -78,7 +78,9 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         V2_RESERVES = IV2Reserves(_v2Reserves);
 
         // only one (or neither) of the base conversion config should be populated
-        require(BASE_CONVERSION_CHAINLINK_FEED == address(0) || BASE_CONVERSION_CL_POOL == address(0), "CONV");
+        address _baseConvFinal =
+            BASE_CONVERSION_DIA_FEED != address(0) ? BASE_CONVERSION_DIA_FEED : BASE_CONVERSION_CL_POOL;
+        require(BASE_CONVERSION_CHAINLINK_FEED == address(0) || _baseConvFinal == address(0), "CONV");
 
         if (CHAINLINK_QUOTE_PRICE_FEED != address(0)) {
             require(CHAINLINK_BASE_PRICE_FEED != address(0), "BCLF");
@@ -93,7 +95,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         }
         BASE_IN_CL = _baseInCl;
 
-        address _pod = IStakingPoolToken(SP_TKN).indexFund();
+        address _pod = IStakingPoolToken(SP_TKN).INDEX_FUND();
         IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_pod).getAllAssets();
         POD = _pod;
         UNDERLYING_TKN = _assets[0].token;

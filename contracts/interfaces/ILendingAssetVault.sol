@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 interface ILendingAssetVault {
     event DonateAssets(address indexed user, uint256 amount, uint256 newShares);
@@ -18,11 +18,13 @@ interface ILendingAssetVault {
 
     event SetVaultMaxAllocation(address indexed vault, uint256 allocation);
 
-    event UpdateAssetMetadataFromVault(address indexed vault);
+    event UpdateAssetMetadataFromVault(address indexed vault, uint256 totalAssets, uint256 assetsUtilized);
 
     event WhitelistDeposit(address indexed user, uint256 amount);
 
     event WhitelistWithdraw(address indexed user, uint256 amount);
+
+    function vaultDeposits(address vault) external view returns (uint256);
 
     function vaultUtilization(address vault) external view returns (uint256);
 

@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -19,6 +19,21 @@ contract TestERC4626Vault is IERC4626, ERC20, ERC20Permit {
     constructor(address __asset) ERC20("Test Vault", "tVAULT") ERC20Permit("Test Vault") {
         _asset = __asset;
     }
+
+    // Needed for LendingAssetVault
+    // Simulates interest that would be added without actually adding it
+    function previewAddInterest()
+        external
+        view
+        returns (
+            uint256 interestEarned,
+            uint256,
+            uint256,
+            IFraxlendPair.CurrentRateInfo memory _currentRateInfo,
+            VaultAccount memory _totalAsset,
+            VaultAccount memory _totalBorrow
+        )
+    {}
 
     // Needed for LendingAssetVault
     function addInterest(bool)

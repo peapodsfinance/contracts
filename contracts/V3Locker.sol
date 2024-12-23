@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/INonfungiblePositionManager.sol";
@@ -10,7 +10,7 @@ contract V3Locker is Ownable {
 
     uint256 public lockedTime;
 
-    constructor() {
+    constructor() Ownable(_msgSender()) {
         CREATED = block.timestamp;
         V3_POS_MGR = INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
     }

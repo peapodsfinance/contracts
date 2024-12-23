@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 interface ICLPool {
     /// @notice The contract that deployed the pool, which must adhere to the ICLFactory interface

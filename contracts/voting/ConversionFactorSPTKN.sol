@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
@@ -29,7 +29,7 @@ contract ConversionFactorSPTKN is ConversionFactorPTKN {
         override
         returns (uint256 _factor, uint256 _denomenator)
     {
-        (uint256 _pFactor, uint256 _pDenomenator) = _calculateCbrWithDen(IStakingPoolToken(_spTKN).indexFund());
+        (uint256 _pFactor, uint256 _pDenomenator) = _calculateCbrWithDen(IStakingPoolToken(_spTKN).INDEX_FUND());
         address _lpTkn = IStakingPoolToken(_spTKN).stakingToken();
         address _token1 = IUniswapV3Pool(PEAS_STABLE_CL_POOL).token1();
         uint160 _sqrtPriceX96 = TWAP_UTILS.sqrtPriceX96FromPoolAndInterval(PEAS_STABLE_CL_POOL);

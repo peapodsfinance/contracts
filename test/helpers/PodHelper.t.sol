@@ -1,21 +1,43 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
+import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "../../contracts/interfaces/IDecentralizedIndex.sol";
 import "../../contracts/interfaces/IDexAdapter.sol";
 import "../../contracts/interfaces/IStakingPoolToken.sol";
 import "../../contracts/interfaces/IV3TwapUtilities.sol";
 import {IndexUtils} from "../../contracts/IndexUtils.sol";
+import {StakingPoolToken} from "../../contracts/StakingPoolToken.sol";
+import {TokenRewards} from "../../contracts/TokenRewards.sol";
 import {WeightedIndex} from "../../contracts/WeightedIndex.sol";
+import {WeightedIndexFactory} from "../../contracts/WeightedIndexFactory.sol";
 import {RewardsWhitelist} from "../../contracts/RewardsWhitelist.sol";
 
 contract PodHelperTest is Test {
-    RewardsWhitelist _rewardsWhitelist;
+    RewardsWhitelist _rewardsWhitelistSub;
+    WeightedIndexFactory _podDeployerSub;
 
     function setUp() public virtual {
-        _rewardsWhitelist = new RewardsWhitelist();
+        _rewardsWhitelistSub = new RewardsWhitelist();
+        _podDeployerSub = new WeightedIndexFactory();
+        _deployImpAndBeacons(address(this));
+    }
+
+    function _deployImpAndBeacons(address _owner)
+        internal
+        returns (address pi, address spi, address tri, address pb, address spb, address trb)
+    {
+        pi = address(new WeightedIndex());
+        pb = address(new UpgradeableBeacon(pi, _owner));
+
+        spi = address(new StakingPoolToken());
+        spb = address(new UpgradeableBeacon(spi, _owner));
+
+        tri = address(new TokenRewards());
+        trb = address(new UpgradeableBeacon(tri, _owner));
+        _podDeployerSub.setImplementationsAndBeacons(pi, spi, tri, pb, spb, trb);
     }
 
     function _dupPodAndSeedLp(
@@ -33,7 +55,7 @@ contract PodHelperTest is Test {
         );
 
         address _underlying;
-        (_underlying, _newPod) = _createPod(_pod, pairedLpToken, 0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb);
+        (_underlying, _newPod) = _duplicatePod(_pod, pairedLpToken);
 
         address _lpStakingPool = IDecentralizedIndex(_pod).lpStakingPool();
         address _podV2Pool = IStakingPoolToken(_lpStakingPool).stakingToken();
@@ -72,23 +94,69 @@ contract PodHelperTest is Test {
         );
     }
 
-    function _createPod(address _oldPod, address _pairedLpToken, address _dexAdapter)
+    function _duplicatePod(address _oldPod, address _pairedLpToken)
         internal
         returns (address _underlying, address _newPod)
     {
         IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_oldPod).getAllAssets();
         _underlying = _assets[0].token;
-        IDecentralizedIndex.Config memory _c;
-        _c.partner = IDecentralizedIndex(_oldPod).partner();
-        IDecentralizedIndex.Fees memory _f = _getPodFees(_oldPod);
         address[] memory _t = new address[](1);
-        _t[0] = address(_underlying);
+        _t[0] = _underlying;
         uint256[] memory _w = new uint256[](1);
         _w[0] = 100;
-        _newPod = address(
-            new WeightedIndex(
-                "Test", "pTEST", _c, _f, _t, _w, false, false, _getImmutables(_pairedLpToken, _dexAdapter)
-            )
+        _newPod = _createPod(
+            "Test",
+            "pTEST",
+            _getPodConfig(_oldPod),
+            IDecentralizedIndex(_oldPod).fees(),
+            _t,
+            _w,
+            address(0),
+            false,
+            _getImmutables(_pairedLpToken, 0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb)
+        );
+    }
+
+    function _duplicatePod(address _oldPod, address _pairedLpToken, address[] memory _tokens, uint256[] memory _weights)
+        internal
+        returns (address _underlying, address _newPod)
+    {
+        IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_oldPod).getAllAssets();
+        _underlying = _assets[0].token;
+        _newPod = _createPod(
+            "Test",
+            "pTEST",
+            _getPodConfig(_oldPod),
+            IDecentralizedIndex(_oldPod).fees(),
+            _tokens,
+            _weights,
+            address(0),
+            false,
+            _getImmutables(_pairedLpToken, 0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb)
+        );
+    }
+
+    function _createPod(
+        string memory indexName,
+        string memory indexSymbol,
+        IDecentralizedIndex.Config memory config,
+        IDecentralizedIndex.Fees memory fees,
+        address[] memory tokens,
+        uint256[] memory weights,
+        address stakeUserRestriction,
+        bool leaveRewardsAsPairedLp,
+        bytes memory immutables
+    ) internal returns (address newPod) {
+        (newPod,,) = _podDeployerSub.deployPodAndLinkDependencies(
+            indexName,
+            indexSymbol,
+            config,
+            fees,
+            tokens,
+            weights,
+            stakeUserRestriction,
+            leaveRewardsAsPairedLp,
+            immutables
         );
     }
 
@@ -98,19 +166,13 @@ contract PodHelperTest is Test {
             0x02f92800F57BCD74066F5709F1Daa1A4302Df875,
             0x6B175474E89094C44Da98b954EedeAC495271d0F,
             0x7d544DD34ABbE24C8832db27820Ff53C151e949b,
-            address(_rewardsWhitelist),
+            address(_rewardsWhitelistSub),
             0x024ff47D552cB222b265D68C7aeB26E586D5229D,
             _dexAdapter
         );
     }
 
-    function _getPodFees(address _pod) internal view returns (IDecentralizedIndex.Fees memory _f) {
-        (uint16 _f0, uint16 _f1, uint16 _f2, uint16 _f3, uint16 _f4, uint16 _f5) = WeightedIndex(payable(_pod)).fees();
-        _f.burn = _f0;
-        _f.bond = _f1;
-        _f.debond = _f2;
-        _f.buy = _f3;
-        _f.sell = _f4;
-        _f.partner = _f5;
+    function _getPodConfig(address _pod) internal view returns (IDecentralizedIndex.Config memory _c) {
+        _c.partner = IDecentralizedIndex(_pod).partner();
     }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import {PodHandler} from "../handlers/PodHandler.sol";
 import {LeverageManagerHandler} from "../handlers/LeverageManagerHandler.sol";
@@ -19,11 +19,12 @@ contract ForgeTest is
     FraxlendPairHandler,
     UniswapV2Handler
 {
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         setup();
     }
 
-    function test_invariant_setup() public {
+    function test_invariant_setup() public pure {
         assert(true);
     }
 
