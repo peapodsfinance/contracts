@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 // fuzzlib
 import {FuzzBase} from "fuzzlib/FuzzBase.sol";
@@ -80,10 +80,12 @@ import {MockV3Aggregator} from "./mocks/MockV3Aggregator.sol";
 import {MockUniV3Minter} from "./mocks/MockUniV3Minter.sol";
 import {MockV3TwapUtilities} from "./mocks/MockV3TwapUtilities.sol";
 
+import {PodHelperTest} from "../helpers/PodHelper.t.sol";
+
 // bytecode for etching with forge (echidna configures this in echidna.yaml)
 import {Bytecode} from "./helpers/Bytecode.sol";
 
-contract FuzzSetup is Test, FuzzBase {
+contract FuzzSetup is PodHelperTest, FuzzBase {
     /*///////////////////////////////////////////////////////////////
                             GLOBAL VARIABLES
     ///////////////////////////////////////////////////////////////*/
@@ -467,14 +469,14 @@ contract FuzzSetup is Test, FuzzBase {
         _t1[0] = address(_peas);
         uint256[] memory _w1 = new uint256[](1);
         _w1[0] = 100;
-        _pod1Peas = new WeightedIndex(
+        address __pod1Peas = _createPod(
             "Weth Pod",
             "pPeas",
             _c,
             _f,
             _t1,
             _w1,
-            false,
+            address(0),
             false,
             abi.encode(
                 address(_mockDai),
@@ -486,6 +488,7 @@ contract FuzzSetup is Test, FuzzBase {
                 address(_dexAdapter)
             )
         );
+        _pod1Peas = WeightedIndex(payable(__pod1Peas));
 
         // approve pod asset & pair asset
         _peas.approve(address(_pod1Peas), type(uint256).max);
@@ -503,14 +506,14 @@ contract FuzzSetup is Test, FuzzBase {
         _t1W[0] = address(_weth);
         uint256[] memory _w1W = new uint256[](1);
         _w1W[0] = 100;
-        _pod1Weth = new WeightedIndex(
+        address __pod1Weth = _createPod(
             "Weth Pod",
             "pWeth",
             _c,
             _f,
             _t1W,
             _w1W,
-            false,
+            address(0),
             false,
             abi.encode(
                 address(_mockDai),
@@ -522,6 +525,7 @@ contract FuzzSetup is Test, FuzzBase {
                 address(_dexAdapter)
             )
         );
+        _pod1Weth = WeightedIndex(payable(__pod1Weth));
 
         // approve pod asset & pair asset
         _weth.approve(address(_pod1Weth), type(uint256).max);
@@ -541,14 +545,14 @@ contract FuzzSetup is Test, FuzzBase {
         uint256[] memory _w2 = new uint256[](2);
         _w2[0] = 50;
         _w2[1] = 50;
-        _pod2 = new WeightedIndex(
+        address __pod2 = _createPod(
             "Test2",
             "pTEST2",
             _c,
             _f,
             _t2,
             _w2,
-            false,
+            address(0),
             false,
             abi.encode(
                 address(_mockDai),
@@ -560,6 +564,7 @@ contract FuzzSetup is Test, FuzzBase {
                 address(_dexAdapter)
             )
         );
+        _pod2 = WeightedIndex(payable(__pod2));
 
         // approve pod asset & pair asset
         _peas.approve(address(_pod2), type(uint256).max);
@@ -574,35 +579,8 @@ contract FuzzSetup is Test, FuzzBase {
         _pods.push(_pod2);
 
         // POD4
-        address[] memory _t4 = new address[](4);
-        _t4[0] = address(_weth);
-        _t4[1] = address(_tokenA);
-        _t4[2] = address(_tokenB);
-        _t4[3] = address(_tokenC);
-        uint256[] memory _w4 = new uint256[](4);
-        _w4[0] = 25;
-        _w4[1] = 25;
-        _w4[2] = 25;
-        _w4[3] = 25;
-        _pod4 = new WeightedIndex(
-            "Test4",
-            "pTEST4",
-            _c,
-            _f,
-            _t4,
-            _w4,
-            false,
-            false,
-            abi.encode(
-                address(_mockDai),
-                address(_peas),
-                address(_mockDai),
-                address(_protocolFeeRouter),
-                address(_rewardsWhitelist),
-                address(_twapUtils),
-                address(_dexAdapter)
-            )
-        );
+        address __pod4 = _deployPod4(_c, _f);
+        _pod4 = WeightedIndex(payable(__pod4));
 
         // approve pod asset & pair asset
         _weth.approve(address(_pod4), type(uint256).max);
@@ -617,6 +595,41 @@ contract FuzzSetup is Test, FuzzBase {
 
         // add to array for fuzzing
         _pods.push(_pod4);
+    }
+
+    function _deployPod4(IDecentralizedIndex.Config memory _c, IDecentralizedIndex.Fees memory _f)
+        internal
+        returns (address __pod4)
+    {
+        address[] memory _t4 = new address[](4);
+        _t4[0] = address(_weth);
+        _t4[1] = address(_tokenA);
+        _t4[2] = address(_tokenB);
+        _t4[3] = address(_tokenC);
+        uint256[] memory _w4 = new uint256[](4);
+        _w4[0] = 25;
+        _w4[1] = 25;
+        _w4[2] = 25;
+        _w4[3] = 25;
+        __pod4 = _createPod(
+            "Test4",
+            "pTEST4",
+            _c,
+            _f,
+            _t4,
+            _w4,
+            address(0),
+            false,
+            abi.encode(
+                address(_mockDai),
+                address(_peas),
+                address(_mockDai),
+                address(_protocolFeeRouter),
+                address(_rewardsWhitelist),
+                address(_twapUtils),
+                address(_dexAdapter)
+            )
+        );
     }
 
     function _deployAutoCompoundingPodLpFactory() internal {

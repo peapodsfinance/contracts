@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -41,7 +41,7 @@ contract MockZapper is IZapper, Context, Ownable {
 
     event Message(string a);
 
-    constructor(IV3TwapUtilities _v3TwapUtilities, IDexAdapter _dexAdapter, address _V3_ROUTER) {
+    constructor(IV3TwapUtilities _v3TwapUtilities, IDexAdapter _dexAdapter, address _V3_ROUTER) Ownable(_msgSender()) {
         V2_ROUTER = _dexAdapter.V2_ROUTER();
         V3_TWAP_UTILS = _v3TwapUtilities;
         DEX_ADAPTER = _dexAdapter;

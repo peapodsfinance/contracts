@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -15,8 +15,14 @@ contract LendingAssetVaultFactory is Ownable {
 
     event SetMinimumDepositAtCreation(uint256 olfFee, uint256 newFee);
 
-    function create(string memory _name, string memory _symbol, address _asset, uint96 _salt) external onlyOwner {
-        address _vault = _deploy(getBytecode(_name, _symbol, _asset), _getFullSalt(_salt));
+    constructor() Ownable(_msgSender()) {}
+
+    function create(string memory _name, string memory _symbol, address _asset, uint96 _salt)
+        external
+        onlyOwner
+        returns (address _vault)
+    {
+        _vault = _deploy(getBytecode(_name, _symbol, _asset), _getFullSalt(_salt));
         if (minimumDepositAtCreation > 0) {
             _depositMin(_vault, _asset);
         }
@@ -26,7 +32,7 @@ contract LendingAssetVaultFactory is Ownable {
 
     function _depositMin(address _vault, address _asset) internal {
         IERC20(_asset).safeTransferFrom(_msgSender(), address(this), minimumDepositAtCreation);
-        IERC20(_asset).safeApprove(_vault, minimumDepositAtCreation);
+        IERC20(_asset).safeIncreaseAllowance(_vault, minimumDepositAtCreation);
         LendingAssetVault(_vault).deposit(minimumDepositAtCreation, _msgSender());
     }
 

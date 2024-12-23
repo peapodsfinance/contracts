@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV2V3Interface.sol";
@@ -32,7 +32,7 @@ contract ChainlinkSinglePriceOracle is IMinimalSinglePriceOracle, Ownable {
     mapping(address => uint256) public feedMaxOracleDelay;
 
     /// @notice If L1 or no sequencer needed on L2 pass address(0)
-    constructor(address _sequencer) {
+    constructor(address _sequencer) Ownable(_msgSender()) {
         _sequencerUptimeFeed = AggregatorV2V3Interface(_sequencer);
     }
 

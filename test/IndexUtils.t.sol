@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
-import "forge-std/console.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "../contracts/IndexUtils.sol";
 import "../contracts/WeightedIndex.sol";
@@ -194,18 +193,16 @@ contract IndexUtilsTest is PodHelperTest {
         IDecentralizedIndex.Config memory config;
         IDecentralizedIndex.Fees memory fees;
 
-        address newPod = address(
-            new WeightedIndex(
-                "Test Multi",
-                "tMULTI",
-                config,
-                fees,
-                tokens,
-                weights,
-                false,
-                false,
-                _getImmutables(dai, 0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb)
-            )
+        address newPod = _createPod(
+            "Test Multi",
+            "tMULTI",
+            config,
+            fees,
+            tokens,
+            weights,
+            address(0),
+            false,
+            _getImmutables(dai, 0x7686aa8B32AA9Eb135AC15a549ccd71976c878Bb)
         );
         IDecentralizedIndex indexFund = IDecentralizedIndex(newPod);
 
@@ -273,6 +270,57 @@ contract IndexUtilsTest is PodHelperTest {
             1, // 1 wei forgiveness for rounding down
             "Should only use bondAmount and refund excess"
         );
+    }
+
+    function test_preventReentrancyFlashMint() public {
+        // Get a pod to test with
+        address podToDup = IStakingPoolToken_OLD(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
+        address newPod = _dupPodAndSeedLp(podToDup, address(0), 0, 0);
+        IDecentralizedIndex indexFund = IDecentralizedIndex(newPod);
+
+        // Setup test amounts
+        uint256 podTokensToAdd = 1e18;
+        uint256 pairedTokensToAdd = 1e18;
+
+        // Deal tokens to this contract
+        deal(peas, address(this), podTokensToAdd + 1000);
+        // attacker balance before
+        // uint256 peasBefore = IERC20(peas).balanceOf(address(this));
+        IERC20(peas).approve(address(indexFund), podTokensToAdd + 1000);
+        uint256 podBef = indexFund.balanceOf(address(this));
+        indexFund.bond(peas, podTokensToAdd + 1000, 0);
+        deal(indexFund.PAIRED_LP_TOKEN(), address(this), pairedTokensToAdd);
+
+        // uint256 initialPairedBalance = IERC20(indexFund.PAIRED_LP_TOKEN())
+        //     .balanceOf(address(this));
+
+        // Approve tokens
+        IERC20(indexFund.PAIRED_LP_TOKEN()).approve(address(indexFund), pairedTokensToAdd);
+
+        uint256 lpAmount = indexFund.addLiquidityV2(
+            indexFund.balanceOf(address(this)) - podBef - 10,
+            pairedTokensToAdd,
+            1000, // 100% slippage for test
+            block.timestamp
+        );
+
+        // Get initial staked LP balance
+        address stakingPool = indexFund.lpStakingPool();
+
+        // Deal tokens to the indexFund to simulate accumulated reward fees
+        deal(address(indexFund), address(indexFund), 100e18);
+
+        bytes memory data = abi.encode(indexFund, stakingPool, lpAmount);
+        vm.expectRevert();
+        indexFund.flashMint(address(this), 0, data);
+    }
+
+    // NOTE: required for test_preventReentrancyFlashMint
+    function callback(bytes calldata data) external {
+        (, address stakingPool, uint256 lpAmount) = abi.decode(data, (address, address, uint256));
+        address _podV2Pool = IStakingPoolToken(stakingPool).stakingToken();
+        IERC20(_podV2Pool).approve(stakingPool, lpAmount);
+        IStakingPoolToken(stakingPool).stake(address(this), lpAmount);
     }
 
     receive() external payable {}

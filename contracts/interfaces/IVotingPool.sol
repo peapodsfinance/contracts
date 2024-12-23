@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "../interfaces/IStakingConversionFactor.sol";
 
@@ -19,7 +19,7 @@ interface IVotingPool {
 
     event AddStake(address indexed user, address asset, uint256 amount);
 
-    event Update(address indexed user, address asset, uint256 conversionFactor, uint256 conversionDenomenator);
+    event UpdateUserState(address indexed user, address asset, uint256 conversionFactor, uint256 conversionDenomenator);
 
     event Unstake(address indexed user, address asset, uint256 amountBurned, uint256 amountAsset);
 

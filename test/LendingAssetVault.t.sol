@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
@@ -88,14 +88,13 @@ contract LendingAssetVaultTest is Test {
         _lendingAssetVault.withdraw(_lavDepAmt / 2, address(this), address(this));
 
         uint256 _optimalBal = _asset.totalSupply() - _lavDepAmt / 2 - _extDepAmt;
-        console.log("actual bal: %s -- optimal bal: %s", _asset.balanceOf(address(this)), _optimalBal);
-        assertApproxEqAbs(_asset.balanceOf(address(this)), _optimalBal, 1e18);
+        assertEq(_asset.balanceOf(address(this)), _optimalBal);
 
         _testVault.withdrawToLendingAssetVault(
             address(_lendingAssetVault), _lendingAssetVault.vaultUtilization(address(_testVault))
         );
         assertEq(_lendingAssetVault.vaultUtilization(address(_testVault)), 0);
-        assertApproxEqAbs(_lendingAssetVault.totalAssets(), _lavDepAmt, 1e2);
+        assertApproxEqAbs(_lendingAssetVault.totalAssets(), _lavDepAmt, 1e2, "final totalAssets not valid");
     }
 
     function test_redeemFromVaultAll() public {
@@ -275,7 +274,7 @@ contract LendingAssetVaultTest is Test {
 
         address notOwner = makeAddr("notOwner");
         vm.startPrank(notOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
         _lendingAssetVault.depositToVault(address(_testVault), _extDepAmt);
         vm.stopPrank();
     }
@@ -426,5 +425,85 @@ contract LendingAssetVaultTest is Test {
         // should not revert
         vm.roll(block.timestamp + 1);
         _lendingAssetVault.withdraw(maxWithdraw, address(this), address(this));
+    }
+
+    function test_previewMint_NoWhitelistedVaults() public {
+        // Remove whitelisted vault
+        _lendingAssetVault.setVaultWhitelist(address(_testVault), false);
+
+        // Initial deposit to set totalSupply and totalAssets
+        uint256 initialDeposit = 10e18;
+        _lendingAssetVault.deposit(initialDeposit, address(this));
+
+        // Preview minting shares
+        uint256 sharesToMint = 5e18;
+        uint256 assetsNeeded = _lendingAssetVault.previewMint(sharesToMint);
+
+        // Since there are no whitelisted vaults, previewMint should be a simple calculation
+        // based on current totalSupply and totalAssets
+        uint256 expectedAssets = (sharesToMint * _lendingAssetVault.totalAssets()) / _lendingAssetVault.totalSupply();
+        assertEq(assetsNeeded, expectedAssets, "Preview mint calculation incorrect without whitelisted vaults");
+
+        // Verify by actually minting
+        uint256 actualAssets = _lendingAssetVault.mint(sharesToMint, address(this));
+        assertEq(actualAssets, assetsNeeded, "Actual mint differs from preview");
+    }
+
+    // function test_previewMint_WithWhitelistedVaultAndInterest() public {
+    //     // Setup vault allocation
+    //     address[] memory vaults = new address[](1);
+    //     vaults[0] = address(_testVault);
+    //     uint256[] memory percentages = new uint256[](1);
+    //     percentages[0] = 10e18;
+    //     _lendingAssetVault.setVaultMaxAllocation(vaults, percentages);
+
+    //     // Initial deposit
+    //     uint256 initialDeposit = 10e18;
+    //     _lendingAssetVault.deposit(initialDeposit, address(this));
+
+    //     // Deposit half to whitelisted vault
+    //     uint256 vaultDeposit = initialDeposit / 2;
+    //     _testVault.depositFromLendingAssetVault(address(_lendingAssetVault), vaultDeposit);
+
+    //     // Simulate interest accrual in the vault
+    //     uint256 interest = 1e18;
+    //     _testVault.simulateInterestAccrual(interest);
+
+    //     // Advance time to trigger interest calculation
+    //     vm.warp(block.timestamp + 1 days);
+
+    //     // Get preview of interest that would be added
+    //     (uint256 interestEarned,,,,,) = _testVault.previewAddInterest();
+    //     assertGt(interestEarned, 0, "Interest should be earned");
+
+    //     // Preview minting shares
+    //     uint256 sharesToMint = 5e18;
+    //     uint256 assetsNeeded = _lendingAssetVault.previewMint(sharesToMint);
+
+    //     // The preview should account for the increased value from interest
+    //     uint256 preInterestAssets = (sharesToMint * initialDeposit) / _lendingAssetVault.totalSupply();
+    //     assertGt(assetsNeeded, preInterestAssets, "Preview mint should account for accrued interest");
+
+    //     // Calculate expected assets needed with interest
+    //     uint256 expectedAssetsWithInterest =
+    //         (sharesToMint * (initialDeposit + interestEarned)) / _lendingAssetVault.totalSupply();
+    //     assertEq(assetsNeeded, expectedAssetsWithInterest, "Preview mint calculation incorrect with interest");
+
+    //     // Verify by actually minting
+    //     uint256 actualAssets = _lendingAssetVault.mint(sharesToMint, address(this));
+    //     assertEq(actualAssets, assetsNeeded, "Actual mint differs from preview");
+    // }
+
+    function test_previewMint_ZeroTotalSupply() public {
+        // No deposits yet, so totalSupply is 0
+        uint256 sharesToMint = 10e18;
+        uint256 assetsNeeded = _lendingAssetVault.previewMint(sharesToMint);
+
+        // When totalSupply is 0, 1 share should equal 1 asset (PRECISION)
+        assertEq(assetsNeeded, sharesToMint, "Preview mint with zero total supply should return same amount");
+
+        // Verify by actually minting
+        uint256 actualAssets = _lendingAssetVault.mint(sharesToMint, address(this));
+        assertEq(actualAssets, assetsNeeded, "Actual mint differs from preview");
     }
 }

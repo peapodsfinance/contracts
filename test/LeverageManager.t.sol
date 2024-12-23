@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -15,9 +15,10 @@ import {UniswapDexAdapter} from "../contracts/dex/UniswapDexAdapter.sol";
 import {BalancerFlashSource} from "../contracts/flash/BalancerFlashSource.sol";
 import {LeverageManager} from "../contracts/lvf/LeverageManager.sol";
 import {MockFraxlendPair} from "./mocks/MockFraxlendPair.sol";
+import {PodHelperTest} from "./helpers/PodHelper.t.sol";
 import "forge-std/console.sol";
 
-contract LeverageManagerTest is Test {
+contract LeverageManagerTest is PodHelperTest {
     IIndexUtils public idxUtils;
     BalancerFlashSource public flashSource;
     AutoCompoundingPodLp public aspTkn;
@@ -36,7 +37,8 @@ contract LeverageManagerTest is Test {
     address public constant BOB = address(0x2);
     uint256 public constant INITIAL_BALANCE = 1000000 * 1e18;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         uint16 fee = 100;
         peas = PEAS(0x02f92800F57BCD74066F5709F1Daa1A4302Df875);
         whitelister = new RewardsWhitelist();
@@ -56,14 +58,14 @@ contract LeverageManagerTest is Test {
         _t[0] = address(peas);
         uint256[] memory _w = new uint256[](1);
         _w[0] = 100;
-        pod = new WeightedIndex(
+        address _pod = _createPod(
             "Test",
             "pTEST",
             _c,
             _f,
             _t,
             _w,
-            false,
+            address(0),
             false,
             abi.encode(
                 dai,
@@ -75,6 +77,7 @@ contract LeverageManagerTest is Test {
                 dexAdapter
             )
         );
+        pod = WeightedIndex(payable(_pod));
 
         spTkn = pod.lpStakingPool();
         aspTkn = new AutoCompoundingPodLp("aspTKN", "aspTKN", false, pod, dexAdapter, idxUtils);
@@ -120,12 +123,12 @@ contract LeverageManagerTest is Test {
         peas.approve(address(pod), peas.totalSupply());
         pod.bond(address(peas), pTknAmt, 0);
 
-        uint256 positionId = leverageManager.initializePosition(address(pod), ALICE, address(0), address(0));
+        uint256 positionId = leverageManager.initializePosition(address(pod), ALICE, address(0), false);
 
         uint256 alicePodTokenBalanceBefore = pod.balanceOf(ALICE);
         uint256 aliceAssetBalanceBefore = IERC20(dai).balanceOf(ALICE);
 
-        leverageManager.addLeverage(positionId, address(pod), pTknAmt, pairedLpDesired, 0, address(0), config);
+        leverageManager.addLeverage(positionId, address(pod), pTknAmt, pairedLpDesired, 0, false, config);
 
         vm.stopPrank();
 
@@ -141,13 +144,13 @@ contract LeverageManagerTest is Test {
         assertEq(IERC20(dai).balanceOf(ALICE), aliceAssetBalanceBefore, "Asset balance should not change for ALICE");
 
         // Verify the state of the LeverageManager contract
-        (address returnedPod, address lendingPair, address custodian, bool isSelfLending, address selfLendingPod) =
+        (address returnedPod, address lendingPair, address custodian, bool isSelfLending, bool hasSelfLendingPairPod) =
             leverageManager.positionProps(positionId);
         assertEq(returnedPod, address(pod), "Incorrect pod address");
         assertEq(lendingPair, address(mockFraxlendPair), "Incorrect lending pair address");
         assertNotEq(custodian, address(0), "Custodian address should not be zero");
         assertEq(isSelfLending, false, "Not self lending");
-        assertEq(selfLendingPod, address(0), "Self lending pod should be zero");
+        assertEq(hasSelfLendingPairPod, false, "Self lending pod should be zero");
     }
 
     // function testAddLeverageMaxAmount() public {
@@ -234,7 +237,7 @@ contract LeverageManagerTest is Test {
 
         vm.expectRevert(); // We expect this call to revert due to invalid position ID
         leverageManager.addLeverage(
-            invalidPositionId, address(pod), pTknAmt, pairedLpDesired, pairedLpAmtMin, address(0), config
+            invalidPositionId, address(pod), pTknAmt, pairedLpDesired, pairedLpAmtMin, false, config
         );
 
         vm.stopPrank();
@@ -257,12 +260,10 @@ contract LeverageManagerTest is Test {
         // burn 1 pTKN so we have less than we need
         pod.burn(1);
 
-        uint256 positionId = leverageManager.initializePosition(address(pod), ALICE, address(0), address(0));
+        uint256 positionId = leverageManager.initializePosition(address(pod), ALICE, address(0), false);
 
         vm.expectRevert(); // We expect this call to revert due to insufficient balance
-        leverageManager.addLeverage(
-            positionId, address(pod), pTknAmt, pairedLpDesired, pairedLpAmtMin, address(0), config
-        );
+        leverageManager.addLeverage(positionId, address(pod), pTknAmt, pairedLpDesired, pairedLpAmtMin, false, config);
 
         vm.stopPrank();
     }
@@ -281,14 +282,12 @@ contract LeverageManagerTest is Test {
         peas.approve(address(pod), peas.totalSupply());
         pod.bond(address(peas), pTknAmt, 0);
 
-        uint256 positionId = leverageManager.initializePosition(address(pod), ALICE, address(0), address(0));
+        uint256 positionId = leverageManager.initializePosition(address(pod), ALICE, address(0), false);
         vm.stopPrank();
 
         vm.startPrank(BOB);
         vm.expectRevert(); // We expect this call to revert due to unauthorized access
-        leverageManager.addLeverage(
-            positionId, address(pod), pTknAmt, pairedLpDesired, pairedLpAmtMin, address(0), config
-        );
+        leverageManager.addLeverage(positionId, address(pod), pTknAmt, pairedLpDesired, pairedLpAmtMin, false, config);
         vm.stopPrank();
     }
 
@@ -331,7 +330,7 @@ contract LeverageManagerTest is Test {
     //     pTknAmt,
     //     pairedLpDesired,
     //     pairedLpAmtMin,
-    //     address(0),
+    //     false,
     //     config
     //   );
 
@@ -362,7 +361,7 @@ contract LeverageManagerTest is Test {
     //     pTknAmt,
     //     pairedLpDesired,
     //     pairedLpAmtMin,
-    //     mockSelfLendingPod,
+    //     false,
     //     config
     //   );
 
@@ -400,7 +399,7 @@ contract LeverageManagerTest is Test {
     //     pTknAmt,
     //     pairedLpDesired,
     //     pairedLpAmtMin,
-    //     address(0),
+    //     false,
     //     config
     //   );
 
@@ -428,13 +427,11 @@ contract LeverageManagerTest is Test {
         peas.approve(address(pod), peas.totalSupply());
         pod.bond(address(peas), pTknAmt, 0);
 
-        uint256 positionId = leverageManager.initializePosition(address(pod), ALICE, address(0), address(0));
+        uint256 positionId = leverageManager.initializePosition(address(pod), ALICE, address(0), false);
 
         uint256 alicePodTokenBalanceBefore = pod.balanceOf(ALICE);
 
-        leverageManager.addLeverage(
-            positionId, address(pod), pTknAmt, pairedLpDesired, pairedLpAmtMin, address(0), config
-        );
+        leverageManager.addLeverage(positionId, address(pod), pTknAmt, pairedLpDesired, pairedLpAmtMin, false, config);
 
         vm.stopPrank();
 

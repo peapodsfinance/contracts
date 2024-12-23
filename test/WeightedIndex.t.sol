@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {Test, console2} from "forge-std/Test.sol";
+import {console2} from "forge-std/Test.sol";
 import {PEAS} from "../contracts/PEAS.sol";
 import {RewardsWhitelist} from "../contracts/RewardsWhitelist.sol";
 import {V3TwapUtilities} from "../contracts/twaputils/V3TwapUtilities.sol";
@@ -11,9 +11,10 @@ import {IDecentralizedIndex} from "../contracts/interfaces/IDecentralizedIndex.s
 import {IStakingPoolToken} from "../contracts/interfaces/IStakingPoolToken.sol";
 import {WeightedIndex} from "../contracts/WeightedIndex.sol";
 import {MockFlashMintRecipient} from "./mocks/MockFlashMintRecipient.sol";
+import {PodHelperTest} from "./helpers/PodHelper.t.sol";
 import "forge-std/console.sol";
 
-contract WeightedIndexTest is Test {
+contract WeightedIndexTest is PodHelperTest {
     PEAS public peas;
     RewardsWhitelist public rewardsWhitelist;
     V3TwapUtilities public twapUtils;
@@ -39,7 +40,8 @@ contract WeightedIndexTest is Test {
 
     event RemoveLiquidity(address indexed user, uint256 lpTokens);
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         peas = PEAS(0x02f92800F57BCD74066F5709F1Daa1A4302Df875);
         twapUtils = new V3TwapUtilities();
         rewardsWhitelist = new RewardsWhitelist();
@@ -57,14 +59,14 @@ contract WeightedIndexTest is Test {
         _t[0] = address(peas);
         uint256[] memory _w = new uint256[](1);
         _w[0] = 100;
-        pod = new WeightedIndex(
+        address _pod = _createPod(
             "Test",
             "pTEST",
             _c,
             _f,
             _t,
             _w,
-            false,
+            address(0),
             false,
             abi.encode(
                 dai,
@@ -76,6 +78,7 @@ contract WeightedIndexTest is Test {
                 dexAdapter
             )
         );
+        pod = WeightedIndex(payable(_pod));
 
         flashMintRecipient = new MockFlashMintRecipient();
 
@@ -304,7 +307,7 @@ contract WeightedIndexTest is Test {
         // as there's a 1:1 ratio when no shares exist
         uint256 shares = 1e18;
         uint256 assets = pod.convertToAssets(shares);
-        assertEq(assets, shares, "Should return same amount when supply is 0");
+        assertEq(assets, shares - ((shares * fee) / 10000), "Should return same amount when supply is 0");
     }
 
     function test_convertToAssets_OneToOneRatio() public {
@@ -315,7 +318,7 @@ contract WeightedIndexTest is Test {
         // Calculate expected assets (should be same as shares since ratio is 1:1)
         uint256 shares = 1e18;
         uint256 assets = pod.convertToAssets(shares);
-        assertEq(assets, shares, "Should maintain 1:1 ratio");
+        assertEq(assets, shares - ((shares * fee) / 10000), "Should maintain 1:1 ratio");
     }
 
     function test_convertToAssets_DifferentRatio() public {
@@ -331,7 +334,7 @@ contract WeightedIndexTest is Test {
         // Now 1 share should be worth 2 assets
         uint256 shares = 1e18;
         uint256 assets = pod.convertToAssets(shares);
-        assertEq(assets, shares * 2, "Should reflect 2:1 asset to share ratio");
+        assertEq(assets, shares * 2 - ((shares * 2 * fee) / 10000), "Should reflect 2:1 asset to share ratio");
     }
 
     function test_convertToShares_ZeroSupply() public view {
@@ -339,7 +342,7 @@ contract WeightedIndexTest is Test {
         // as there's a 1:1 ratio when no shares exist
         uint256 assets = 1e18;
         uint256 shares = pod.convertToShares(assets);
-        assertEq(shares, assets, "Should return same amount when supply is 0");
+        assertEq(shares, assets - ((assets * fee) / 10000), "Should return same amount when supply is 0");
     }
 
     function test_convertToShares_OneToOneRatio() public {
@@ -350,7 +353,7 @@ contract WeightedIndexTest is Test {
         // Calculate expected shares (should be same as assets since ratio is 1:1)
         uint256 assets = 1e18;
         uint256 shares = pod.convertToShares(assets);
-        assertEq(shares, assets, "Should maintain 1:1 ratio");
+        assertEq(shares, assets - ((assets * fee) / 10000), "Should maintain 1:1 ratio");
     }
 
     function test_convertToShares_DifferentRatio() public {
@@ -366,7 +369,7 @@ contract WeightedIndexTest is Test {
         // Now 2 assets should be worth 1 share (inverse of convertToAssets ratio)
         uint256 assets = 2e18;
         uint256 shares = pod.convertToShares(assets);
-        assertEq(shares, assets / 2, "Should reflect 1:2 share to asset ratio");
+        assertEq(shares, assets / 2 - (((assets / 2) * fee) / 10000), "Should reflect 1:2 share to asset ratio");
     }
 
     function test_addLiquidityV2() public {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/IFlashLoanSource.sol";
@@ -10,6 +10,8 @@ contract LeverageManagerAccessControl is Ownable {
     mapping(address => address) public lendingPairs;
     // borrow asset (USDC, DAI, pOHM, etc.) => flash source
     mapping(address => address) public flashSource;
+
+    constructor() Ownable(_msgSender()) {}
 
     function setLendingPair(address _pod, address _pair) external onlyOwner {
         if (_pair != address(0)) {

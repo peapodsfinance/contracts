@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 interface ILeverageManager {
     enum FlashCallbackMethod {
@@ -10,7 +10,8 @@ interface ILeverageManager {
     struct LeverageFlashProps {
         FlashCallbackMethod method;
         uint256 positionId;
-        address user;
+        address owner;
+        address sender;
         uint256 pTknAmt;
         uint256 pairedLpDesired;
         bytes config;
@@ -21,7 +22,7 @@ interface ILeverageManager {
         address lendingPair;
         address custodian;
         bool isSelfLending;
-        address selfLendingPod;
+        bool hasSelfLendingPairPod;
     }
 
     event AddLeverage(uint256 indexed positionId, address indexed user, uint256 collateralAmt, uint256 borrowAmt);
@@ -38,7 +39,7 @@ interface ILeverageManager {
         address _pod,
         address _recipient,
         address _overrideLendingPair,
-        address _selfLendingPairPod
+        bool _hasSelfLendingPairPod
     ) external returns (uint256 _positionId);
 
     function addLeverage(
@@ -47,7 +48,7 @@ interface ILeverageManager {
         uint256 _pTknAmt,
         uint256 _pairedLpDesired,
         uint256 _userProvidedDebtAmt,
-        address _selfLendingPairPod,
+        bool _hasSelfLendingPairPod,
         bytes memory _config
     ) external;
 
@@ -57,6 +58,7 @@ interface ILeverageManager {
         uint256 _collateralAssetAmtRemove,
         uint256 _podAmtMin,
         uint256 _pairedAssetAmtMin,
+        uint256 _podSwapAmtOutMin,
         uint256 _userProvidedDebtAmtMax
     ) external;
 }

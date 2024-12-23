@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {VaultAccount} from "../libraries/VaultAccount.sol";
@@ -31,9 +31,23 @@ interface IFraxlendPair is IERC20 {
 
     function convertToAssets(uint256 shares) external view returns (uint256 assets);
 
+    function convertToShares(uint256 assets) external view returns (uint256 shares);
+
     function userCollateralBalance(address user) external view returns (uint256); // amount of collateral each user is backed
 
     function userBorrowShares(address user) external view returns (uint256); // represents the shares held by individuals
+
+    function previewAddInterest()
+        external
+        view
+        returns (
+            uint256 _interestEarned,
+            uint256 _feesAmount,
+            uint256 _feesShare,
+            CurrentRateInfo memory _newCurrentRateInfo,
+            VaultAccount memory _totalAsset,
+            VaultAccount memory _totalBorrow
+        );
 
     function addInterest(bool _returnAccounting)
         external

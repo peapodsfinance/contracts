@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IProtocolFees.sol";
@@ -10,7 +10,7 @@ contract ProtocolFeeRouter is IProtocolFeeRouter, Ownable {
 
     IProtocolFees public override protocolFees;
 
-    constructor(IProtocolFees _fees) {
+    constructor(IProtocolFees _fees) Ownable(_msgSender()) {
         protocolFees = _fees;
     }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: ISC
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 // ====================================================================
 // |     ______                   _______                             |
 // |    / _____________ __  __   / ____(_____  ____ _____  ________   |
@@ -23,7 +23,7 @@ pragma solidity ^0.8.19;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {FraxlendPairAccessControl} from "./FraxlendPairAccessControl.sol";
 import {FraxlendPairConstants} from "./FraxlendPairConstants.sol";

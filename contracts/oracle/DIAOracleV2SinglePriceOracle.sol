@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import "../interfaces/IDIAOracleV2.sol";
@@ -26,8 +26,14 @@ contract DIAOracleV2SinglePriceOracle is ChainlinkSinglePriceOracle {
         // default base price to 1, which just means return only quote pool price without any base conversion
         uint256 _basePrice18 = 10 ** 18;
         uint256 _updatedAt = block.timestamp;
+        bool _isBadDataBase;
         if (_clBaseConversionPoolPriceFeed != address(0)) {
-            (_basePrice18, _updatedAt, _isBadData) = _getChainlinkPriceFeedPrice18(_clBaseConversionPoolPriceFeed);
+            (_basePrice18, _updatedAt, _isBadDataBase) = _getChainlinkPriceFeedPrice18(_clBaseConversionPoolPriceFeed);
+            uint256 _maxDelayBase = feedMaxOracleDelay[_clBaseConversionPoolPriceFeed] > 0
+                ? feedMaxOracleDelay[_clBaseConversionPoolPriceFeed]
+                : defaultMaxOracleDelay;
+            uint256 _isBadTimeBase = block.timestamp - _maxDelayBase;
+            _isBadData = _isBadData || _isBadDataBase || _updatedAt < _isBadTimeBase;
         }
         _price18 = (_quotePrice8 * _basePrice18) / 10 ** 8;
     }

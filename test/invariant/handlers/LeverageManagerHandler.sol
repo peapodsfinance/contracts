@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import {Properties} from "../helpers/Properties.sol";
 
@@ -41,7 +41,7 @@ contract LeverageManagerHandler is Properties {
             address(cache.pod),
             cache.user,
             address(0), // change for self-lending
-            address(0) // change for self-lending
+            false // change for self-lending
         ) {} catch {
             fl.t(false, "INIT POSITION FAILED");
         }
@@ -110,7 +110,7 @@ contract LeverageManagerHandler is Properties {
             podAmount,
             cache.pairedLpAmount,
             cache.pairedLpAmount,
-            address(0),
+            false,
             abi.encode(
                 cache.pairedLpAmount + feeAmount, // pairedLpAmount + feeAmount,
                 1000,
@@ -188,7 +188,7 @@ contract LeverageManagerHandler is Properties {
         address lendingPair;
         address borrowToken;
         address custodian;
-        address selfLendingPod;
+        bool hasSelfLendingPairPod;
         WeightedIndex pod;
         address flashSource;
     }
@@ -204,7 +204,7 @@ contract LeverageManagerHandler is Properties {
         cache.positionNFT = _leverageManager.positionNFT();
         cache.positionId = fl.clamp(positionIdSeed, 0, cache.positionNFT.totalSupply());
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
-        (cache.podAddress, cache.lendingPair, cache.custodian,, cache.selfLendingPod) =
+        (cache.podAddress, cache.lendingPair, cache.custodian,, cache.hasSelfLendingPairPod) =
             _leverageManager.positionProps(cache.positionId);
 
         // I don't think flash is accounting for interest to be added???
@@ -216,7 +216,7 @@ contract LeverageManagerHandler is Properties {
 
         cache.pod = WeightedIndex(payable(cache.podAddress));
         cache.flashSource = _leverageManager.flashSource(IFraxlendPair(cache.lendingPair).asset());
-        cache.borrowToken = cache.selfLendingPod != address(0)
+        cache.borrowToken = cache.hasSelfLendingPairPod
             ? IFraxlendPair(cache.lendingPair).asset()
             : IDecentralizedIndex(cache.podAddress).PAIRED_LP_TOKEN();
 
@@ -261,7 +261,7 @@ contract LeverageManagerHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try _leverageManager.removeLeverage(cache.positionId, borrowAssets, collateralAmount, 0, 0, userDebtRepay) {
+        try _leverageManager.removeLeverage(cache.positionId, borrowAssets, collateralAmount, 0, 0, 0, userDebtRepay) {
             // POST-CONDITIONS
             __afterLM(
                 cache.lendingPair,

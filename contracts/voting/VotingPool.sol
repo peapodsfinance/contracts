@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/IVotingPool.sol";
@@ -20,8 +21,14 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     // user => asset => State
     mapping(address => mapping(address => Stake)) public stakes;
 
-    constructor(bytes memory _immutables) ERC20("Peapods Voting", "vlPEAS") {
-        REWARDS = address(new TokenRewards(address(this), address(this), false, _immutables));
+    constructor(address _rewardsBeacon, address _rewardsImp, bytes memory _immutables)
+        ERC20("Peapods Voting", "vlPEAS")
+        Ownable(_msgSender())
+    {
+        bytes memory _tokenRewardsData = abi.encodeWithSelector(
+            IInitializeSelector(_rewardsImp).initializeSelector(), address(this), address(this), false, _immutables
+        );
+        REWARDS = address(new BeaconProxy(_rewardsBeacon, _tokenRewardsData));
     }
 
     function processPreSwapFeesAndSwap() external override {
@@ -33,7 +40,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
         IERC20(_asset).safeTransferFrom(_msgSender(), address(this), _amount);
         stakes[_msgSender()][_asset].lastStaked = block.timestamp;
         stakes[_msgSender()][_asset].lockupPeriod = lockupPeriod;
-        _update(_msgSender(), _asset, _amount);
+        _updateUserState(_msgSender(), _asset, _amount);
         emit AddStake(_msgSender(), _asset, _amount);
     }
 
@@ -49,10 +56,10 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
     }
 
     function update(address _asset) external returns (uint256 _convFctr, uint256 _convDenom) {
-        return _update(_msgSender(), _asset, 0);
+        return _updateUserState(_msgSender(), _asset, 0);
     }
 
-    function _update(address _user, address _asset, uint256 _addAmt)
+    function _updateUserState(address _user, address _asset, uint256 _addAmt)
         internal
         returns (uint256 _convFctr, uint256 _convDenom)
     {
@@ -74,7 +81,7 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
                 _burn(_user, _mintedAmtBefore - _finalNewMintAmt);
             }
         }
-        emit Update(_user, _asset, _convFctr, _convDenom);
+        emit UpdateUserState(_user, _asset, _convFctr, _convDenom);
     }
 
     function addOrUpdateAsset(address _asset, IStakingConversionFactor _convFactor, bool _enabled) external onlyOwner {
@@ -104,13 +111,14 @@ contract VotingPool is IVotingPool, ERC20, Ownable {
         }
     }
 
-    function _afterTokenTransfer(address _from, address _to, uint256 _amount) internal virtual override {
+    function _update(address _from, address _to, uint256 _value) internal override {
+        super._update(_from, _to, _value);
         require(_from == address(0) || _to == address(0), "NT");
         if (_from != address(0)) {
-            TokenRewards(REWARDS).setShares(_from, _amount, true);
+            TokenRewards(REWARDS).setShares(_from, _value, true);
         }
         if (_to != address(0) && _to != address(0xdead)) {
-            TokenRewards(REWARDS).setShares(_to, _amount, false);
+            TokenRewards(REWARDS).setShares(_to, _value, false);
         }
     }
 }
