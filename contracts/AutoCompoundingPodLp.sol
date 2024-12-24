@@ -98,11 +98,19 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
 
     function convertToShares(uint256 _assets) public view override returns (uint256 _shares) {
-        return Math.mulDiv(_assets, FACTOR, _cbr(), Math.Rounding.Ceil);
+        return _convertToShares(_assets, Math.Rounding.Floor);
+    }
+
+    function _convertToShares(uint256 _assets, Math.Rounding _roundDirection) internal view returns (uint256 _shares) {
+        return Math.mulDiv(_assets, FACTOR, _cbr(), _roundDirection);
     }
 
     function convertToAssets(uint256 _shares) public view override returns (uint256 _assets) {
-        return Math.mulDiv(_shares, _cbr(), FACTOR, Math.Rounding.Floor);
+        return _convertToAssets(_shares, Math.Rounding.Floor);
+    }
+
+    function _convertToAssets(uint256 _shares, Math.Rounding _roundDirection) internal view returns (uint256 _assets) {
+        return Math.mulDiv(_shares, _cbr(), FACTOR, _roundDirection);
     }
 
     function maxDeposit(address) external pure override returns (uint256 maxAssets) {
@@ -110,12 +118,12 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
 
     function previewDeposit(uint256 _assets) external view override returns (uint256 _shares) {
-        return convertToShares(_assets);
+        return _convertToShares(_assets, Math.Rounding.Floor);
     }
 
     function deposit(uint256 _assets, address _receiver) external override returns (uint256 _shares) {
         _processRewardsToPodLp(0, block.timestamp);
-        _shares = convertToShares(_assets);
+        _shares = _convertToShares(_assets, Math.Rounding.Floor);
         _deposit(_assets, _shares, _receiver);
     }
 
@@ -134,12 +142,12 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
 
     function previewMint(uint256 _shares) external view override returns (uint256 _assets) {
-        _assets = convertToAssets(_shares);
+        _assets = _convertToAssets(_shares, Math.Rounding.Ceil);
     }
 
     function mint(uint256 _shares, address _receiver) external override returns (uint256 _assets) {
         _processRewardsToPodLp(0, block.timestamp);
-        _assets = convertToAssets(_shares);
+        _assets = _convertToAssets(_shares, Math.Rounding.Ceil);
         _deposit(_assets, _shares, _receiver);
     }
 
@@ -148,12 +156,12 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
 
     function previewWithdraw(uint256 _assets) external view override returns (uint256 _shares) {
-        _shares = convertToShares(_assets);
+        _shares = _convertToShares(_assets, Math.Rounding.Ceil);
     }
 
     function withdraw(uint256 _assets, address _receiver, address _owner) external override returns (uint256 _shares) {
         _processRewardsToPodLp(0, block.timestamp);
-        _shares = convertToShares(_assets);
+        _shares = _convertToShares(_assets, Math.Rounding.Ceil);
         _withdraw(_assets, _shares, _msgSender(), _owner, _receiver);
     }
 
@@ -162,12 +170,12 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     }
 
     function previewRedeem(uint256 _shares) external view override returns (uint256 _assets) {
-        _assets = convertToAssets(_shares);
+        _assets = _convertToAssets(_shares, Math.Rounding.Floor);
     }
 
     function redeem(uint256 _shares, address _receiver, address _owner) external override returns (uint256 _assets) {
         _processRewardsToPodLp(0, block.timestamp);
-        _assets = convertToAssets(_shares);
+        _assets = _convertToAssets(_shares, Math.Rounding.Floor);
         _withdraw(_assets, _shares, _msgSender(), _owner, _receiver);
     }
 
