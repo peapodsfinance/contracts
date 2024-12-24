@@ -117,6 +117,7 @@ contract PodUnwrapLocker is Context, ReentrancyGuard {
         require(!_lock.withdrawn, "W2");
 
         _lock.withdrawn = true;
+        address _feeRecipient = Ownable(FEE_RECIPIENT_OWNABLE).owner();
 
         IDecentralizedIndex.Fees memory _podFees = IDecentralizedIndex(_lock.pod).fees();
         uint256 _debondFee = _podFees.debond;
@@ -128,10 +129,10 @@ contract PodUnwrapLocker is Context, ReentrancyGuard {
         for (uint256 i = 0; i < _lock.tokens.length; i++) {
             if (_lock.amounts[i] > 0) {
                 uint256 _penaltyAmount = (_lock.amounts[i] * _penaltyBps) / 10000;
-                _penaltyAmount = _penaltyAmount == 0 ? 1 : _penaltyAmount;
+                _penaltyAmount = _penaltyAmount == 0 && _debondFee > 0 ? 1 : _penaltyAmount;
                 _penalizedAmounts[i] = _lock.amounts[i] - _penaltyAmount;
                 if (_penaltyAmount > 0) {
-                    IERC20(_lock.tokens[i]).safeTransfer(Ownable(FEE_RECIPIENT_OWNABLE).owner(), _penaltyAmount);
+                    IERC20(_lock.tokens[i]).safeTransfer(_feeRecipient, _penaltyAmount);
                 }
                 IERC20(_lock.tokens[i]).safeTransfer(_msgSender(), _penalizedAmounts[i]);
             }
