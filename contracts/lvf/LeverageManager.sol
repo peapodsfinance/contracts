@@ -74,7 +74,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
     /// @param _hasSelfLendingPairPod bool Advanced implementation parameter that determines whether or not the self lending pod's paired LP asset (fTKN) is podded as well
     /// @param _config Extra config to apply when leveraging a position abi.encode(uint256,uint256,uint256)
     /// @dev _config[0] == overrideBorrowAmt Override amount to borrow from the lending pair, only matters if max LTV is >50% on the lending pair
-    /// @dev _configs[1] == slippage for the LP execution with 1000 precision (1000 == 100%)
+    /// @dev _config[1] == slippage for the LP execution with 1000 precision (1000 == 100%)
     /// @dev _config[2] == deadline LP deadline for the UniswapV2 implementation
     function addLeverage(
         uint256 _positionId,
@@ -85,35 +85,53 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         bool _hasSelfLendingPairPod,
         bytes memory _config
     ) external override workflow(true) {
-        address _sender = _msgSender();
-        if (_positionId == 0) {
-            _positionId = _initializePosition(_pod, _sender, address(0), _hasSelfLendingPairPod);
-        } else {
-            address _owner = positionNFT.ownerOf(_positionId);
-            require(
-                _owner == _sender || positionNFT.getApproved(_positionId) == _sender
-                    || positionNFT.isApprovedForAll(_owner, _sender),
-                "AUTH"
-            );
-            _pod = positionProps[_positionId].pod;
-        }
-        require(_getFlashSource(_positionId) != address(0), "FSV");
-
         uint256 _pTknBalBefore = IERC20(_pod).balanceOf(address(this));
-        IERC20(_pod).safeTransferFrom(_sender, address(this), _pTknAmt);
+        IERC20(_pod).safeTransferFrom(_msgSender(), address(this), _pTknAmt);
+        _addLeveragePreCallback(
+            _msgSender(),
+            _positionId,
+            _pod,
+            IERC20(_pod).balanceOf(address(this)) - _pTknBalBefore,
+            _pairedLpDesired,
+            _userProvidedDebtAmt,
+            _hasSelfLendingPairPod,
+            _config
+        );
+    }
 
-        if (_userProvidedDebtAmt > 0) {
-            IERC20(_getBorrowTknForPod(_positionId)).safeTransferFrom(_sender, address(this), _userProvidedDebtAmt);
-        }
-
-        // if additional fees required for flash source, handle that here
-        _processExtraFlashLoanPayment(_positionId, _sender);
-
-        IFlashLoanSource(_getFlashSource(_positionId)).flash(
-            _getBorrowTknForPod(_positionId),
-            _pairedLpDesired - _userProvidedDebtAmt,
-            address(this),
-            _getFlashDataAddLeverage(_positionId, _sender, _pTknBalBefore, _pairedLpDesired, _config)
+    /// @notice The ```addLeverageFromTkn``` function adds leverage to a position (or creates a new one and adds leverage) using underlying pod's TKN
+    /// @param _positionId The NFT ID of an existing position to add leverage to, or 0 if a new position should be created
+    /// @param _pod The pod to leverage against for the position
+    /// @param _tknAmt Amount of underlying pod TKN to use to leverage against
+    /// @param _amtPtknMintMin Amount of minimum pTKN that should be minted from provided underlying TKN
+    /// @param _pairedLpDesired Total amount of pairedLpTkn for the pod to use to add LP for the new position (including _userProvidedDebtAmt)
+    /// @param _userProvidedDebtAmt Amt of borrow token a user will provide to reduce flash loan amount and ultimately borrowed position LTV
+    /// @param _hasSelfLendingPairPod bool Advanced implementation parameter that determines whether or not the self lending pod's paired LP asset (fTKN) is podded as well
+    /// @param _config Extra config to apply when leveraging a position abi.encode(uint256,uint256,uint256)
+    /// @dev _config[0] == overrideBorrowAmt Override amount to borrow from the lending pair, only matters if max LTV is >50% on the lending pair
+    /// @dev _config[1] == slippage for the LP execution with 1000 precision (1000 == 100%)
+    /// @dev _config[2] == deadline LP deadline for the UniswapV2 implementation
+    function addLeverageFromTkn(
+        uint256 _positionId,
+        address _pod,
+        uint256 _tknAmt,
+        uint256 _amtPtknMintMin,
+        uint256 _pairedLpDesired,
+        uint256 _userProvidedDebtAmt,
+        bool _hasSelfLendingPairPod,
+        bytes memory _config
+    ) external override workflow(true) {
+        uint256 _pTknBalBefore = IERC20(_pod).balanceOf(address(this));
+        _bondToPod(_msgSender(), _pod, _tknAmt, _amtPtknMintMin);
+        _addLeveragePreCallback(
+            _msgSender(),
+            _positionId,
+            _pod,
+            IERC20(_pod).balanceOf(address(this)) - _pTknBalBefore,
+            _pairedLpDesired,
+            _userProvidedDebtAmt,
+            _hasSelfLendingPairPod,
+            _config
         );
     }
 
@@ -195,12 +213,12 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         require(_getFlashSource(_posProps.positionId) == _msgSender(), "AUTH");
 
         if (_posProps.method == FlashCallbackMethod.ADD) {
-            uint256 _ptknRefundAmt = _addLeverage(_userData);
+            uint256 _ptknRefundAmt = _addLeveragePostCallback(_userData);
             if (_ptknRefundAmt > 0) {
                 IERC20(_pod).safeTransfer(_posProps.owner, _ptknRefundAmt);
             }
         } else if (_posProps.method == FlashCallbackMethod.REMOVE) {
-            (uint256 _ptknToUserAmt, uint256 _pairedLpToUser) = _removeLeverage(_userData);
+            (uint256 _ptknToUserAmt, uint256 _pairedLpToUser) = _removeLeveragePostCallback(_userData);
             if (_ptknToUserAmt > 0) {
                 // if there's a close fee send returned pod tokens for fee to protocol
                 if (closeFeePerc > 0) {
@@ -249,7 +267,45 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         }
     }
 
-    function _addLeverage(bytes memory _data) internal returns (uint256 _ptknRefundAmt) {
+    function _addLeveragePreCallback(
+        address _sender,
+        uint256 _positionId,
+        address _pod,
+        uint256 _pTknAmt,
+        uint256 _pairedLpDesired,
+        uint256 _userProvidedDebtAmt,
+        bool _hasSelfLendingPairPod,
+        bytes memory _config
+    ) internal {
+        if (_positionId == 0) {
+            _positionId = _initializePosition(_pod, _sender, address(0), _hasSelfLendingPairPod);
+        } else {
+            address _owner = positionNFT.ownerOf(_positionId);
+            require(
+                _owner == _sender || positionNFT.getApproved(_positionId) == _sender
+                    || positionNFT.isApprovedForAll(_owner, _sender),
+                "AUTH"
+            );
+            _pod = positionProps[_positionId].pod;
+        }
+        require(_getFlashSource(_positionId) != address(0), "FSV");
+
+        if (_userProvidedDebtAmt > 0) {
+            IERC20(_getBorrowTknForPod(_positionId)).safeTransferFrom(_sender, address(this), _userProvidedDebtAmt);
+        }
+
+        // if additional fees required for flash source, handle that here
+        _processExtraFlashLoanPayment(_positionId, _sender);
+
+        IFlashLoanSource(_getFlashSource(_positionId)).flash(
+            _getBorrowTknForPod(_positionId),
+            _pairedLpDesired - _userProvidedDebtAmt,
+            address(this),
+            _getFlashDataAddLeverage(_positionId, _sender, _pTknAmt, _pairedLpDesired, _config)
+        );
+    }
+
+    function _addLeveragePostCallback(bytes memory _data) internal returns (uint256 _ptknRefundAmt) {
         IFlashLoanSource.FlashData memory _d = abi.decode(_data, (IFlashLoanSource.FlashData));
         (LeverageFlashProps memory _props,) = abi.decode(_d.data, (LeverageFlashProps, bytes));
         (uint256 _overrideBorrowAmt,,) = abi.decode(_props.config, (uint256, uint256, uint256));
@@ -285,7 +341,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         emit AddLeverage(_props.positionId, _props.owner, _aspTknCollateralBal, _borrowAmt);
     }
 
-    function _removeLeverage(bytes memory _userData)
+    function _removeLeveragePostCallback(bytes memory _userData)
         internal
         returns (uint256 _podAmtRemaining, uint256 _borrowAmtRemaining)
     {
@@ -508,6 +564,17 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         _pairedAmtReceived = IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedTokenAmtBefore;
     }
 
+    function _bondToPod(address _user, address _pod, uint256 _tknAmt, uint256 _amtPtknMintMin) internal {
+        IDecentralizedIndex.IndexAssetInfo[] memory _podAssets = IDecentralizedIndex(_pod).getAllAssets();
+        IERC20 _tkn = IERC20(_podAssets[0].token);
+        uint256 _tknBalBefore = _tkn.balanceOf(address(this));
+        _tkn.safeTransferFrom(_user, address(this), _tknAmt);
+        uint256 _pTknBalBefore = IERC20(_pod).balanceOf(address(this));
+        _tkn.approve(_pod, _tkn.balanceOf(address(this)) - _tknBalBefore);
+        IDecentralizedIndex(_pod).bond(address(_tkn), _tkn.balanceOf(address(this)) - _tknBalBefore, _amtPtknMintMin);
+        IERC20(_pod).balanceOf(address(this)) - _pTknBalBefore;
+    }
+
     function _isPodSelfLending(uint256 _positionId) internal view returns (bool) {
         address _pod = positionProps[_positionId].pod;
         address _lendingPair = positionProps[_positionId].lendingPair;
@@ -529,7 +596,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
     function _getFlashDataAddLeverage(
         uint256 _positionId,
         address _sender,
-        uint256 _pTknBalBefore,
+        uint256 _pTknAmt,
         uint256 _pairedLpDesired,
         bytes memory _config
     ) internal view returns (bytes memory) {
@@ -539,7 +606,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
                 positionId: _positionId,
                 owner: positionNFT.ownerOf(_positionId),
                 sender: _sender,
-                pTknAmt: IERC20(positionProps[_positionId].pod).balanceOf(address(this)) - _pTknBalBefore,
+                pTknAmt: _pTknAmt,
                 pairedLpDesired: _pairedLpDesired,
                 config: _config
             }),

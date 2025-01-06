@@ -12,6 +12,8 @@ contract DeployLendingAssetVault is Script {
         address factory = vm.envAddress("LAV_FACTORY");
         address asset = vm.envAddress("ASSET");
 
+        uint256 _depAmount = LendingAssetVaultFactory(factory).minimumDepositAtCreation();
+        IERC20(asset).approve(factory, _depAmount);
         address lav = LendingAssetVaultFactory(factory).create(
             string.concat("MetaVault for ", IERC20Metadata(asset).name()),
             string.concat("mv", IERC20Metadata(asset).symbol()),

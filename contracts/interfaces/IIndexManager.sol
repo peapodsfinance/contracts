@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import "./IDecentralizedIndex.sol";
+
 interface IIndexManager {
     struct IIndexAndStatus {
         address index; // aka pod
@@ -23,4 +25,11 @@ interface IIndexManager {
     function removeIndex(uint256 idx) external;
 
     function verifyIndex(uint256 idx, bool verified) external;
+
+    function deployNewIndex(
+        string memory indexName,
+        string memory indexSymbol,
+        bytes memory baseConfig,
+        bytes memory immutables
+    ) external returns (address _index);
 }

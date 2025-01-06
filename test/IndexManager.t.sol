@@ -5,20 +5,13 @@ import "forge-std/Test.sol";
 import "../contracts/IndexManager.sol";
 import "../contracts/interfaces/IWeightedIndexFactory.sol";
 import "../contracts/interfaces/IDecentralizedIndex.sol";
-import "../contracts/test/TestERC20.sol";
+import "./mocks/TestERC20.sol";
 
 contract MockWeightedIndexFactory is IWeightedIndexFactory {
-    function deployPodAndLinkDependencies(
-        string memory,
-        string memory,
-        IDecentralizedIndex.Config memory,
-        IDecentralizedIndex.Fees memory,
-        address[] memory,
-        uint256[] memory,
-        address,
-        bool,
-        bytes memory
-    ) external returns (address pod, address vault, address rewards) {
+    function deployPodAndLinkDependencies(string memory, string memory, bytes memory, bytes memory)
+        external
+        returns (address pod, address vault, address rewards)
+    {
         // Return dummy addresses for testing
         return (address(new TestERC20("Pod", "POD")), address(0), address(0));
     }
@@ -135,7 +128,7 @@ contract IndexManagerTest is Test {
         weights[0] = 5000;
         weights[1] = 5000;
 
-        manager.deployNewIndex(name, symbol, config, fees, tokens, weights, address(0), false, "");
+        manager.deployNewIndex(name, symbol, abi.encode(config, fees, tokens, weights, address(0), false), "");
 
         assertEq(manager.indexLength(), 1);
     }

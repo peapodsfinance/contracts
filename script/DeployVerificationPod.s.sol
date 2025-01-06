@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
-import "../contracts/interfaces/IWeightedIndexFactory.sol";
+import "../contracts/interfaces/IIndexManager.sol";
 import "../contracts/WeightedIndex.sol";
 
 contract DeployVerificationPod is Script {
@@ -14,15 +14,10 @@ contract DeployVerificationPod is Script {
         _t[0] = 0x02f92800F57BCD74066F5709F1Daa1A4302Df875;
         uint256[] memory _w = new uint256[](1);
         _w[0] = 1e18;
-        (address _pod,,) = IWeightedIndexFactory(vm.envAddress("POD_FACTORY")).deployPodAndLinkDependencies(
+        address _pod = IIndexManager(vm.envAddress("INDEX_MANAGER")).deployNewIndex(
             "Verification",
             "pVER",
-            _c,
-            _getFees(),
-            _t,
-            _w,
-            address(0),
-            false,
+            abi.encode(_c, _getFees(), _t, _w, address(0), false),
             _getImmutables(
                 vm.envAddress("DAI"),
                 vm.envAddress("FEE_ROUTER"),

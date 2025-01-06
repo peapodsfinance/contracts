@@ -52,6 +52,17 @@ interface ILeverageManager {
         bytes memory _config
     ) external;
 
+    function addLeverageFromTkn(
+        uint256 _positionId,
+        address _pod,
+        uint256 _tknAmt,
+        uint256 _amtPtknMintMin,
+        uint256 _pairedLpDesired,
+        uint256 _userProvidedDebtAmt,
+        bool _hasSelfLendingPairPod,
+        bytes memory _config
+    ) external;
+
     function removeLeverage(
         uint256 _positionId,
         uint256 _borrowAssetAmt,

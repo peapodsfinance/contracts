@@ -3,20 +3,19 @@ pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {IDecentralizedIndex} from "../contracts/interfaces/IDecentralizedIndex.sol";
-import {IIndexUtils} from "../contracts/interfaces/IIndexUtils.sol";
-import {IndexUtils} from "../contracts/IndexUtils.sol";
-import {AutoCompoundingPodLp} from "../contracts/AutoCompoundingPodLp.sol";
-import {RewardsWhitelist} from "../contracts/RewardsWhitelist.sol";
-import {WeightedIndex} from "../contracts/WeightedIndex.sol";
-import {PEAS} from "../contracts/PEAS.sol";
-import {V3TwapUtilities} from "../contracts/twaputils/V3TwapUtilities.sol";
-import {UniswapDexAdapter} from "../contracts/dex/UniswapDexAdapter.sol";
-import {BalancerFlashSource} from "../contracts/flash/BalancerFlashSource.sol";
-import {LeverageManager} from "../contracts/lvf/LeverageManager.sol";
-import {MockFraxlendPair} from "./mocks/MockFraxlendPair.sol";
-import {PodHelperTest} from "./helpers/PodHelper.t.sol";
-import "forge-std/console.sol";
+import {IDecentralizedIndex} from "../../contracts/interfaces/IDecentralizedIndex.sol";
+import {IIndexUtils} from "../../contracts/interfaces/IIndexUtils.sol";
+import {IndexUtils} from "../../contracts/IndexUtils.sol";
+import {AutoCompoundingPodLp} from "../../contracts/AutoCompoundingPodLp.sol";
+import {RewardsWhitelist} from "../../contracts/RewardsWhitelist.sol";
+import {WeightedIndex} from "../../contracts/WeightedIndex.sol";
+import {PEAS} from "../../contracts/PEAS.sol";
+import {V3TwapUtilities} from "../../contracts/twaputils/V3TwapUtilities.sol";
+import {UniswapDexAdapter} from "../../contracts/dex/UniswapDexAdapter.sol";
+import {BalancerFlashSource} from "../../contracts/flash/BalancerFlashSource.sol";
+import {LeverageManager} from "../../contracts/lvf/LeverageManager.sol";
+import {MockFraxlendPair} from "../mocks/MockFraxlendPair.sol";
+import {PodHelperTest} from "../helpers/PodHelper.t.sol";
 
 contract LeverageManagerTest is PodHelperTest {
     IIndexUtils public idxUtils;
@@ -141,6 +140,53 @@ contract LeverageManagerTest is PodHelperTest {
             alicePodTokenBalanceBefore - pTknAmt,
             "Incorrect Pod Token balance after adding leverage"
         );
+        assertEq(IERC20(dai).balanceOf(ALICE), aliceAssetBalanceBefore, "Asset balance should not change for ALICE");
+
+        // Verify the state of the LeverageManager contract
+        (address returnedPod, address lendingPair, address custodian, bool isSelfLending, bool hasSelfLendingPairPod) =
+            leverageManager.positionProps(positionId);
+        assertEq(returnedPod, address(pod), "Incorrect pod address");
+        assertEq(lendingPair, address(mockFraxlendPair), "Incorrect lending pair address");
+        assertNotEq(custodian, address(0), "Custodian address should not be zero");
+        assertEq(isSelfLending, false, "Not self lending");
+        assertEq(hasSelfLendingPairPod, false, "Self lending pod should be zero");
+    }
+
+    function test_addLeverageFromTkn() public {
+        uint256 tknAmt = 100 * 1e18;
+        // uint256 ptknAmt = pod.convertToShares(tknAmt);
+        uint256 pairedLpDesired = 50 * 1e18;
+        bytes memory config = abi.encode(0, 1000, block.timestamp + 1 hours);
+
+        deal(address(peas), ALICE, tknAmt * 100);
+
+        vm.startPrank(ALICE);
+
+        uint256 positionId = leverageManager.initializePosition(address(pod), ALICE, address(0), false);
+
+        uint256 alicePeasTokenBalanceBefore = peas.balanceOf(ALICE);
+        // uint256 alicePodTokenBalanceBefore = pod.balanceOf(ALICE);
+        uint256 aliceAssetBalanceBefore = IERC20(dai).balanceOf(ALICE);
+
+        peas.approve(address(leverageManager), tknAmt);
+        leverageManager.addLeverageFromTkn(positionId, address(pod), tknAmt, 0, pairedLpDesired, 0, false, config);
+
+        vm.stopPrank();
+
+        // Verify the position NFT was minted
+        assertEq(leverageManager.positionNFT().ownerOf(positionId), ALICE, "Position NFT not minted to ALICE");
+
+        // Verify the balance changes in the mock contracts
+        assertEq(
+            peas.balanceOf(ALICE),
+            alicePeasTokenBalanceBefore - tknAmt,
+            "Incorrect PEAS Token balance after adding leverage"
+        );
+        // assertEq(
+        //     pod.balanceOf(ALICE),
+        //     alicePodTokenBalanceBefore - ptknAmt,
+        //     "Incorrect Pod Token balance after adding leverage"
+        // );
         assertEq(IERC20(dai).balanceOf(ALICE), aliceAssetBalanceBefore, "Asset balance should not change for ALICE");
 
         // Verify the state of the LeverageManager contract

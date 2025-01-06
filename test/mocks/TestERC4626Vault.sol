@@ -5,9 +5,9 @@ import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../interfaces/ILendingAssetVault.sol";
-import "../interfaces/IFraxlendPair.sol";
-import {VaultAccount} from "../libraries/VaultAccount.sol";
+import "../../contracts/interfaces/ILendingAssetVault.sol";
+import "../../contracts/interfaces/IFraxlendPair.sol";
+import {VaultAccount} from "../../contracts/libraries/VaultAccount.sol";
 
 contract TestERC4626Vault is IERC4626, ERC20, ERC20Permit {
     using SafeERC20 for IERC20;

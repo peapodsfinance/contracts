@@ -3,8 +3,8 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../interfaces/IFlashLoanRecipient.sol";
-import "../interfaces/IFlashLoanSource.sol";
+import "../../../contracts/interfaces/IFlashLoanRecipient.sol";
+import "../../../contracts/interfaces/IFlashLoanSource.sol";
 
 contract FlashSourceReceiverTest is IFlashLoanRecipient {
     using SafeERC20 for IERC20;

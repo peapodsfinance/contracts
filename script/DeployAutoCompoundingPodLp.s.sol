@@ -17,6 +17,8 @@ contract DeployAutoCompoundingPodLp is Script {
         address dexAdapter = vm.envAddress("ADAPTER");
         address indexUtils = vm.envAddress("UTILS");
 
+        uint256 _depAmount = AutoCompoundingPodLpFactory(aspFactory).minimumDepositAtCreation();
+        IERC20(IDecentralizedIndex(pod).lpStakingPool()).approve(aspFactory, _depAmount);
         address asp = AutoCompoundingPodLpFactory(aspFactory).create(
             string.concat("Auto Compounding LP for ", IERC20Metadata(pod).name()),
             string.concat("as", IERC20Metadata(pod).symbol()),

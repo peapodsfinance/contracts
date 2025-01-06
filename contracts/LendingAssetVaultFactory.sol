@@ -9,7 +9,7 @@ import "./LendingAssetVault.sol";
 contract LendingAssetVaultFactory is Ownable {
     using SafeERC20 for IERC20;
 
-    uint256 minimumDepositAtCreation = 10 ** 3;
+    uint256 public minimumDepositAtCreation = 10 ** 3;
 
     event Create(address newVault);
 
@@ -19,7 +19,6 @@ contract LendingAssetVaultFactory is Ownable {
 
     function create(string memory _name, string memory _symbol, address _asset, uint96 _salt)
         external
-        onlyOwner
         returns (address _vault)
     {
         _vault = _deploy(getBytecode(_name, _symbol, _asset), _getFullSalt(_salt));

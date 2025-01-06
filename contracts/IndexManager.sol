@@ -30,25 +30,10 @@ contract IndexManager is IIndexManager, Context, Ownable {
     function deployNewIndex(
         string memory indexName,
         string memory indexSymbol,
-        IDecentralizedIndex.Config memory config,
-        IDecentralizedIndex.Fees memory fees,
-        address[] memory tokens,
-        uint256[] memory weights,
-        address stakeUserRestriction,
-        bool leaveRewardsAsPairedLp,
+        bytes memory baseConfig,
         bytes memory immutables
-    ) external {
-        (address _index,,) = podFactory.deployPodAndLinkDependencies(
-            indexName,
-            indexSymbol,
-            config,
-            fees,
-            tokens,
-            weights,
-            stakeUserRestriction,
-            leaveRewardsAsPairedLp,
-            immutables
-        );
+    ) external override returns (address _index) {
+        (_index,,) = podFactory.deployPodAndLinkDependencies(indexName, indexSymbol, baseConfig, immutables);
         _addIndex(_index, _msgSender(), false, false, false);
     }
 

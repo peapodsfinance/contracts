@@ -47,12 +47,7 @@ contract WeightedIndexFactory is Ownable, IWeightedIndexFactory {
     function deployPodAndLinkDependencies(
         string memory indexName,
         string memory indexSymbol,
-        IDecentralizedIndex.Config memory config,
-        IDecentralizedIndex.Fees memory fees,
-        address[] memory tokens,
-        uint256[] memory weights,
-        address stakeUserRestriction,
-        bool leaveRewardsAsPairedLp,
+        bytes memory baseConfig,
         bytes memory immutables
     ) external override returns (address weightedIndex, address stakingPool, address tokenRewards) {
         require(
@@ -72,13 +67,14 @@ contract WeightedIndexFactory is Ownable, IWeightedIndexFactory {
             IInitializeSelector(deployedContracts.weightedIndexImpl).initializeSelector(),
             indexName,
             indexSymbol,
-            config,
-            fees,
-            tokens,
-            weights,
+            baseConfig,
             immutables
         );
         weightedIndex = address(new BeaconProxy(deployedContracts.weightedIndexBeacon, weightedIndexData));
+
+        (,,,, address stakeUserRestriction, bool leaveRewardsAsPairedLp) = abi.decode(
+            baseConfig, (IDecentralizedIndex.Config, IDecentralizedIndex.Fees, address[], uint256[], address, bool)
+        );
 
         // Deploy StakingPoolToken proxy
         bytes memory stakingPoolData = abi.encodeWithSelector(

@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import "../contracts/PodUnwrapLocker.sol";
-import "../contracts/test/TestERC20.sol";
+import "./mocks/TestERC20.sol";
 import {WeightedIndex} from "../contracts/WeightedIndex.sol";
 import {MockOwnable} from "./mocks/MockOwnable.sol";
 import {PodHelperTest} from "./helpers/PodHelper.t.sol";

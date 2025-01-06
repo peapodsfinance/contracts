@@ -3,8 +3,8 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
-import "../contracts/test/TestERC20.sol";
-import "../contracts/test/TestERC4626Vault.sol";
+import "./mocks/TestERC20.sol";
+import "./mocks/TestERC4626Vault.sol";
 import "../contracts/LendingAssetVault.sol";
 
 contract LendingAssetVaultTest is Test {

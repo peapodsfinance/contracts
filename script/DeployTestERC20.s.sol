@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Script.sol";
-import "../contracts/test/TestERC20.sol";
+import "../test/mocks/TestERC20.sol";
 
 contract DeployTestERC20 is Script {
     function run() external {

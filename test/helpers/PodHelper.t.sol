@@ -150,12 +150,7 @@ contract PodHelperTest is Test {
         (newPod,,) = _podDeployerSub.deployPodAndLinkDependencies(
             indexName,
             indexSymbol,
-            config,
-            fees,
-            tokens,
-            weights,
-            stakeUserRestriction,
-            leaveRewardsAsPairedLp,
+            abi.encode(config, fees, tokens, weights, stakeUserRestriction, leaveRewardsAsPairedLp),
             immutables
         );
     }

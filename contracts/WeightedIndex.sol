@@ -23,20 +23,19 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
     /// @notice The ```initialize``` function initializes a new WeightedIndex pod
     /// @param _name The name of the ERC20 token of the pod
     /// @param _symbol The symbol/ticker of the ERC20 token of the pod
-    /// @param _config A struct containing some pod-level, one off configuration for the pod
-    /// @param _fees A struct holding all pod-level fees
-    /// @param _tokens The ERC20 token addresses that make up the pod
-    /// @param _weights The weights that each ERC20 token makes up in the pod, defined by token amount
+    /// @param _baseConfig A packed set of vars that represents some core pod data
+    ///     @param _baseConfig[0] = _config A struct containing some pod-level, one off configuration for the pod
+    ///     @param _baseConfig[1] = _fees A struct holding all pod-level fees
+    ///     @param _baseConfig[2] = _tokens The ERC20 token addresses that make up the pod
+    ///     @param _baseConfig[3] = _weights The weights that each ERC20 token makes up in the pod, defined by token amount
     /// @param _immutables A number of immutable options/addresses to help the pod function properly on the current network, see DecentralizedIndex for unpacking info
-    function initialize(
-        string memory _name,
-        string memory _symbol,
-        Config memory _config,
-        Fees memory _fees,
-        address[] memory _tokens,
-        uint256[] memory _weights,
-        bytes memory _immutables
-    ) public initializer {
+    function initialize(string memory _name, string memory _symbol, bytes memory _baseConfig, bytes memory _immutables)
+        public
+        initializer
+    {
+        (Config memory _config, Fees memory _fees, address[] memory _tokens, uint256[] memory _weights,,) =
+            abi.decode(_baseConfig, (Config, Fees, address[], uint256[], address, bool));
+
         __DecentralizedIndex_init(_name, _symbol, IndexType.WEIGHTED, _config, _fees, _immutables);
         __WeightedIndex_init(_config, _tokens, _weights, _immutables);
     }

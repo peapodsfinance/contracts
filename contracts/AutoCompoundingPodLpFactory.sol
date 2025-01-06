@@ -8,7 +8,7 @@ import "./AutoCompoundingPodLp.sol";
 contract AutoCompoundingPodLpFactory is Ownable {
     using SafeERC20 for IERC20;
 
-    uint256 minimumDepositAtCreation = 10 ** 3;
+    uint256 public minimumDepositAtCreation = 10 ** 3;
 
     event Create(address newAspTkn);
 
@@ -24,7 +24,7 @@ contract AutoCompoundingPodLpFactory is Ownable {
         IDexAdapter _dexAdapter,
         IIndexUtils _indexUtils,
         uint96 _salt
-    ) external onlyOwner returns (address _aspAddy) {
+    ) external returns (address _aspAddy) {
         _aspAddy =
             _deploy(getBytecode(_name, _symbol, _isSelfLendingPod, _pod, _dexAdapter, _indexUtils), _getFullSalt(_salt));
         if (address(_pod) != address(0) && minimumDepositAtCreation > 0) {
