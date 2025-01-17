@@ -20,14 +20,9 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     bool public immutable BASE_IS_FRAX_PAIR;
     address internal immutable BASE_IN_CL;
 
-    /// @dev The pod stake token and oracle quote token that custodies UniV2 LP tokens
-    address public immutable SP_TKN; // QUOTE_TOKEN
-    address public immutable POD;
-
     /// @dev The concentrated liquidity UniV3 pool where we get the TWAP to price the underlying TKN
-    /// @dev of the pod represented through SP_TKN and then convert it to the spTKN price
+    /// @dev of the pod represented through spTkn and then convert it to the spTKN price
     address public immutable UNDERLYING_TKN_CL_POOL;
-    address public immutable UNDERLYING_TKN;
 
     /// @dev The Chainlink price feed we can use to convert the price we fetch through UNDERLYING_TKN_CL_POOL
     /// @dev into a BASE_TOKEN normalized price,
@@ -51,11 +46,19 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     /// @dev this allows us to define a uniform interface to fetch the reserves of each asset in a pair
     IV2Reserves public immutable V2_RESERVES;
 
+    /// @dev The pod staked LP token and oracle quote token that custodies UniV2 LP tokens
+    address public spTkn; // QUOTE_TOKEN
+    address public pod;
+    address public underlyingTkn;
+
     uint32 twapInterval = 10 minutes;
+
+    event SetSpTknAndDependencies(address _pod);
 
     event SetTwapInterval(uint32 oldMax, uint32 newMax);
 
     constructor(bytes memory _requiredImmutables, bytes memory _optionalImmutables) Ownable(_msgSender()) {
+        address _spTkn;
         address _v2Reserves;
         (
             CHAINLINK_SINGLE_PRICE_ORACLE,
@@ -64,7 +67,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
             BASE_TOKEN,
             BASE_IS_POD,
             BASE_IS_FRAX_PAIR,
-            SP_TKN,
+            _spTkn,
             UNDERLYING_TKN_CL_POOL
         ) = abi.decode(_requiredImmutables, (address, address, address, address, bool, bool, address, address));
         (
@@ -95,18 +98,15 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         }
         BASE_IN_CL = _baseInCl;
 
-        address _pod = IStakingPoolToken(SP_TKN).INDEX_FUND();
-        IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_pod).getAllAssets();
-        POD = _pod;
-        UNDERLYING_TKN = _assets[0].token;
+        _setSpTknAndDependencies(_spTkn);
     }
 
     function getPodPerBasePrice() external view override returns (uint256 _pricePTknPerBase18) {
         _pricePTknPerBase18 = 10 ** (18 * 2) / _calculateBasePerPTkn(0);
     }
 
-    /// @notice The ```getPrices``` function gets the mathematical price of SP_TKN / BASE_TOKEN, so in plain english will
-    /// @notice be the number of SP_TKN per every BASE_TOKEN at 1e18 precision
+    /// @notice The ```getPrices``` function gets the mathematical price of spTkn / BASE_TOKEN, so in plain english will
+    /// @notice be the number of spTkn per every BASE_TOKEN at 1e18 precision
     /// @return _isBadData Whether the price(s) returned should be considered bad
     /// @return _priceLow The lower of the dual prices returned
     /// @return _priceHigh The higher of the dual prices returned
@@ -176,18 +176,18 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
                 return 0;
             }
         }
-        _basePerPTkn18 = _accountForCBRInPrice(POD, UNDERLYING_TKN, _price18);
+        _basePerPTkn18 = _accountForCBRInPrice(pod, underlyingTkn, _price18);
 
         // adjust current price for spTKN pod unwrap fee, which will end up making the end price
         // (spTKN per base) higher, meaning it will take more spTKN to equal the value
         // of base token. This will more accurately ensure healthy LTVs when lending since
         // a liquidation path will need to account for unwrap fees
-        _basePerPTkn18 = _accountForUnwrapFeeInPrice(POD, _basePerPTkn18);
+        _basePerPTkn18 = _accountForUnwrapFeeInPrice(pod, _basePerPTkn18);
     }
 
     function _getDefaultPrice18() internal view returns (bool _isBadData, uint256 _price18) {
         (_isBadData, _price18) = IMinimalSinglePriceOracle(UNISWAP_V3_SINGLE_PRICE_ORACLE).getPriceUSD18(
-            BASE_CONVERSION_CHAINLINK_FEED, UNDERLYING_TKN, UNDERLYING_TKN_CL_POOL, twapInterval
+            BASE_CONVERSION_CHAINLINK_FEED, underlyingTkn, UNDERLYING_TKN_CL_POOL, twapInterval
         );
         if (_isBadData) {
             return (true, 0);
@@ -225,7 +225,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     }
 
     function _getPair() private view returns (address) {
-        return IStakingPoolToken(SP_TKN).stakingToken();
+        return IStakingPoolToken(spTkn).stakingToken();
     }
 
     function _accountForCBRInPrice(address _pod, address _underlying, uint256 _amtUnderlying)
@@ -259,6 +259,23 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
             y = z;
             z = (x / z + z) / 2;
         }
+    }
+
+    function _setSpTknAndDependencies(address _spTkn) internal {
+        if (address(_spTkn) == address(0)) {
+            return;
+        }
+        require(address(spTkn) == address(0), "S");
+        spTkn = _spTkn;
+        pod = IStakingPoolToken(spTkn).INDEX_FUND();
+        IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(pod).getAllAssets();
+        underlyingTkn = _assets[0].token;
+        emit SetSpTknAndDependencies(address(pod));
+    }
+
+    function setSpTknAndDependencies(address _spTkn) external onlyOwner {
+        require(address(_spTkn) != address(0), "INP");
+        _setSpTknAndDependencies(_spTkn);
     }
 
     function setTwapInterval(uint32 _interval) external onlyOwner {

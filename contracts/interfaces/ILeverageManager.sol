@@ -25,7 +25,9 @@ interface ILeverageManager {
         bool hasSelfLendingPairPod;
     }
 
-    event AddLeverage(uint256 indexed positionId, address indexed user, uint256 collateralAmt, uint256 borrowAmt);
+    event AddLeverage(
+        uint256 indexed positionId, address indexed user, uint256 pTknAmtUsed, uint256 collateralAmt, uint256 borrowAmt
+    );
 
     event RemoveLeverage(uint256 indexed positionId, address indexed user, uint256 collateralAmt);
 

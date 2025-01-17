@@ -2,13 +2,13 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import "../contracts/voting/VotingPool.sol";
-import "../contracts/interfaces/IProtocolFeeRouter.sol";
-import "../contracts/interfaces/IRewardsWhitelister.sol";
-import "../contracts/interfaces/IDexAdapter.sol";
-import "../contracts/interfaces/IV3TwapUtilities.sol";
+import "../../contracts/voting/VotingPool.sol";
+import "../../contracts/interfaces/IProtocolFeeRouter.sol";
+import "../../contracts/interfaces/IRewardsWhitelister.sol";
+import "../../contracts/interfaces/IDexAdapter.sol";
+import "../../contracts/interfaces/IV3TwapUtilities.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {PodHelperTest} from "./helpers/PodHelper.t.sol";
+import {PodHelperTest} from "../helpers/PodHelper.t.sol";
 
 contract VotingPoolTest is PodHelperTest {
     VotingPool public votingPool;

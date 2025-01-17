@@ -66,6 +66,10 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
         return _totalAssets - _totalAssetsUtilized;
     }
 
+    function getAllWhitelistedVaults() external view override returns (address[] memory) {
+        return _vaultWhitelistAry;
+    }
+
     function totalAvailableAssetsForVault(address _vault) public view override returns (uint256 _totalVaultAvailable) {
         uint256 _overallAvailable = totalAvailableAssets();
 

@@ -29,7 +29,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
     mapping(uint256 => LeveragePositionProps) public positionProps;
 
     modifier onlyPositionOwner(uint256 _positionId) {
-        require(positionNFT.ownerOf(_positionId) == _msgSender(), "AUTH");
+        require(positionNFT.ownerOf(_positionId) == _msgSender(), "A0");
         _;
     }
 
@@ -157,7 +157,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         require(
             _owner == _sender || positionNFT.getApproved(_positionId) == _sender
                 || positionNFT.isApprovedForAll(_owner, _sender),
-            "AUTH"
+            "A1"
         );
 
         address _lendingPair = positionProps[_positionId].lendingPair;
@@ -210,7 +210,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
 
         address _pod = positionProps[_posProps.positionId].pod;
 
-        require(_getFlashSource(_posProps.positionId) == _msgSender(), "AUTH");
+        require(_getFlashSource(_posProps.positionId) == _msgSender(), "A2");
 
         if (_posProps.method == FlashCallbackMethod.ADD) {
             uint256 _ptknRefundAmt = _addLeveragePostCallback(_userData);
@@ -284,7 +284,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
             require(
                 _owner == _sender || positionNFT.getApproved(_positionId) == _sender
                     || positionNFT.isApprovedForAll(_owner, _sender),
-                "AUTH"
+                "A3"
             );
             _pod = positionProps[_positionId].pod;
         }
@@ -338,7 +338,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         if (_remaining != 0) {
             IERC20(_d.token).safeTransfer(positionNFT.ownerOf(_props.positionId), _remaining);
         }
-        emit AddLeverage(_props.positionId, _props.owner, _aspTknCollateralBal, _borrowAmt);
+        emit AddLeverage(_props.positionId, _props.owner, _pTknAmtUsed, _aspTknCollateralBal, _borrowAmt);
     }
 
     function _removeLeveragePostCallback(bytes memory _userData)

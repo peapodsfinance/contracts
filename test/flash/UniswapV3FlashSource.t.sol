@@ -33,7 +33,7 @@ contract UniswapV3FlashSourceTest is Test {
 
     function test_flash_onlyLeverageManager() public {
         vm.startPrank(alice);
-        vm.expectRevert(bytes("AUTH")); // From onlyLeverageManager modifier
+        vm.expectRevert(bytes("OLM")); // From onlyLeverageManager modifier
         flashSource.flash(USDC, 1000e6, address(receiver), "");
         vm.stopPrank();
     }

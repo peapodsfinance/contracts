@@ -8,17 +8,20 @@ import "../interfaces/IStakingPoolToken.sol";
 import "../interfaces/IUniswapV3Pool.sol";
 import "../interfaces/ICamelotPair.sol";
 import "../interfaces/IV3TwapUtilities.sol";
+import "../interfaces/IV2Reserves.sol";
 import "./ConversionFactorPTKN.sol";
 
 contract ConversionFactorSPTKN is ConversionFactorPTKN {
-    address constant PEAS = 0x02f92800F57BCD74066F5709F1Daa1A4302Df875;
-
+    address immutable PEAS;
     address immutable PEAS_STABLE_CL_POOL;
     IV3TwapUtilities immutable TWAP_UTILS;
+    IV2Reserves immutable V2_RESERVES;
 
-    constructor(address _peasStablePool, IV3TwapUtilities _utils) {
+    constructor(address _peas, address _peasStablePool, IV3TwapUtilities _utils, IV2Reserves _v2Res) {
+        PEAS = _peas;
         PEAS_STABLE_CL_POOL = _peasStablePool;
         TWAP_UTILS = _utils;
+        V2_RESERVES = _v2Res;
     }
 
     /// @notice several assumptions here, that pairedLpToken is a stable, and that any stable
@@ -36,7 +39,7 @@ contract ConversionFactorSPTKN is ConversionFactorPTKN {
         uint256 _priceX96 = TWAP_UTILS.priceX96FromSqrtPriceX96(_sqrtPriceX96);
         uint256 _pricePeasNumX96 = _token1 == PEAS ? _priceX96 : FixedPoint96.Q96 ** 2 / _priceX96;
         uint256 _pricePPeasNumX96 = (_pricePeasNumX96 * _pFactor) / _pDenomenator;
-        (uint112 _reserve0, uint112 _reserve1,,) = ICamelotPair(_lpTkn).getReserves();
+        (uint112 _reserve0, uint112 _reserve1) = V2_RESERVES.getReserves(_lpTkn);
         uint256 _k = uint256(_reserve0) * _reserve1;
         uint256 _avgTotalPeasInLpX96 = _sqrt(_pricePPeasNumX96 * _k) * 2 ** (96 / 2);
 

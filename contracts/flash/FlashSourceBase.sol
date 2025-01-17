@@ -20,7 +20,7 @@ abstract contract FlashSourceBase is IFlashLoanSource, Context {
     }
 
     modifier onlyLeverageManager() {
-        require(_msgSender() == LEVERAGE_MANAGER, "AUTH");
+        require(_msgSender() == LEVERAGE_MANAGER, "OLM");
         _;
     }
 

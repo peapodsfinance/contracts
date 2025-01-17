@@ -45,6 +45,10 @@ interface IAspTkn {
     function setPod(IDecentralizedIndex _pod) external;
 }
 
+interface IAspTknOracle {
+    function setSpTknAndDependencies(address _spTkn) external;
+}
+
 interface IFraxlendPairFactory {
     function defaultDepositAmt() external view returns (uint256);
 
@@ -100,6 +104,7 @@ contract LeverageFactory is Ownable {
         _aspTkn = _getOrCreateAspTkn(_podConstructorArgs, "", "", address(0), _dexAdapter, _indexUtils, true, false);
         require(_aspTkn == _aspTknAddy, "ASP");
         IAspTkn(_aspTkn).setPod(IDecentralizedIndex(_newPod));
+        IAspTknOracle(_aspTknOracle).setSpTknAndDependencies(IDecentralizedIndex(_newPod).lpStakingPool());
 
         emit CreateSelfLendingPod(_newPod, _aspTkn, _aspTknOracle, _fraxlendPair);
     }

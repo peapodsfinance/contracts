@@ -16,18 +16,9 @@ contract ConversionFactorPTKN is IStakingConversionFactor {
         (_factor, _denomenator) = _calculateCbrWithDen(_pod);
     }
 
-    function _calculateCbrWithDen(address _pTKN) internal view returns (uint256, uint256) {
-        require(IDecentralizedIndex(_pTKN).unlocked() == 1, "OU");
+    function _calculateCbrWithDen(address _pod) internal view returns (uint256, uint256) {
+        require(IDecentralizedIndex(_pod).unlocked() == 1, "OU");
         uint256 _den = 10 ** 18;
-        IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_pTKN).getAllAssets();
-        uint256 _firstAssetBal = IERC20(_assets[0].token).balanceOf(_pTKN);
-        uint256 _totalSupply = IDecentralizedIndex(_pTKN).totalSupply();
-        return (
-            _totalSupply == 0
-                ? _den
-                : (_den * _firstAssetBal * 10 ** IERC20Metadata(_pTKN).decimals()) / _totalSupply
-                    / 10 ** IERC20Metadata(_assets[0].token).decimals(),
-            _den
-        );
+        return (IDecentralizedIndex(_pod).convertToAssets(_den), _den);
     }
 }

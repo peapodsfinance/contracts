@@ -31,7 +31,7 @@ contract BalancerFlashSourceTest is Test {
 
     function test_flash_onlyLeverageManager() public {
         vm.startPrank(alice);
-        vm.expectRevert(); // From onlyLeverageManager modifier
+        vm.expectRevert(bytes("OLM")); // From onlyLeverageManager modifier
         flashSource.flash(WETH, 1 ether, address(receiver), "");
         vm.stopPrank();
     }
