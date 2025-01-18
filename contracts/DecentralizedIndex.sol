@@ -27,7 +27,7 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
 
     uint256 public FLASH_FEE_AMOUNT_DAI; // 10 DAI
     address public PAIRED_LP_TOKEN;
-    uint256 INITIALIZED;
+    address CREATOR;
     address V2_ROUTER;
     address V3_ROUTER;
     address DAI;
@@ -91,7 +91,7 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
 
-        INITIALIZED = block.number;
+        CREATOR = _msgSender();
         unlocked = 1;
         _swapAndFeeOn = 1;
 
@@ -447,7 +447,7 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     }
 
     function setLpStakingPool(address _pool) external {
-        require(block.number == INITIALIZED && lpStakingPool == address(0), "I");
+        require(_msgSender() == CREATOR && lpStakingPool == address(0), "I");
         lpStakingPool = _pool;
     }
 

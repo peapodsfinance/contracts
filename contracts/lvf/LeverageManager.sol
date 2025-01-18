@@ -22,6 +22,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
     IIndexUtils public indexUtils;
     LeveragePositions public positionNFT;
 
+    address public feeReceiver;
     uint16 public openFeePerc; // 1000 precision
     uint16 public closeFeePerc; // 1000 precision
 
@@ -47,6 +48,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
     }
 
     constructor(string memory _positionName, string memory _positionSymbol, IIndexUtils _idxUtils) {
+        feeReceiver = _msgSender();
         indexUtils = _idxUtils;
         positionNFT = new LeveragePositions(_positionName, _positionSymbol);
     }
@@ -223,7 +225,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
                 // if there's a close fee send returned pod tokens for fee to protocol
                 if (closeFeePerc > 0) {
                     uint256 _closeFeeAmt = (_ptknToUserAmt * closeFeePerc) / 1000;
-                    IERC20(_pod).safeTransfer(owner(), _closeFeeAmt);
+                    IERC20(_pod).safeTransfer(feeReceiver, _closeFeeAmt);
                     _ptknToUserAmt -= _closeFeeAmt;
                 }
                 IERC20(_pod).safeTransfer(_posProps.owner, _ptknToUserAmt);
@@ -314,7 +316,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         // if there's an open fee send debt/borrow token to protocol
         if (openFeePerc > 0) {
             uint256 _openFeeAmt = (_borrowTknAmtToLp * openFeePerc) / 1000;
-            IERC20(_d.token).safeTransfer(owner(), _openFeeAmt);
+            IERC20(_d.token).safeTransfer(feeReceiver, _openFeeAmt);
             _borrowTknAmtToLp -= _openFeeAmt;
         }
         (uint256 _pTknAmtUsed,, uint256 _pairedLeftover) = _lpAndStakeInPod(_d.token, _borrowTknAmtToLp, _props);
@@ -618,6 +620,12 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         address _old = address(indexUtils);
         indexUtils = _utils;
         emit SetIndexUtils(_old, address(_utils));
+    }
+
+    function setFeeReceiver(address _receiver) external onlyOwner {
+        address _currentReceiver = feeReceiver;
+        feeReceiver = _receiver;
+        emit SetFeeReceiver(_currentReceiver, _receiver);
     }
 
     function setOpenFeePerc(uint16 _newFee) external onlyOwner {

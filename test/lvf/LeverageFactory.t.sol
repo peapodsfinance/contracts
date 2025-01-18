@@ -130,7 +130,8 @@ contract LeverageFactoryTest is PodHelperTest {
             address(leverageManager),
             address(aspTknFactory),
             address(aspTknOracleFactory),
-            address(mockFraxlendPairDeployer)
+            address(mockFraxlendPairDeployer),
+            address(this)
         );
 
         // set ownership of a couple CAs to leverage factory so the factory can make admin changes

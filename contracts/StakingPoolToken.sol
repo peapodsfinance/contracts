@@ -21,8 +21,6 @@ contract StakingPoolToken is
 {
     using SafeERC20 for IERC20;
 
-    uint256 INITIALIZED;
-
     address public override INDEX_FUND;
     address public override POOL_REWARDS;
 
@@ -51,8 +49,6 @@ contract StakingPoolToken is
     ) public initializer {
         __ERC20_init(_name, _symbol);
         __Ownable_init(_msgSender());
-
-        INITIALIZED = block.number;
 
         stakeUserRestriction = _stakeUserRestriction;
         INDEX_FUND = _indexFund;
@@ -85,7 +81,7 @@ contract StakingPoolToken is
     }
 
     function setPoolRewards(address _rewards) external onlyOwner {
-        require(block.number == INITIALIZED && POOL_REWARDS == address(0), "I");
+        require(POOL_REWARDS == address(0), "I");
         POOL_REWARDS = _rewards;
     }
 

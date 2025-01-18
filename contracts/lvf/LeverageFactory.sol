@@ -63,10 +63,13 @@ contract LeverageFactory is Ownable {
     address public aspTknFactory;
     address public aspTknOracleFactory;
     address public fraxlendPairFactory;
+    address public aspOwnershipTransfer;
 
     event AddLvfSupportForPod(address _pod, address _aspTkn, address _aspTknOracle, address _lendingPair);
 
     event CreateSelfLendingPod(address _pod, address _aspTkn, address _aspTknOracle, address _lendingPair);
+
+    event SetAspOwnershipTransfer(address _prevOwner, address _newOwner);
 
     event TransferContractOwnership(address _ownable, address _currentOwner, address _newOwner);
 
@@ -75,11 +78,13 @@ contract LeverageFactory is Ownable {
         address _leverageManager,
         address _aspTknFactory,
         address _aspTknOracleFactory,
-        address _fraxlendPairFactory
+        address _fraxlendPairFactory,
+        address _aspOwnershipTransfer
     ) Ownable(_msgSender()) {
         _setLevMgrAndFactories(
             _indexManager, _leverageManager, _aspTknFactory, _aspTknOracleFactory, _fraxlendPairFactory
         );
+        aspOwnershipTransfer = _aspOwnershipTransfer;
     }
 
     function createSelfLendingPodAndAddLvf(
@@ -104,6 +109,7 @@ contract LeverageFactory is Ownable {
         _aspTkn = _getOrCreateAspTkn(_podConstructorArgs, "", "", address(0), _dexAdapter, _indexUtils, true, false);
         require(_aspTkn == _aspTknAddy, "ASP");
         IAspTkn(_aspTkn).setPod(IDecentralizedIndex(_newPod));
+        Ownable(_aspTkn).transferOwnership(aspOwnershipTransfer);
         IAspTknOracle(_aspTknOracle).setSpTknAndDependencies(IDecentralizedIndex(_newPod).lpStakingPool());
 
         emit CreateSelfLendingPod(_newPod, _aspTkn, _aspTknOracle, _fraxlendPair);
@@ -155,6 +161,12 @@ contract LeverageFactory is Ownable {
         _setLevMgrAndFactories(
             _indexManager, _leverageManager, _aspTknFactory, _aspTknOracleFactory, _fraxlendPairFactory
         );
+    }
+
+    function setAspOwnershipTransfer(address _newOwner) external onlyOwner {
+        address _current = aspOwnershipTransfer;
+        aspOwnershipTransfer = _newOwner;
+        emit SetAspOwnershipTransfer(_current, _newOwner);
     }
 
     function _buildFinalFraxlendConfigData(
