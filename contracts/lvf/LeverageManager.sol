@@ -178,6 +178,7 @@ contract LeverageManager is ILeverageManager, IFlashLoanRecipient, Context, Leve
         _props.method = FlashCallbackMethod.REMOVE;
         _props.positionId = _positionId;
         _props.owner = _owner;
+        _props.sender = _sender;
         bytes memory _additionalInfo = abi.encode(
             IFraxlendPair(_lendingPair).totalBorrow().toShares(_borrowAssetAmt, false),
             _collateralAssetRemoveAmt,
