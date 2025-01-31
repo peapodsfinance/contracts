@@ -8,6 +8,7 @@ import {RewardsWhitelist} from "../contracts/RewardsWhitelist.sol";
 import {V3TwapUtilities} from "../contracts/twaputils/V3TwapUtilities.sol";
 import {UniswapDexAdapter} from "../contracts/dex/UniswapDexAdapter.sol";
 import {IDecentralizedIndex} from "../contracts/interfaces/IDecentralizedIndex.sol";
+import {IFlashLoanSource} from "../contracts/interfaces/IFlashLoanSource.sol";
 import {IStakingPoolToken} from "../contracts/interfaces/IStakingPoolToken.sol";
 import {WeightedIndex} from "../contracts/WeightedIndex.sol";
 import {MockFlashMintRecipient} from "./mocks/MockFlashMintRecipient.sol";
@@ -212,8 +213,12 @@ contract WeightedIndexTest is PodHelperTest {
         deal(address(peas), address(this), expectedFee);
         peas.approve(address(pod), expectedFee);
         pod.bond(address(peas), expectedFee, 0);
+        pod.transfer(address(flashMintRecipient), expectedFee);
 
-        pod.flashMint(address(flashMintRecipient), mintAmount, "");
+        IFlashLoanSource.FlashData memory _d = IFlashLoanSource.FlashData(
+            address(flashMintRecipient), address(pod), mintAmount, abi.encode(""), expectedFee
+        );
+        pod.flashMint(address(flashMintRecipient), mintAmount, abi.encode(_d));
 
         assertEq(pod.totalSupply(), 0, "Total supply should be 0");
         assertEq(pod.balanceOf(address(flashMintRecipient)), 0, "Recipient should have no balance after flash mint");
@@ -226,8 +231,12 @@ contract WeightedIndexTest is PodHelperTest {
         deal(address(peas), address(this), expectedFee);
         peas.approve(address(pod), expectedFee);
         pod.bond(address(peas), expectedFee, 0);
+        pod.transfer(address(flashMintRecipient), expectedFee);
 
-        pod.flashMint(address(flashMintRecipient), mintAmount, "");
+        IFlashLoanSource.FlashData memory _d = IFlashLoanSource.FlashData(
+            address(flashMintRecipient), address(pod), mintAmount, abi.encode(""), expectedFee
+        );
+        pod.flashMint(address(flashMintRecipient), mintAmount, abi.encode(_d));
 
         assertEq(pod.totalSupply(), 0, "Total supply should not increase");
         assertEq(pod.balanceOf(address(flashMintRecipient)), 0, "Recipient should have no balance after flash mint");
@@ -241,8 +250,11 @@ contract WeightedIndexTest is PodHelperTest {
         deal(address(peas), address(this), expectedFee);
         peas.approve(address(pod), expectedFee);
         pod.bond(address(peas), expectedFee, 0);
+        pod.transfer(address(flashMintRecipient), expectedFee);
 
-        pod.flashMint(address(flashMintRecipient), mintAmount, callbackData);
+        IFlashLoanSource.FlashData memory _d =
+            IFlashLoanSource.FlashData(address(flashMintRecipient), address(pod), mintAmount, callbackData, expectedFee);
+        pod.flashMint(address(flashMintRecipient), mintAmount, abi.encode(_d));
 
         assertEq(flashMintRecipient.lastCallbackData(), callbackData, "Callback data should match");
     }
@@ -250,8 +262,11 @@ contract WeightedIndexTest is PodHelperTest {
     function test_flashMintRevertOnCallbackFailure() public {
         flashMintRecipient.setRevertFlag(true);
 
+        IFlashLoanSource.FlashData memory _d = IFlashLoanSource.FlashData(
+            address(flashMintRecipient), address(pod), 1000e18, abi.encode(""), 1000e18 / 1000
+        );
         vm.expectRevert("MockFlashMintRecipient: forced revert");
-        pod.flashMint(address(flashMintRecipient), 1000e18, "");
+        pod.flashMint(address(flashMintRecipient), 1000e18, abi.encode(_d));
     }
 
     // function test_flashMintDuringBondDebond() public {
@@ -296,8 +311,12 @@ contract WeightedIndexTest is PodHelperTest {
         deal(address(peas), address(this), expectedFee);
         peas.approve(address(pod), expectedFee);
         pod.bond(address(peas), expectedFee, 0);
+        pod.transfer(address(flashMintRecipient), expectedFee);
 
-        pod.flashMint(address(flashMintRecipient), mintAmount, "");
+        IFlashLoanSource.FlashData memory _d = IFlashLoanSource.FlashData(
+            address(flashMintRecipient), address(pod), mintAmount, abi.encode(""), expectedFee
+        );
+        pod.flashMint(address(flashMintRecipient), mintAmount, abi.encode(_d));
 
         assertEq(pod.totalSupply(), 0, "Total supply should not increase");
     }
