@@ -571,7 +571,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     }
 
     // needed for flashMint test to test locked state and revert
-    function callback(bytes calldata _data) external {
+    function callback(bytes calldata _data) external view {
         address _oracle = abi.decode(_data, (address));
         spTKNMinimalOracle(_oracle).getPrices();
     }

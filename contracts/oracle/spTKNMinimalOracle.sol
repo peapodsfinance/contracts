@@ -277,7 +277,8 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         }
         uint256 _pTknAmt =
             (_amtUnderlying * 10 ** IERC20Metadata(_pod).decimals()) / 10 ** IERC20Metadata(_underlying).decimals();
-        return IDecentralizedIndex(_pod).convertToAssets(_pTknAmt);
+        return (IDecentralizedIndex(_pod).convertToAssets(_pTknAmt) * 10000)
+            / (10000 - IDecentralizedIndex(_pod).DEBOND_FEE());
     }
 
     function _accountForUnwrapFeeInPrice(address _pod, uint256 _currentPrice)

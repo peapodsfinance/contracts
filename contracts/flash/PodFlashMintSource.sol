@@ -12,7 +12,7 @@ contract PodFlashMintSource is FlashSourceBase, IFlashLoanRecipient {
 
     address public immutable override source;
     address public immutable override paymentToken;
-    uint256 public override paymentAmount;
+    uint256 public immutable override paymentAmount;
 
     constructor(address _pod, address _lvfMan) FlashSourceBase(_lvfMan) {
         source = _pod;
