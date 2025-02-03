@@ -245,9 +245,10 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         }
     }
 
+    // final price with pod as baseTkn = price * baseCbr / (1 - basePodWrapFee)
     function _checkAndHandleBaseTokenPodConfig(uint256 _currentPrice18) internal view returns (uint256 _finalPrice18) {
         _finalPrice18 = _accountForCBRInPrice(BASE_TOKEN, address(0), _currentPrice18);
-        _finalPrice18 = _accountForWrapFeeInPrice(BASE_TOKEN, _finalPrice18);
+        _finalPrice18 = (_finalPrice18 * 10000) / (10000 - IDecentralizedIndex(BASE_TOKEN).BOND_FEE());
     }
 
     function _chainlinkBasePerPaired18() internal view returns (uint256 _price18) {
@@ -288,11 +289,6 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     {
         uint16 _unwrapFee = IDecentralizedIndex(_pod).DEBOND_FEE();
         _newPrice = _currentPrice - (_currentPrice * _unwrapFee) / 10000;
-    }
-
-    function _accountForWrapFeeInPrice(address _pod, uint256 _currentPrice) internal view returns (uint256 _newPrice) {
-        uint16 _wrapFee = IDecentralizedIndex(_pod).BOND_FEE();
-        _newPrice = _currentPrice - (_currentPrice * _wrapFee) / 10000;
     }
 
     function _sqrt(uint256 x) private pure returns (uint256 y) {
