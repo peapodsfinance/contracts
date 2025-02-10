@@ -158,6 +158,10 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     /// @param _amount Amount of pTKN being transferred
     function _update(address _from, address _to, uint256 _amount) internal override {
         require(!_blacklist[_to], "BK");
+        if (_from == address(0) || _to == address(0)) {
+            super._update(_from, _to, _amount);
+            return;
+        }
         bool _buy = _from == V2_POOL && _to != V2_ROUTER;
         bool _sell = _to == V2_POOL;
         uint256 _fee;
@@ -424,13 +428,16 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     function flashMint(address _recipient, uint256 _amount, bytes calldata _data) external override lock {
         _shortCircuitRewards = 1;
         uint256 _fee = _amount / 1000;
+        _fee = _fee == 0 ? 1 : _fee;
+
+        uint256 _balance = balanceOf(address(this));
         _mint(_recipient, _amount);
         IFlashLoanRecipient(_recipient).callback(_data);
-        // Make sure the calling user pays fee of 0.1% more than they flash minted to recipient
-        _burn(_recipient, _amount);
-        // only adjust _totalSupply by fee amt since we didn't add to supply at mint during flash mint
-        _totalSupply -= _fee == 0 ? 1 : _fee;
-        _burn(_msgSender(), _fee == 0 ? 1 : _fee);
+        // recipient should have transferred pTKN back here to burn
+        require(balanceOf(address(this)) >= _balance + _amount + _fee, "FMA");
+        // only adjust _totalSupply by fee since we didn't add to supply at mint during flash mint
+        _totalSupply -= _fee;
+        _burn(address(this), _amount + _fee);
         _shortCircuitRewards = 0;
         emit FlashMint(_msgSender(), _recipient, _amount);
     }

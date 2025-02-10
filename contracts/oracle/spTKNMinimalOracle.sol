@@ -53,8 +53,19 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
 
     uint32 twapInterval = 10 minutes;
 
-    event SetSpTknAndDependencies(address _pod);
+    // errors
+    error InvalidTwapInterval();
+    error NoPriceAvailableFromSources();
+    error NotValidSpTkn();
+    error OnlyOneOrNoBaseConversionsRequired();
+    error PodLocked();
+    error PrimaryOracleNotPresent();
+    error QuoteAndBaseChainlinkFeedsNotProvided();
+    error SpTknAlreadySet();
+    error UnableToPriceBasePerSpTkn();
 
+    // events
+    event SetSpTknAndDependencies(address _pod);
     event SetTwapInterval(uint32 oldMax, uint32 newMax);
 
     constructor(bytes memory _requiredImmutables, bytes memory _optionalImmutables) Ownable(_msgSender()) {
@@ -80,13 +91,24 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         ) = abi.decode(_optionalImmutables, (address, address, address, address, address, address));
         V2_RESERVES = IV2Reserves(_v2Reserves);
 
+        if (
+            UNDERLYING_TKN_CL_POOL == address(0) && CHAINLINK_BASE_PRICE_FEED == address(0)
+                && CHAINLINK_QUOTE_PRICE_FEED == address(0)
+        ) {
+            revert PrimaryOracleNotPresent();
+        }
+        if (
+            (CHAINLINK_QUOTE_PRICE_FEED != address(0) && CHAINLINK_BASE_PRICE_FEED == address(0))
+                || (CHAINLINK_QUOTE_PRICE_FEED == address(0) && CHAINLINK_BASE_PRICE_FEED != address(0))
+        ) {
+            revert QuoteAndBaseChainlinkFeedsNotProvided();
+        }
+
         // only one (or neither) of the base conversion config should be populated
         address _baseConvFinal =
             BASE_CONVERSION_DIA_FEED != address(0) ? BASE_CONVERSION_DIA_FEED : BASE_CONVERSION_CL_POOL;
-        require(BASE_CONVERSION_CHAINLINK_FEED == address(0) || _baseConvFinal == address(0), "CONV");
-
-        if (CHAINLINK_QUOTE_PRICE_FEED != address(0)) {
-            require(CHAINLINK_BASE_PRICE_FEED != address(0), "BCLF");
+        if (BASE_CONVERSION_CHAINLINK_FEED != address(0) && _baseConvFinal != address(0)) {
+            revert OnlyOneOrNoBaseConversionsRequired();
         }
 
         address _baseInCl = BASE_TOKEN;
@@ -117,10 +139,13 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         override
         returns (bool _isBadData, uint256 _priceLow, uint256 _priceHigh)
     {
-        uint256 _priceSpTKNBase = _calculateSpTknPerBase(0);
-        _isBadData = _priceSpTKNBase == 0;
+        uint256 _priceOne18;
         uint8 _baseDec = IERC20Metadata(BASE_TOKEN).decimals();
-        uint256 _priceOne18 = _priceSpTKNBase * 10 ** (_baseDec > 18 ? _baseDec - 18 : 18 - _baseDec);
+        if (UNDERLYING_TKN_CL_POOL != address(0)) {
+            uint256 _priceSpTKNBase = _calculateSpTknPerBase(0);
+            _isBadData = _priceSpTKNBase == 0;
+            _priceOne18 = _priceSpTKNBase * 10 ** (_baseDec > 18 ? _baseDec - 18 : 18 - _baseDec);
+        }
 
         uint256 _priceTwo18 = _priceOne18;
         if (CHAINLINK_BASE_PRICE_FEED != address(0) && CHAINLINK_QUOTE_PRICE_FEED != address(0)) {
@@ -130,9 +155,14 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
             _isBadData = _isBadData || _clPrice18 == 0;
         }
 
-        require(_priceOne18 != 0 || _priceTwo18 != 0, "BZ");
+        if (_priceOne18 == 0 && _priceTwo18 == 0) {
+            revert NoPriceAvailableFromSources();
+        }
 
-        if (_priceTwo18 == 0) {
+        if (_priceOne18 == 0) {
+            _priceLow = _priceTwo18;
+            _priceHigh = _priceTwo18;
+        } else if (_priceTwo18 == 0) {
             _priceLow = _priceOne18;
             _priceHigh = _priceOne18;
         } else {
@@ -151,9 +181,14 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         uint256 _kDec = 10 ** IERC20Metadata(IUniswapV2Pair(_pair).token0()).decimals()
             * 10 ** IERC20Metadata(IUniswapV2Pair(_pair).token1()).decimals();
         uint256 _avgBaseAssetInLp18 = _sqrt((_priceBasePerPTkn18 * _k) / _kDec) * 10 ** (18 / 2);
-        uint256 _basePerSpTkn18 =
-            (2 * _avgBaseAssetInLp18 * 10 ** IERC20Metadata(_pair).decimals()) / IERC20(_pair).totalSupply();
-        require(_basePerSpTkn18 > 0, "V2R");
+        uint256 _pairSupply = IERC20(_pair).totalSupply();
+        if (_pairSupply == 0) {
+            return 0;
+        }
+        uint256 _basePerSpTkn18 = (2 * _avgBaseAssetInLp18 * 10 ** IERC20Metadata(_pair).decimals()) / _pairSupply;
+        if (_basePerSpTkn18 == 0) {
+            revert UnableToPriceBasePerSpTkn();
+        }
         _spTknBasePrice18 = 10 ** (18 * 2) / _basePerSpTkn18;
 
         // if the base asset is a pod, we will assume that the CL/chainlink pool(s) are
@@ -210,9 +245,10 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         }
     }
 
+    // final price with pod as baseTkn = price * baseCbr / (1 - basePodWrapFee)
     function _checkAndHandleBaseTokenPodConfig(uint256 _currentPrice18) internal view returns (uint256 _finalPrice18) {
         _finalPrice18 = _accountForCBRInPrice(BASE_TOKEN, address(0), _currentPrice18);
-        _finalPrice18 = _accountForUnwrapFeeInPrice(BASE_TOKEN, _finalPrice18);
+        _finalPrice18 = (_finalPrice18 * 10000) / (10000 - IDecentralizedIndex(BASE_TOKEN).BOND_FEE());
     }
 
     function _chainlinkBasePerPaired18() internal view returns (uint256 _price18) {
@@ -233,14 +269,17 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         view
         returns (uint256)
     {
-        require(IDecentralizedIndex(_pod).unlocked() == 1, "OU");
+        if (IDecentralizedIndex(_pod).unlocked() != 1) {
+            revert PodLocked();
+        }
         if (_underlying == address(0)) {
             IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_pod).getAllAssets();
             _underlying = _assets[0].token;
         }
         uint256 _pTknAmt =
             (_amtUnderlying * 10 ** IERC20Metadata(_pod).decimals()) / 10 ** IERC20Metadata(_underlying).decimals();
-        return IDecentralizedIndex(_pod).convertToAssets(_pTknAmt);
+        return (IDecentralizedIndex(_pod).convertToAssets(_pTknAmt) * 10000)
+            / (10000 - IDecentralizedIndex(_pod).DEBOND_FEE());
     }
 
     function _accountForUnwrapFeeInPrice(address _pod, uint256 _currentPrice)
@@ -265,7 +304,9 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         if (address(_spTkn) == address(0)) {
             return;
         }
-        require(address(spTkn) == address(0), "S");
+        if (address(spTkn) != address(0)) {
+            revert SpTknAlreadySet();
+        }
         spTkn = _spTkn;
         pod = IStakingPoolToken(spTkn).INDEX_FUND();
         IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(pod).getAllAssets();
@@ -274,12 +315,16 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     }
 
     function setSpTknAndDependencies(address _spTkn) external onlyOwner {
-        require(address(_spTkn) != address(0), "INP");
+        if (address(_spTkn) == address(0)) {
+            revert NotValidSpTkn();
+        }
         _setSpTknAndDependencies(_spTkn);
     }
 
     function setTwapInterval(uint32 _interval) external onlyOwner {
-        require(_interval > 0, "Z");
+        if (_interval == 0) {
+            revert InvalidTwapInterval();
+        }
         uint32 _oldInterval = twapInterval;
         twapInterval = _interval;
         emit SetTwapInterval(_oldInterval, _interval);
