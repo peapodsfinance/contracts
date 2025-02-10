@@ -31,6 +31,8 @@ interface ILeverageManager {
 
     event RemoveLeverage(uint256 indexed positionId, address indexed user, uint256 collateralAmt);
 
+    event SetPositionsNFT(address oldPosNFT, address newPosNFT);
+
     event SetIndexUtils(address oldIdxUtils, address newIdxUtils);
 
     event SetFeeReceiver(address oldReceiver, address newReceiver);
@@ -39,12 +41,9 @@ interface ILeverageManager {
 
     event SetCloseFeePerc(uint16 oldFee, uint16 newFee);
 
-    function initializePosition(
-        address _pod,
-        address _recipient,
-        address _overrideLendingPair,
-        bool _hasSelfLendingPairPod
-    ) external returns (uint256 _positionId);
+    function initializePosition(address _pod, address _recipient, bool _hasSelfLendingPairPod)
+        external
+        returns (uint256 _positionId);
 
     function addLeverage(
         uint256 _positionId,
@@ -67,13 +66,5 @@ interface ILeverageManager {
         bytes memory _config
     ) external;
 
-    function removeLeverage(
-        uint256 _positionId,
-        uint256 _borrowAssetAmt,
-        uint256 _collateralAssetAmtRemove,
-        uint256 _podAmtMin,
-        uint256 _pairedAssetAmtMin,
-        uint256 _podSwapAmtOutMin,
-        uint256 _userProvidedDebtAmtMax
-    ) external;
+    function removeLeverage(uint256 _positionId, uint256 _borrowAssetAmt, bytes memory _remLevConfig) external;
 }

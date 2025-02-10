@@ -374,7 +374,7 @@ contract FraxlendPairHandler is Properties {
     function fraxPair_liquidate(uint256 positionIdSeed, uint128 shares) public {
         // PRE-CONDITIONS
         LiquidateTemps memory cache;
-        cache.positionNFT = _leverageManager.positionNFT();
+        cache.positionNFT = LeveragePositions(address(_leverageManager.positionNFT()));
         cache.positionId = fl.clamp(positionIdSeed, 0, cache.positionNFT.totalSupply());
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
         (cache.podAddress, cache.lendingPair, cache.custodian,,) = _leverageManager.positionProps(cache.positionId);

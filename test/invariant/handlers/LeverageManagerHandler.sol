@@ -40,7 +40,6 @@ contract LeverageManagerHandler is Properties {
         try _leverageManager.initializePosition(
             address(cache.pod),
             cache.user,
-            address(0), // change for self-lending
             false // change for self-lending
         ) {} catch {
             fl.t(false, "INIT POSITION FAILED");
@@ -67,7 +66,7 @@ contract LeverageManagerHandler is Properties {
     function leverageManager_addLeverage(uint256 positionIdSeed, uint256 podAmount, uint256 pairedLpAmount) public {
         // PRE-CONDITIONS
         AddLeverageTemps memory cache;
-        cache.positionNFT = _leverageManager.positionNFT();
+        cache.positionNFT = LeveragePositions(address(_leverageManager.positionNFT()));
         cache.positionId = fl.clamp(positionIdSeed, 0, cache.positionNFT.totalSupply());
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
         (cache.podAddress, cache.lendingPair, cache.custodian,,) = _leverageManager.positionProps(cache.positionId);
@@ -201,7 +200,7 @@ contract LeverageManagerHandler is Properties {
     ) public {
         // PRE-CONDITIONS
         RemoveLeverageTemps memory cache;
-        cache.positionNFT = _leverageManager.positionNFT();
+        cache.positionNFT = LeveragePositions(address(_leverageManager.positionNFT()));
         cache.positionId = fl.clamp(positionIdSeed, 0, cache.positionNFT.totalSupply());
         cache.user = cache.positionNFT.ownerOf(cache.positionId);
         (cache.podAddress, cache.lendingPair, cache.custodian,, cache.hasSelfLendingPairPod) =
@@ -261,7 +260,9 @@ contract LeverageManagerHandler is Properties {
 
         // ACTION
         vm.prank(cache.user);
-        try _leverageManager.removeLeverage(cache.positionId, borrowAssets, collateralAmount, 0, 0, 0, userDebtRepay) {
+        try _leverageManager.removeLeverage(
+            cache.positionId, borrowAssets, abi.encode(collateralAmount, 0, 0, 0, userDebtRepay)
+        ) {
             // POST-CONDITIONS
             __afterLM(
                 cache.lendingPair,

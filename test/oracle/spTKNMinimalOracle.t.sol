@@ -263,7 +263,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     function test_getPrices_BTCUSDC() public {
         address _usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
         address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 20, 0); // $20 pOHM, $1 USDC, 20/1 = 20
+        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 25, 0); // $25 pOHM, $1 USDC, 25/1 = 25
         spTKNMinimalOracle oracleBTCUSDC = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),
@@ -360,7 +360,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     function test_getPrices_BTCUSDC_ChainlinkOnly() public {
         address _usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
         address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 20, 0); // $20 pOHM, $1 USDC, 20/1 = 20
+        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 25, 0); // $25 pOHM, $1 USDC, 25/1 = 25
         spTKNMinimalOracle oracleBTCUSDC = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),
@@ -407,7 +407,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     function test_getPrices_BTCUSDC_BTCWETH_ClPool() public {
         address _usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
         address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 23, 0); // $23 pOHM, $1 USDC, 23/1 = 21
+        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 25, 0); // $25 pOHM, $1 USDC, 25/1 = 25
         spTKNMinimalOracle oracleBTCUSDC1 = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),
@@ -491,7 +491,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     function test_getPrices_BTCWETH() public {
         address weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
         address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, weth, 0, 120); // $2600 ETH, $22 pOHM, 2600/22 = 120
+        address _newPod = _dupPodAndSeedLp(_podToDup, weth, 0, 108); // $2700 ETH, $25 pOHM, 2700/25 = 108
         spTKNMinimalOracle oracleBTCWETH = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),
@@ -567,13 +567,54 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         IERC20(wbtc).approve(_newPod, 1e18);
         IDecentralizedIndex(_newPod).bond(wbtc, 1e18, 0);
         vm.expectRevert(spTKNMinimalOracle.PodLocked.selector);
-        IDecentralizedIndex(_newPod).flashMint(address(this), 1e18, abi.encode(address(oracleBTCWETH)));
+        IDecentralizedIndex(_newPod).flashMint(
+            address(this), 1e18, abi.encode(_newPod, address(oracleBTCWETH), uint256(1e18))
+        );
+    }
+
+    function test_getPrices_BTCWETH_PassesIfBaseTknFlashMinted() public {
+        address wbtc = 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599;
+        address weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+        address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
+        address _newBasePod = _dupPodAndSeedLp(_podToDup, weth, 0, 120); // $2600 ETH, $22 pOHM, 2600/22 = 120
+        address _newPod = _dupPodAndSeedLp(_podToDup, _newBasePod, 0, 120); // $2600 ETH, $22 pOHM, 2600/22 = 120
+
+        spTKNMinimalOracle oracleBTCWETH = new spTKNMinimalOracle(
+            abi.encode(
+                address(_clOracle),
+                address(_uniOracle),
+                address(_diaOracle),
+                _newBasePod,
+                true,
+                false,
+                IDecentralizedIndex(_newPod).lpStakingPool(),
+                0x4585FE77225b41b697C938B018E2Ac67Ac5a20c0 // UniV3: WBTC / WETH
+            ),
+            abi.encode(
+                address(0),
+                address(0),
+                address(0),
+                0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419, // CL: ETH / USD
+                0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // CL: BTC / USD
+                address(_v2Res)
+            )
+        );
+
+        // wrap into the pod for the flashMint fee
+        deal(wbtc, address(this), 2e18);
+        IERC20(wbtc).approve(_newBasePod, 2e18);
+        IDecentralizedIndex(_newBasePod).bond(wbtc, 2e18, 0);
+        // should pass without revert
+        IDecentralizedIndex(_newBasePod).flashMint(
+            address(this), 1e18, abi.encode(_newBasePod, address(oracleBTCWETH), 1e18)
+        );
     }
 
     // needed for flashMint test to test locked state and revert
-    function callback(bytes calldata _data) external view {
-        address _oracle = abi.decode(_data, (address));
+    function callback(bytes calldata _data) external {
+        (address _pod, address _oracle, uint256 _amt) = abi.decode(_data, (address, address, uint256));
         spTKNMinimalOracle(_oracle).getPrices();
+        IERC20(_pod).transfer(_pod, _amt + _amt / 1000);
     }
 
     function _getUnsafeSpTknPrice18(address _oracle) internal view returns (uint256 _unsafePrice18) {

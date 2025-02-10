@@ -39,10 +39,11 @@ import "../../contracts/interfaces/IUniswapV2Router02.sol";
 import "../../contracts/interfaces/IV3TwapUtilities.sol";
 
 import {PodHelperTest} from "./PodHelper.t.sol";
+import {LVFHelper} from "./LVFHelper.t.sol";
 
 import {console} from "forge-std/console.sol";
 
-contract LivePOC is PodHelperTest {
+contract LivePOC is PodHelperTest, LVFHelper {
     FraxlendPairDeployer deployer;
     FraxlendPair pair;
     ERC20 DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
@@ -159,7 +160,8 @@ contract LivePOC is PodHelperTest {
         spTkn = pod.lpStakingPool();
         aspTkn = new AutoCompoundingPodLp("aspTkn", "aspTkn", false, pod, dexAdapter, idxUtils);
 
-        leverageManager = new LeverageManager("Leverage Position", "LP", idxUtils);
+        leverageManager =
+            LeverageManager(_deployLeverageManager("Leverage Position", "LP", address(idxUtils), address(this)));
         flashSource = new BalancerFlashSource(address(leverageManager));
 
         // PART 2

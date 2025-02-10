@@ -14,7 +14,7 @@ interface IDecentralizedIndex is IERC20 {
         address partner;
         uint256 debondCooldown;
         bool hasTransferTax;
-        bool blacklistTKNpTKNPoolV2;
+        bool blacklistTKNpTKNPoolV2; // DEPRECATED: we should remove this in future versions
     }
 
     // all fees: 1 == 0.01%, 10 == 0.1%, 100 == 1%
@@ -39,6 +39,19 @@ interface IDecentralizedIndex is IERC20 {
     /// @param newIdx The CA of the new index contract
     /// @param wallet The creator of the new index
     event Create(address indexed newIdx, address indexed wallet);
+
+    /// @notice The ```FlashLoan``` event fires when someone flash loans assets from the pod
+    /// @param executor The sender of the request
+    /// @param recipient The recipient of the flashed funds
+    /// @param token The token being flash loaned
+    /// @param amount The amount of token to flash loan
+    event FlashLoan(address indexed executor, address indexed recipient, address token, uint256 amount);
+
+    /// @notice The ```FlashMint``` event fires when someone flash mints pTKN from the pod
+    /// @param executor The sender of the request
+    /// @param recipient The recipient of the flashed funds
+    /// @param amount The amount of pTKN to flash mint
+    event FlashMint(address indexed executor, address indexed recipient, uint256 amount);
 
     /// @notice The ```Initialize``` event fires when the new pod has been initialized,
     /// @notice which is at creation on some and in another txn for others (gas limits)
@@ -89,6 +102,8 @@ interface IDecentralizedIndex is IERC20 {
 
     function unlocked() external view returns (uint8);
 
+    function isFlashMinting() external view returns (uint8);
+
     function indexType() external view returns (IndexType);
 
     function created() external view returns (uint256);
@@ -96,8 +111,6 @@ interface IDecentralizedIndex is IERC20 {
     function lpStakingPool() external view returns (address);
 
     function lpRewardsToken() external view returns (address);
-
-    function partner() external view returns (address);
 
     function isAsset(address token) external view returns (bool);
 
@@ -114,6 +127,8 @@ interface IDecentralizedIndex is IERC20 {
     function convertToShares(uint256 assets) external view returns (uint256 shares);
 
     function convertToAssets(uint256 shares) external view returns (uint256 assets);
+
+    function convertToAssetsPreFlashMint(uint256 shares) external view returns (uint256 assets);
 
     function setup() external;
 

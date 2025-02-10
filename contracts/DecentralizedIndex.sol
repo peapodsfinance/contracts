@@ -46,7 +46,7 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     IndexAssetInfo[] public indexTokens;
     mapping(address => bool) _isTokenInIndex;
     mapping(address => uint8) _fundTokenIdx;
-    mapping(address => bool) _blacklist;
+    mapping(address => bool) _blacklist; // DEPRECATED: remove in future versions, DO NOT remove until redeploy beacon to prevent breaking current proxy storage
     mapping(address => uint256) _totalAssets;
     uint256 _totalSupply;
     uint64 _partnerFirstWrapped;
@@ -56,8 +56,9 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     uint8 _shortCircuitRewards;
     bool _isSetup;
 
-    event FlashLoan(address indexed executor, address indexed recipient, address token, uint256 amount);
-    event FlashMint(address indexed executor, address indexed recipient, uint256 amount);
+    uint8 public override isFlashMinting;
+    uint256 _totalAssets0PreFlashMint;
+    uint256 _totalSupplyPreFlashMint;
 
     modifier lock() {
         require(unlocked == 1, "L");
@@ -206,7 +207,7 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
             _lastSwap = uint64(block.timestamp);
             uint256 _totalAmt = _bal > _max ? _max : _bal;
             uint256 _partnerAmt;
-            if (_fees.partner > 0 && _config.partner != address(0) && !_blacklist[_config.partner]) {
+            if (_fees.partner > 0 && _config.partner != address(0)) {
                 _partnerAmt = (_totalAmt * _fees.partner) / DEN;
                 super._update(address(this), _config.partner, _partnerAmt);
             }
@@ -290,10 +291,6 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     function processPreSwapFeesAndSwap() external override lock {
         require(_msgSender() == IStakingPoolToken(lpStakingPool).POOL_REWARDS(), "R");
         _processPreSwapFeesAndSwap();
-    }
-
-    function partner() external view override returns (address) {
-        return _config.partner;
     }
 
     function BOND_FEE() external view override returns (uint16) {
@@ -426,7 +423,11 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     /// @param _amount Number of pTKN to receive/mint
     /// @param _data Any data the recipient wants to be passed on the flash mint callback
     function flashMint(address _recipient, uint256 _amount, bytes calldata _data) external override lock {
+        isFlashMinting = 1;
         _shortCircuitRewards = 1;
+        _totalAssets0PreFlashMint = _totalAssets[indexTokens[0].token];
+        _totalSupplyPreFlashMint = _totalSupply;
+
         uint256 _fee = _amount / 1000;
         _fee = _fee == 0 ? 1 : _fee;
 
@@ -438,7 +439,11 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
         // only adjust _totalSupply by fee since we didn't add to supply at mint during flash mint
         _totalSupply -= _fee;
         _burn(address(this), _amount + _fee);
+
+        _totalAssets0PreFlashMint = 0;
+        _totalSupplyPreFlashMint = 0;
         _shortCircuitRewards = 0;
+        isFlashMinting = 0;
         emit FlashMint(_msgSender(), _recipient, _amount);
     }
 

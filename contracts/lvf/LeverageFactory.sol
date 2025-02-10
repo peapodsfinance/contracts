@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/IDecentralizedIndex.sol";
 import "../interfaces/IDexAdapter.sol";
+import "../interfaces/IFraxlendPair.sol";
 import "../interfaces/IIndexManager.sol";
 import "../interfaces/IIndexUtils.sol";
 import "../interfaces/ILeverageManager.sol";
@@ -58,6 +59,8 @@ interface IFraxlendPairFactory {
 contract LeverageFactory is Ownable {
     using SafeERC20 for IERC20;
 
+    address public indexUtils;
+    address public dexAdapter;
     address public indexManager;
     address public leverageManager;
     address public aspTknFactory;
@@ -67,13 +70,15 @@ contract LeverageFactory is Ownable {
 
     event AddLvfSupportForPod(address _pod, address _aspTkn, address _aspTknOracle, address _lendingPair);
 
-    event CreateSelfLendingPod(address _pod, address _aspTkn, address _aspTknOracle, address _lendingPair);
+    event CreateLvfPod(address _pod, address _aspTkn, address _aspTknOracle, address _lendingPair);
 
     event SetAspOwnershipTransfer(address _prevOwner, address _newOwner);
 
     event TransferContractOwnership(address _ownable, address _currentOwner, address _newOwner);
 
     constructor(
+        address _indexUtils,
+        address _dexAdapter,
         address _indexManager,
         address _leverageManager,
         address _aspTknFactory,
@@ -82,43 +87,61 @@ contract LeverageFactory is Ownable {
         address _aspOwnershipTransfer
     ) Ownable(_msgSender()) {
         _setLevMgrAndFactories(
-            _indexManager, _leverageManager, _aspTknFactory, _aspTknOracleFactory, _fraxlendPairFactory
+            _indexUtils,
+            _dexAdapter,
+            _indexManager,
+            _leverageManager,
+            _aspTknFactory,
+            _aspTknOracleFactory,
+            _fraxlendPairFactory
         );
         aspOwnershipTransfer = _aspOwnershipTransfer;
     }
 
-    function createSelfLendingPodAndAddLvf(
+    function createPodAndAddLvfSupport(
         address _borrowTkn,
-        address _dexAdapter,
-        address _indexUtils,
         bytes memory _podConstructorArgs,
         bytes memory _aspTknOracleRequiredImmutables,
         bytes memory _aspTknOracleOptionalImmutables,
-        bytes memory _fraxlendPairConfigData
+        bytes memory _fraxlendPairConfigData,
+        bool _isSelfLending
     ) external returns (address _newPod, address _aspTkn, address _aspTknOracle, address _fraxlendPair) {
         require(ILeverageManagerAccessControl(leverageManager).flashSource(_borrowTkn) != address(0), "FS1");
 
-        address _aspTknAddy =
-            _getOrCreateAspTkn(_podConstructorArgs, "", "", address(0), _dexAdapter, _indexUtils, true, true);
+        address _aspTknAddy = _getOrCreateAspTkn(
+            _podConstructorArgs, "", "", address(0), dexAdapter, indexUtils, _isSelfLending, _isSelfLending
+        );
         _aspTknOracle = IAspTknOracleFactory(aspTknOracleFactory).create(
             _aspTknAddy, _aspTknOracleRequiredImmutables, _aspTknOracleOptionalImmutables, 0
         );
         _fraxlendPair = _createFraxlendPair(_borrowTkn, _aspTknAddy, _aspTknOracle, _fraxlendPairConfigData);
-        _newPod = _createSelfLendingPod(_fraxlendPair, _podConstructorArgs);
+        _newPod = _createPodWithArgs(_podConstructorArgs, _isSelfLending ? _fraxlendPair : address(0));
 
-        _aspTkn = _getOrCreateAspTkn(_podConstructorArgs, "", "", address(0), _dexAdapter, _indexUtils, true, false);
-        require(_aspTkn == _aspTknAddy, "ASP");
+        if (_isSelfLending) {
+            _aspTkn = _getOrCreateAspTkn(
+                _podConstructorArgs, "", "", address(0), dexAdapter, indexUtils, _isSelfLending, false
+            );
+            require(_aspTkn == _aspTknAddy, "ASP");
+        } else {
+            _aspTkn = _aspTknAddy;
+        }
         IAspTkn(_aspTkn).setPod(IDecentralizedIndex(_newPod));
         Ownable(_aspTkn).transferOwnership(aspOwnershipTransfer);
         IAspTknOracle(_aspTknOracle).setSpTknAndDependencies(IDecentralizedIndex(_newPod).lpStakingPool());
 
-        emit CreateSelfLendingPod(_newPod, _aspTkn, _aspTknOracle, _fraxlendPair);
+        // for not self-lending, turn on LVF
+        _setLendingPairInLevMgr(_newPod, _fraxlendPair);
+
+        IFraxlendPair(_fraxlendPair).addInterest(false);
+        // NOTE: don't update exchange rate yet because the uniswap V2 pair has no
+        // supply yet, so there technically is no exchange rate to set yet
+        // IFraxlendPair(_fraxlendPair).updateExchangeRate();
+
+        emit CreateLvfPod(_newPod, _aspTkn, _aspTknOracle, _fraxlendPair);
     }
 
     function addLvfSupportForPod(
         address _pod,
-        address _dexAdapter,
-        address _indexUtils,
         bytes memory _aspTknOracleRequiredImmutables,
         bytes memory _aspTknOracleOptionalImmutables,
         bytes memory _fraxlendPairConfigData
@@ -132,7 +155,7 @@ contract LeverageFactory is Ownable {
             IERC20(_spTkn).safeIncreaseAllowance(aspTknFactory, _aspMinDep);
         }
         _aspTkn = _getOrCreateAspTkn(
-            "", IERC20Metadata(_pod).name(), IERC20Metadata(_pod).symbol(), _pod, _dexAdapter, _indexUtils, false, false
+            "", IERC20Metadata(_pod).name(), IERC20Metadata(_pod).symbol(), _pod, dexAdapter, indexUtils, false, false
         );
         _aspTknOracle = IAspTknOracleFactory(aspTknOracleFactory).create(
             _aspTkn, _aspTknOracleRequiredImmutables, _aspTknOracleOptionalImmutables, 0
@@ -140,7 +163,7 @@ contract LeverageFactory is Ownable {
         _fraxlendPair = _createFraxlendPair(_borrowTkn, _aspTkn, _aspTknOracle, _fraxlendPairConfigData);
 
         // this effectively is what "turns on" LVF for the pair
-        ILeverageManagerAccessControl(leverageManager).setLendingPair(_pod, _fraxlendPair);
+        _setLendingPairInLevMgr(_pod, _fraxlendPair);
 
         emit AddLvfSupportForPod(_pod, _aspTkn, _aspTknOracle, _fraxlendPair);
     }
@@ -152,6 +175,8 @@ contract LeverageFactory is Ownable {
     }
 
     function setLevMgrAndFactories(
+        address _indexUtils,
+        address _dexAdapter,
         address _indexManager,
         address _leverageManager,
         address _aspTknFactory,
@@ -159,7 +184,13 @@ contract LeverageFactory is Ownable {
         address _fraxlendPairFactory
     ) external onlyOwner {
         _setLevMgrAndFactories(
-            _indexManager, _leverageManager, _aspTknFactory, _aspTknOracleFactory, _fraxlendPairFactory
+            _indexUtils,
+            _dexAdapter,
+            _indexManager,
+            _leverageManager,
+            _aspTknFactory,
+            _aspTknOracleFactory,
+            _fraxlendPairFactory
         );
     }
 
@@ -167,6 +198,10 @@ contract LeverageFactory is Ownable {
         address _current = aspOwnershipTransfer;
         aspOwnershipTransfer = _newOwner;
         emit SetAspOwnershipTransfer(_current, _newOwner);
+    }
+
+    function _setLendingPairInLevMgr(address _pod, address _fraxlendPair) internal {
+        ILeverageManagerAccessControl(leverageManager).setLendingPair(_pod, _fraxlendPair);
     }
 
     function _buildFinalFraxlendConfigData(
@@ -180,9 +215,10 @@ contract LeverageFactory is Ownable {
             address _rateContract,
             uint64 _fullUtilizationRate,
             uint256 _maxLTV,
-            uint256 _liquidationFee,
+            uint256 _cleanLiquidationFee,
+            uint256 _dirtyLiquidationFee,
             uint256 _protocolLiquidationFee
-        ) = abi.decode(_providedData, (uint32, address, uint64, uint256, uint256, uint256));
+        ) = abi.decode(_providedData, (uint32, address, uint64, uint256, uint256, uint256, uint256));
         _finalConfigData = abi.encode(
             _borrowTkn,
             _aspTkn,
@@ -191,7 +227,8 @@ contract LeverageFactory is Ownable {
             _rateContract,
             _fullUtilizationRate,
             _maxLTV,
-            _liquidationFee,
+            _cleanLiquidationFee,
+            _dirtyLiquidationFee,
             _protocolLiquidationFee
         );
     }
@@ -223,7 +260,7 @@ contract LeverageFactory is Ownable {
         bool _onlyComputeAddress
     ) internal returns (address _aspTkn) {
         if (_podConstructorArgs.length > 0) {
-            (_podName, _podSymbol,,) = abi.decode(_podConstructorArgs, (string, string, bytes, bytes));
+            (_podName, _podSymbol,,,) = abi.decode(_podConstructorArgs, (string, string, bytes, bytes, address));
         }
         string memory _aspName = string.concat("Auto Compounding LP for ", _podName);
         string memory _aspSymbol = string.concat("as", _podSymbol);
@@ -250,18 +287,29 @@ contract LeverageFactory is Ownable {
         }
     }
 
-    function _createSelfLendingPod(address _fraxlendPair, bytes memory _podConstructorArgs)
+    function _createPodWithArgs(bytes memory _podConstructorArgs, address _overridePairedLpTkn)
         internal
         returns (address _newPod)
     {
-        (string memory indexName, string memory indexSymbol, bytes memory baseConfig, bytes memory immutables) =
-            abi.decode(_podConstructorArgs, (string, string, bytes, bytes));
+        (
+            string memory indexName,
+            string memory indexSymbol,
+            bytes memory baseConfig,
+            bytes memory immutables,
+            address owner
+        ) = abi.decode(_podConstructorArgs, (string, string, bytes, bytes, address));
         _newPod = IIndexManager(indexManager).deployNewIndex(
-            indexName, indexSymbol, baseConfig, _getNewPodImmutables(_fraxlendPair, immutables)
+            indexName,
+            indexSymbol,
+            baseConfig,
+            _overridePairedLpTkn == address(0)
+                ? immutables
+                : _getSelfLendingPodImmutables(_overridePairedLpTkn, immutables),
+            owner
         );
     }
 
-    function _getNewPodImmutables(address _fraxlendPair, bytes memory _immutables)
+    function _getSelfLendingPodImmutables(address _fraxlendPair, bytes memory _immutables)
         internal
         pure
         returns (bytes memory)
@@ -280,16 +328,20 @@ contract LeverageFactory is Ownable {
     }
 
     function _setLevMgrAndFactories(
+        address _indexUtils,
+        address _dexAdapter,
         address _indexManager,
         address _leverageManager,
         address _aspTknFactory,
         address _aspTknOracleFactory,
         address _fraxlendPairFactory
     ) internal {
-        indexManager = _indexManager;
-        leverageManager = _leverageManager;
-        aspTknFactory = _aspTknFactory;
-        aspTknOracleFactory = _aspTknOracleFactory;
-        fraxlendPairFactory = _fraxlendPairFactory;
+        indexUtils = _indexUtils == address(0) ? indexUtils : _indexUtils;
+        dexAdapter = _dexAdapter == address(0) ? dexAdapter : _dexAdapter;
+        indexManager = _indexManager == address(0) ? indexManager : _indexManager;
+        leverageManager = _leverageManager == address(0) ? leverageManager : _leverageManager;
+        aspTknFactory = _aspTknFactory == address(0) ? aspTknFactory : _aspTknFactory;
+        aspTknOracleFactory = _aspTknOracleFactory == address(0) ? aspTknOracleFactory : _aspTknOracleFactory;
+        fraxlendPairFactory = _fraxlendPairFactory == address(0) ? fraxlendPairFactory : _fraxlendPairFactory;
     }
 }

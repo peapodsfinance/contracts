@@ -128,7 +128,9 @@ contract IndexManagerTest is Test {
         weights[0] = 5000;
         weights[1] = 5000;
 
-        manager.deployNewIndex(name, symbol, abi.encode(config, fees, tokens, weights, address(0), false), "");
+        manager.deployNewIndex(
+            name, symbol, abi.encode(config, fees, tokens, weights, address(0), false), "", address(this)
+        );
 
         assertEq(manager.indexLength(), 1);
     }

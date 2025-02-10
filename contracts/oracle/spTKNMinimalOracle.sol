@@ -269,17 +269,22 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         view
         returns (uint256)
     {
-        if (IDecentralizedIndex(_pod).unlocked() != 1) {
-            revert PodLocked();
-        }
         if (_underlying == address(0)) {
             IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_pod).getAllAssets();
             _underlying = _assets[0].token;
         }
         uint256 _pTknAmt =
             (_amtUnderlying * 10 ** IERC20Metadata(_pod).decimals()) / 10 ** IERC20Metadata(_underlying).decimals();
-        return (IDecentralizedIndex(_pod).convertToAssets(_pTknAmt) * 10000)
-            / (10000 - IDecentralizedIndex(_pod).DEBOND_FEE());
+
+        uint256 _assetConv;
+        if (_pod == BASE_TOKEN && IDecentralizedIndex(_pod).isFlashMinting() == 1) {
+            _assetConv = IDecentralizedIndex(_pod).convertToAssetsPreFlashMint(_pTknAmt);
+        } else if (IDecentralizedIndex(_pod).unlocked() == 1) {
+            _assetConv = IDecentralizedIndex(_pod).convertToAssets(_pTknAmt);
+        } else {
+            revert PodLocked();
+        }
+        return (_assetConv * 10000) / (10000 - IDecentralizedIndex(_pod).DEBOND_FEE());
     }
 
     function _accountForUnwrapFeeInPrice(address _pod, uint256 _currentPrice)
