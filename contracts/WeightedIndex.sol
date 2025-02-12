@@ -14,8 +14,6 @@ import "./DecentralizedIndex.sol";
 contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex {
     using SafeERC20 for IERC20;
 
-    uint256 private _totalWeights;
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -47,6 +45,7 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
 
     function __WeightedIndex_init(address[] memory _tokens, uint256[] memory _weights) internal {
         require(_tokens.length == _weights.length, "V");
+        uint256 _totalWeights;
         uint256 _tl = _tokens.length;
         for (uint8 _i; _i < _tl; _i++) {
             require(!_isTokenInIndex[_tokens[_i]], "D");

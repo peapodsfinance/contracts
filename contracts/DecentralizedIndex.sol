@@ -56,9 +56,11 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
     uint8 _shortCircuitRewards;
     bool _isSetup;
 
-    uint8 public override isFlashMinting;
     uint256 _totalAssets0PreFlashMint;
     uint256 _totalSupplyPreFlashMint;
+    uint8 public override isFlashMinting;
+
+    uint256[50] private __gap; // reserved for future upgrades
 
     modifier lock() {
         require(unlocked == 1, "L");
