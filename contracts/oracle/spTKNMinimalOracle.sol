@@ -180,16 +180,16 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         uint256 _k = uint256(_reserve0) * _reserve1;
         uint256 _kDec = 10 ** IERC20Metadata(IUniswapV2Pair(_pair).token0()).decimals()
             * 10 ** IERC20Metadata(IUniswapV2Pair(_pair).token1()).decimals();
-        uint256 _avgBaseAssetInLp18 = _sqrt((_priceBasePerPTkn18 * _k) / _kDec) * 10 ** (18 / 2);
+        uint256 _avgBaseAssetInLp27 = _sqrt((_priceBasePerPTkn18 * _k) / _kDec) * 10 ** 18;
         uint256 _pairSupply = IERC20(_pair).totalSupply();
         if (_pairSupply == 0) {
             return 0;
         }
-        uint256 _basePerSpTkn18 = (2 * _avgBaseAssetInLp18 * 10 ** IERC20Metadata(_pair).decimals()) / _pairSupply;
-        if (_basePerSpTkn18 == 0) {
+        uint256 _basePerSpTkn27 = (2 * _avgBaseAssetInLp27 * 10 ** IERC20Metadata(_pair).decimals()) / _pairSupply;
+        if (_basePerSpTkn27 == 0) {
             revert UnableToPriceBasePerSpTkn();
         }
-        _spTknBasePrice18 = 10 ** (18 * 2) / _basePerSpTkn18;
+        _spTknBasePrice18 = 10 ** (27 + 18) / _basePerSpTkn27;
 
         // if the base asset is a pod, we will assume that the CL/chainlink pool(s) are
         // pricing the underlying asset of the base asset pod, and therefore we will
