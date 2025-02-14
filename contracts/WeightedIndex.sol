@@ -103,26 +103,27 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
     /// @param _shares Number of pTKN to burn
     /// @return _assets Number of TKN[0] to be returned to user from pod
     function convertToAssets(uint256 _shares) external view override returns (uint256 _assets) {
-        bool _firstIn = _isFirstIn();
-        uint256 _percSharesX96_2 = _firstIn ? 2 ** (96 / 2) : (_shares * 2 ** (96 / 2)) / _totalSupply;
-        if (_firstIn) {
-            _assets = (indexTokens[0].q1 * _percSharesX96_2) / FixedPoint96.Q96 / 2 ** (96 / 2);
-        } else {
-            _assets = (_totalAssets[indexTokens[0].token] * _percSharesX96_2) / 2 ** (96 / 2);
-        }
-        _assets -= ((_assets * _fees.debond) / DEN);
+        _assets = _convertToAssets(_shares, _totalAssets[indexTokens[0].token], _totalSupply);
     }
 
     /// @notice The ```convertToAssetsPreFlashMint``` function returns the number of TKN returned based on burning _shares pTKN excluding fees before a flash mint starts
     /// @param _shares Number of pTKN to burn
     /// @return _assets Number of TKN[0] to be returned to user from pod
     function convertToAssetsPreFlashMint(uint256 _shares) external view override returns (uint256 _assets) {
+        _assets = _convertToAssets(_shares, _totalAssets0PreFlashMint, _totalSupplyPreFlashMint);
+    }
+
+    function _convertToAssets(uint256 _shares, uint256 _localTotalAssets0, uint256 _localTotalSupply)
+        internal
+        view
+        returns (uint256 _assets)
+    {
         bool _firstIn = _isFirstIn();
-        uint256 _percSharesX96_2 = _firstIn ? 2 ** (96 / 2) : (_shares * 2 ** (96 / 2)) / _totalSupplyPreFlashMint;
+        uint256 _percSharesX96_2 = _firstIn ? 2 ** (96 / 2) : (_shares * 2 ** (96 / 2)) / _localTotalSupply;
         if (_firstIn) {
             _assets = (indexTokens[0].q1 * _percSharesX96_2) / FixedPoint96.Q96 / 2 ** (96 / 2);
         } else {
-            _assets = (_totalAssets0PreFlashMint * _percSharesX96_2) / 2 ** (96 / 2);
+            _assets = (_localTotalAssets0 * _percSharesX96_2) / 2 ** (96 / 2);
         }
         _assets -= ((_assets * _fees.debond) / DEN);
     }
