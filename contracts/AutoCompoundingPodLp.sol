@@ -60,7 +60,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     IIndexUtils public indexUtils;
     ISPTknOracle public podOracle; // oracle to price pTKN per base for slippage
     bool public yieldConvEnabled = true;
-    uint16 public protocolFee = 50; // 1000 precision
+    uint16 public protocolFee = 100; // 1000 precision
     uint256 public lpSlippage = 300;
     // token in => token out => swap pool(s)
     mapping(address => mapping(address => Pools)) public swapMaps;
@@ -214,6 +214,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         if (!yieldConvEnabled) {
             return _lpAmtOut;
         }
+        ITokenRewards(IStakingPoolToken(_asset()).POOL_REWARDS()).claimReward(address(this));
         address[] memory _tokens = ITokenRewards(IStakingPoolToken(_asset()).POOL_REWARDS()).getAllRewardsTokens();
         uint256 _len = _tokens.length + 1;
         for (uint256 _i; _i < _len; _i++) {
@@ -407,11 +408,11 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         }
     }
 
-    function withdrawProtocolFees() external onlyOwner {
+    function withdrawProtocolFees() external {
         require(_protocolFees > 0, "Z");
         uint256 _feesToPay = _protocolFees;
         _protocolFees = 0;
-        IERC20(pod.PAIRED_LP_TOKEN()).safeTransfer(_msgSender(), _feesToPay);
+        IERC20(pod.PAIRED_LP_TOKEN()).safeTransfer(owner(), _feesToPay);
         emit WithdrawProtocolFees(_feesToPay);
     }
 

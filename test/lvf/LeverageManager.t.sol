@@ -169,6 +169,13 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         );
         assertEq(IERC20(dai).balanceOf(ALICE), aliceAssetBalanceBefore, "Asset balance should not change for ALICE");
 
+        assertApproxEqAbs(
+            aspTkn.balanceOf(address(leverageManager)), 0, 1, "Collateral balance should not change for leverageManager"
+        );
+        assertApproxEqAbs(
+            IERC20(dai).balanceOf(address(leverageManager)), 0, 1, "Asset balance should not change for leverageManager"
+        );
+
         // Verify the state of the LeverageManager contract
         (address returnedPod, address lendingPair, address custodian, bool isSelfLending, bool hasSelfLendingPairPod) =
             leverageManager.positionProps(positionId);
@@ -179,7 +186,7 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         assertEq(hasSelfLendingPairPod, false, "Self lending pod should be zero");
     }
 
-    function test_addLeverage_RemoveLeverageWithUserProvidedDebt() public {
+    function test_addLeverage_RemoveLeverageWithMixBorrowAndUserProvidedDebt() public {
         uint256 pTknAmt = 100 * 1e18;
         uint256 pairedLpDesired = 50 * 1e18;
         bytes memory config = abi.encode(0, 1000, block.timestamp + 1 hours);
@@ -207,6 +214,66 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         leverageManager.removeLeverage(
             positionId,
             pairedLpDesired / 2,
+            abi.encode(MockFraxlendPair(lendingPair).userCollateralBalance(custodian) / 2, 0, 0, 0, pairedLpDesired / 4)
+        );
+
+        vm.stopPrank();
+
+        // Verify the position NFT was minted
+        assertEq(leverageManager.positionNFT().ownerOf(positionId), ALICE, "Position NFT not minted to ALICE");
+
+        assertApproxEqAbs(
+            aspTkn.balanceOf(address(leverageManager)), 0, 1, "Collateral balance should not change for leverageManager"
+        );
+        assertApproxEqAbs(
+            IERC20(dai).balanceOf(address(leverageManager)), 0, 1, "Asset balance should not change for leverageManager"
+        );
+
+        // Verify the balance changes in the mock contracts
+        assertGt(
+            pod.balanceOf(ALICE),
+            alicePodTokenBalanceBefore - pTknAmt,
+            "Pod Token balance should be more than amount after adding leverage, then removing leverage"
+        );
+        assertLe(
+            IERC20(dai).balanceOf(ALICE),
+            aliceAssetBalanceBefore,
+            "Asset balance should be equal or less for ALICE when paying off position with user provided debt"
+        );
+
+        // Verify the state of the LeverageManager contract
+        assertEq(lendingPair, address(mockFraxlendPair), "Incorrect lending pair address");
+        assertNotEq(custodian, address(0), "Custodian address should not be zero");
+    }
+
+    function test_addLeverage_RemoveLeverageWithOnlyUserProvidedDebt() public {
+        uint256 pTknAmt = 100 * 1e18;
+        uint256 pairedLpDesired = 50 * 1e18;
+        bytes memory config = abi.encode(0, 1000, block.timestamp + 1 hours);
+
+        deal(address(peas), ALICE, pTknAmt * 100);
+
+        vm.startPrank(ALICE);
+
+        // wrap into the pod
+        peas.approve(address(pod), peas.totalSupply());
+        pod.bond(address(peas), pTknAmt, 0);
+
+        uint256 positionId = leverageManager.initializePosition(address(pod), ALICE, false);
+
+        uint256 alicePodTokenBalanceBefore = pod.balanceOf(ALICE);
+        uint256 aliceAssetBalanceBefore = IERC20(dai).balanceOf(ALICE);
+
+        // add to newly created position
+        leverageManager.addLeverage(positionId, address(pod), pTknAmt, pairedLpDesired, 0, false, config);
+
+        (, address lendingPair, address custodian,,) = leverageManager.positionProps(positionId);
+
+        // remove from position
+        IERC20(dai).approve(address(leverageManager), pairedLpDesired);
+        leverageManager.removeLeverage(
+            positionId,
+            pairedLpDesired,
             abi.encode(MockFraxlendPair(lendingPair).userCollateralBalance(custodian) / 2, 0, 0, 0, pairedLpDesired)
         );
 
@@ -214,6 +281,13 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
 
         // Verify the position NFT was minted
         assertEq(leverageManager.positionNFT().ownerOf(positionId), ALICE, "Position NFT not minted to ALICE");
+
+        assertApproxEqAbs(
+            aspTkn.balanceOf(address(leverageManager)), 0, 1, "Collateral balance should not change for leverageManager"
+        );
+        assertApproxEqAbs(
+            IERC20(dai).balanceOf(address(leverageManager)), 0, 1, "Asset balance should not change for leverageManager"
+        );
 
         // Verify the balance changes in the mock contracts
         assertGt(
@@ -268,6 +342,13 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         // Verify the position NFT was minted
         assertEq(leverageManager.positionNFT().ownerOf(positionId), ALICE, "Position NFT not minted to ALICE");
 
+        assertApproxEqAbs(
+            aspTkn.balanceOf(address(leverageManager)), 0, 1, "Collateral balance should not change for leverageManager"
+        );
+        assertApproxEqAbs(
+            IERC20(dai).balanceOf(address(leverageManager)), 0, 1, "Asset balance should not change for leverageManager"
+        );
+
         // Verify the balance changes in the mock contracts
         assertEq(
             pod.balanceOf(ALICE),
@@ -318,6 +399,16 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         // Verify the position NFT was minted
         assertEq(leverageManager.positionNFT().ownerOf(positionId), ALICE, "Position NFT not minted to ALICE");
 
+        assertApproxEqAbs(
+            aspTkn2.balanceOf(address(leverageManager)),
+            0,
+            1,
+            "Collateral balance should not change for leverageManager"
+        );
+        assertApproxEqAbs(
+            pairedLpPod.balanceOf(address(leverageManager)), 0, 1, "Asset balance should not change for leverageManager"
+        );
+
         // Verify the balance changes in the mock contracts
         assertEq(
             podWithPairedAsPod.balanceOf(ALICE),
@@ -365,6 +456,13 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         // Verify the position NFT was minted
         assertEq(leverageManager.positionNFT().ownerOf(positionId), ALICE, "Position NFT not minted to ALICE");
 
+        assertApproxEqAbs(
+            aspTkn.balanceOf(address(leverageManager)), 0, 1, "Collateral balance should not change for leverageManager"
+        );
+        assertApproxEqAbs(
+            IERC20(dai).balanceOf(address(leverageManager)), 0, 1, "Asset balance should not change for leverageManager"
+        );
+
         // Verify the balance changes in the mock contracts
         assertEq(
             pod.balanceOf(ALICE),
@@ -407,6 +505,13 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         // Verify the position NFT was minted
         assertEq(leverageManager.positionNFT().ownerOf(positionId), ALICE, "Position NFT not minted to ALICE");
 
+        assertApproxEqAbs(
+            aspTkn.balanceOf(address(leverageManager)), 0, 1, "Collateral balance should not change for leverageManager"
+        );
+        assertApproxEqAbs(
+            IERC20(dai).balanceOf(address(leverageManager)), 0, 1, "Asset balance should not change for leverageManager"
+        );
+
         // Verify the balance changes in the mock contracts
         assertEq(
             peas.balanceOf(ALICE),
@@ -430,7 +535,7 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         assertEq(hasSelfLendingPairPod, false, "Self lending pod should be zero");
     }
 
-    // function testAddLeverageMaxAmount() public {
+    // function test_addLeverageMaxAmount() public {
     //   uint256 pTknAmt = INITIAL_BALANCE;
     //   uint256 pairedLpDesired = INITIAL_BALANCE / 2;
     //   uint256 pairedLpAmtMin = (INITIAL_BALANCE * 45) / 100;
@@ -463,7 +568,7 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
     //   );
     // }
 
-    // function testAddLeverageMinAmount() public {
+    // function test_addLeverageMinAmount() public {
     //   uint256 pTknAmt = 1;
     //   uint256 pairedLpDesired = 1;
     //   uint256 pairedLpAmtMin = 1;
@@ -496,7 +601,7 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
     //   );
     // }
 
-    function testAddLeverageInvalidPositionId() public {
+    function test_addLeverageInvalidPositionId() public {
         uint256 pTknAmt = 100 * 1e18;
         uint256 pairedLpDesired = 50 * 1e18;
         uint256 pairedLpAmtMin = 45 * 1e18;
@@ -520,7 +625,7 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         vm.stopPrank();
     }
 
-    function testAddLeverageInsufficientBalance() public {
+    function test_addLeverageInsufficientBalance() public {
         uint256 pTknAmt = 100 * 1e18;
         uint256 pairedLpDesired = 50 * 1e18;
         uint256 pairedLpAmtMin = 45 * 1e18;
@@ -545,7 +650,7 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         vm.stopPrank();
     }
 
-    function testAddLeverageUnauthorized() public {
+    function test_addLeverageUnauthorized() public {
         uint256 pTknAmt = 100 * 1e18;
         uint256 pairedLpDesired = 50 * 1e18;
         uint256 pairedLpAmtMin = 45 * 1e18;
@@ -568,7 +673,7 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         vm.stopPrank();
     }
 
-    // function testAddLeverageFlashLoanInteraction() public {
+    // function test_addLeverageFlashLoanInteraction() public {
     //   uint256 pTknAmt = 100 * 1e18;
     //   uint256 pairedLpDesired = 50 * 1e18;
     //   uint256 pairedLpAmtMin = 45 * 1e18;
@@ -617,7 +722,7 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
     //   mockFlashLoanSource.verifyFlash();
     // }
 
-    // function testAddLeverageWithSelfLendingPod() public {
+    // function test_addLeverageWithSelfLendingPod() public {
     //   uint256 pTknAmt = 100 * 1e18;
     //   uint256 pairedLpDesired = 50 * 1e18;
     //   uint256 pairedLpAmtMin = 45 * 1e18;
@@ -653,7 +758,7 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
     //   );
     // }
 
-    // function testAddLeverageSlippageLimit() public {
+    // function test_addLeverageSlippageLimit() public {
     //   uint256 pTknAmt = 100 * 1e18;
     //   uint256 pairedLpDesired = 50 * 1e18;
     //   uint256 pairedLpAmtMin = 49 * 1e18; // Set a high minimum to trigger slippage protection
@@ -683,7 +788,7 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
     //   vm.stopPrank();
     // }
 
-    function testAddLeverageWithOpenFee() public {
+    function test_addLeverageWithOpenFee() public {
         uint256 pTknAmt = 100 * 1e18;
         uint256 pairedLpDesired = 50 * 1e18;
         uint256 pairedLpAmtMin = 45 * 1e18;
@@ -711,6 +816,13 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         leverageManager.addLeverage(positionId, address(pod), pTknAmt, pairedLpDesired, pairedLpAmtMin, false, config);
 
         vm.stopPrank();
+
+        assertApproxEqAbs(
+            aspTkn.balanceOf(address(leverageManager)), 0, 1, "Collateral balance should not change for leverageManager"
+        );
+        assertApproxEqAbs(
+            IERC20(dai).balanceOf(address(leverageManager)), 0, 1, "Asset balance should not change for leverageManager"
+        );
 
         // Verify the open fee was charged
         assertEq(

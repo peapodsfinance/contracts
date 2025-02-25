@@ -16,6 +16,8 @@ contract MockERC20 is ERC20 {
 contract MockTokenRewards {
     address[] private _processedRewardTokens;
 
+    function claimReward(address) external {}
+
     function getAllRewardsTokens() external view returns (address[] memory) {
         return _processedRewardTokens;
     }

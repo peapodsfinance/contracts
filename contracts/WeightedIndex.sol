@@ -89,14 +89,14 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
     /// @return _shares Number of pTKN to be minted
     function convertToShares(uint256 _assets) external view override returns (uint256 _shares) {
         bool _firstIn = _isFirstIn();
-        uint256 _tokenAmtSupplyRatioX96 =
-            _firstIn ? FixedPoint96.Q96 : (_assets * FixedPoint96.Q96) / _totalAssets[indexTokens[0].token];
         if (_firstIn) {
-            _shares = (_assets * FixedPoint96.Q96 * 10 ** decimals()) / indexTokens[0].q1;
+            _shares = FullMath.mulDiv(_assets, FixedPoint96.Q96 * 10 ** decimals(), indexTokens[0].q1);
         } else {
-            _shares = (_totalSupply * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+            uint256 _tokenAmtSupplyRatioX96 =
+                FullMath.mulDiv(_assets, FixedPoint96.Q96, _totalAssets[indexTokens[0].token]);
+            _shares = FullMath.mulDiv(_totalSupply, _tokenAmtSupplyRatioX96, FixedPoint96.Q96);
         }
-        _shares -= ((_shares * _fees.bond) / DEN);
+        _shares -= FullMath.mulDiv(_shares, _fees.bond, DEN);
     }
 
     /// @notice The ```convertToAssets``` function returns the number of TKN returned based on burning _shares pTKN excluding fees
@@ -119,13 +119,13 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
         returns (uint256 _assets)
     {
         bool _firstIn = _isFirstIn();
-        uint256 _percSharesX96_2 = _firstIn ? 2 ** (96 / 2) : (_shares * 2 ** (96 / 2)) / _localTotalSupply;
         if (_firstIn) {
-            _assets = (indexTokens[0].q1 * _percSharesX96_2) / FixedPoint96.Q96 / 2 ** (96 / 2);
+            _assets = FullMath.mulDiv(_shares, indexTokens[0].q1, FixedPoint96.Q96 * 10 ** decimals());
         } else {
-            _assets = (_localTotalAssets0 * _percSharesX96_2) / 2 ** (96 / 2);
+            uint256 _percSharesX96 = FullMath.mulDiv(_shares, FixedPoint96.Q96, _localTotalSupply);
+            _assets = FullMath.mulDiv(_localTotalAssets0, _percSharesX96, FixedPoint96.Q96);
         }
-        _assets -= ((_assets * _fees.debond) / DEN);
+        _assets -= FullMath.mulDiv(_assets, _fees.debond, DEN);
     }
 
     /// @notice The ```bond``` function wraps a user into a pod and mints new pTKN

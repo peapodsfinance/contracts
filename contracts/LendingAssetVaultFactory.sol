@@ -32,7 +32,7 @@ contract LendingAssetVaultFactory is Ownable {
     function _depositMin(address _vault, address _asset) internal {
         IERC20(_asset).safeTransferFrom(_msgSender(), address(this), minimumDepositAtCreation);
         IERC20(_asset).safeIncreaseAllowance(_vault, minimumDepositAtCreation);
-        LendingAssetVault(_vault).deposit(minimumDepositAtCreation, _msgSender());
+        LendingAssetVault(_vault).deposit(minimumDepositAtCreation, address(0xdead));
     }
 
     function getNewCaFromParams(string memory _name, string memory _symbol, address _asset, uint96 _salt)
