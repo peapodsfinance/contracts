@@ -260,16 +260,21 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         } else if (_posProps.method == FlashCallbackMethod.REMOVE) {
             (uint256 _ptknToUserAmt, uint256 _borrowTknToUser) = _removeLeveragePostCallback(_userData);
             if (_ptknToUserAmt > 0) {
-                // if there's a close fee send returned pod tokens for fee to protocol
                 if (closeFeePerc > 0) {
-                    uint256 _closeFeeAmt = (_ptknToUserAmt * closeFeePerc) / 10000;
-                    IERC20(_pod).safeTransfer(feeReceiver, _closeFeeAmt);
-                    _ptknToUserAmt -= _closeFeeAmt;
+                    uint256 _closeFeePtknAmt = (_ptknToUserAmt * closeFeePerc) / 10000;
+                    IERC20(_pod).safeTransfer(feeReceiver, _closeFeePtknAmt);
+                    _ptknToUserAmt -= _closeFeePtknAmt;
                 }
                 IERC20(_pod).safeTransfer(_posProps.owner, _ptknToUserAmt);
             }
             if (_borrowTknToUser > 0) {
-                IERC20(_getBorrowTknForPosition(_posProps.positionId)).safeTransfer(_posProps.owner, _borrowTknToUser);
+                address _borrowTkn = _getBorrowTknForPosition(_posProps.positionId);
+                if (closeFeePerc > 0) {
+                    uint256 _closeFeeBorrowAmt = (_borrowTknToUser * closeFeePerc) / 10000;
+                    IERC20(_borrowTkn).safeTransfer(feeReceiver, _closeFeeBorrowAmt);
+                    _borrowTknToUser -= _closeFeeBorrowAmt;
+                }
+                IERC20(_borrowTkn).safeTransfer(_posProps.owner, _borrowTknToUser);
             }
         } else {
             require(false, "NI");
