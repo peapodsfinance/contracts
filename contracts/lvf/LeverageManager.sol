@@ -184,6 +184,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         bytes memory _additionalInfo =
             abi.encode(IFraxlendPair(_lendingPair).totalBorrow().toShares(_borrowAssetAmt, false), _remLevConfig);
         if (_borrowAssetAmt > _userProvidedDebtAmt) {
+            require(_getFlashSource(_positionId) != address(0), "FSVR");
             IFlashLoanSource(_getFlashSource(_positionId)).flash(
                 _borrowTkn, _borrowAssetAmt - _userProvidedDebtAmt, address(this), abi.encode(_props, _additionalInfo)
             );
@@ -328,7 +329,6 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
             );
             _pod = positionProps[_positionId].pod;
         }
-        require(_getFlashSource(_positionId) != address(0), "FSV");
 
         if (_userProvidedDebtAmt > 0) {
             IERC20(_getBorrowTknForPosition(_positionId)).safeTransferFrom(_sender, address(this), _userProvidedDebtAmt);
@@ -338,6 +338,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _processExtraFlashLoanPayment(_positionId, _sender);
 
         if (_pairedLpDesired > _userProvidedDebtAmt) {
+            require(_getFlashSource(_positionId) != address(0), "FSVA");
             IFlashLoanSource(_getFlashSource(_positionId)).flash(
                 _getBorrowTknForPosition(_positionId),
                 _pairedLpDesired - _userProvidedDebtAmt,
