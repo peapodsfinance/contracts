@@ -239,14 +239,14 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
     /// @notice The ```callback``` function can only be called within the addLeverage or removeLeverage workflow,
     /// @notice and is called by the flash source implementation used to borrow assets to initiate adding or removing lev
     /// @param _userData Config/info to unpack and extract individual pieces when adding/removing leverage, see addLeverage and removeLeverage
-    function callback(bytes memory _userData) external override workflow(false) {
+    function callback(bytes memory _userData) external override {
         IFlashLoanSource.FlashData memory _d = abi.decode(_userData, (IFlashLoanSource.FlashData));
         (LeverageFlashProps memory _posProps,) = abi.decode(_d.data, (LeverageFlashProps, bytes));
         require(_getFlashSource(_posProps.positionId) == _msgSender(), "A2");
         _callback(_userData);
     }
 
-    function _callback(bytes memory _userData) internal {
+    function _callback(bytes memory _userData) internal workflow(false) {
         IFlashLoanSource.FlashData memory _d = abi.decode(_userData, (IFlashLoanSource.FlashData));
         (LeverageFlashProps memory _posProps,) = abi.decode(_d.data, (LeverageFlashProps, bytes));
 
