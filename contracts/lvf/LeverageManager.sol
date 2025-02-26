@@ -190,7 +190,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         } else {
             _callback(
                 abi.encode(
-                    IFlashLoanSource.FlashData(address(this), address(0), 0, abi.encode(_props, _additionalInfo), 0)
+                    IFlashLoanSource.FlashData(address(this), _borrowTkn, 0, abi.encode(_props, _additionalInfo), 0)
                 )
             );
         }
@@ -344,7 +344,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
                 abi.encode(
                     IFlashLoanSource.FlashData(
                         address(this),
-                        address(0),
+                        _getBorrowTknForPosition(_positionId),
                         0,
                         _getFlashDataAddLeverage(_positionId, _sender, _pTknAmt, _pairedLpDesired, _config),
                         0
