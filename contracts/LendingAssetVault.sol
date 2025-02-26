@@ -291,7 +291,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
             return;
         }
         uint256 _vaultAssetRatioChange = _prevVaultCbr > _vaultWhitelistCbr[_vault]
-            ? 2 * PRECISION - ((PRECISION * _prevVaultCbr) / _vaultWhitelistCbr[_vault])
+            ? PRECISION - ((PRECISION * _vaultWhitelistCbr[_vault]) / _prevVaultCbr)
             : ((PRECISION * _vaultWhitelistCbr[_vault]) / _prevVaultCbr) - PRECISION;
 
         uint256 _currentAssetsUtilized = vaultUtilization[_vault];
