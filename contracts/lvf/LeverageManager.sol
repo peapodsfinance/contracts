@@ -143,14 +143,14 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
 
     /// @notice The ```removeLeverage``` function removes leverage from a position
     /// @param _positionId The NFT ID for the position
-    /// @param _borrowAssetAmt Amount of borrowed assets to use pay back and remove leverage
+    /// @param _borrowSharesAmt Amount of borrow shares to remove from the position by paying back
     /// @param _remLevConfig Extra config required for removing leverage
     /// @dev _config[0] == _collateralAssetRemoveAmt Amount of collateral asset to remove from the position
     /// @dev _config[1] == _podAmtMin Minimum Amount of pTKN to receive on remove LP transaction (slippage)
     /// @dev _config[2] == _pairedAssetAmtMin Minimum amount of pairedLpTkn to receive on remove LP transaction (slippage)
     /// @dev _config[3] == _podPairedLiquidityPrice18 If we need to swap pTKN for pairedLpTkn to pay back flash loan, this is a 10**18*token1/token0 (decimals NOT removed) price of pod LP
     /// @dev _config[4] == _userProvidedDebtAmt Amount of borrow token a user will use to transfer from their wallet to pay back flash loan
-    function removeLeverage(uint256 _positionId, uint256 _borrowAssetAmt, bytes memory _remLevConfig)
+    function removeLeverage(uint256 _positionId, uint256 _borrowSharesAmt, bytes memory _remLevConfig)
         external
         override
         workflow(true)
@@ -163,10 +163,11 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
             "A1"
         );
 
-        (,,,, uint256 _userProvidedDebtAmt) = abi.decode(_remLevConfig, (uint256, uint256, uint256, uint256, uint256));
-        require(_borrowAssetAmt >= _userProvidedDebtAmt, "UPM");
         address _lendingPair = positionProps[_positionId].lendingPair;
         IFraxlendPair(_lendingPair).addInterest(false);
+        uint256 _borrowAmt = IFraxlendPair(_lendingPair).totalBorrow().toAmount(_borrowSharesAmt, true);
+        (uint256 _userProvidedDebtAmt, bytes memory _finalRemLevConfig) =
+            _checkAndResetRemoveLeverageConfigFromBorrowAmt(_borrowAmt, _remLevConfig);
 
         // if additional fees required for flash source, handle that here
         _processExtraFlashLoanPayment(_positionId, _sender);
@@ -174,19 +175,17 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         address _borrowTkn = _getBorrowTknForPosition(_positionId);
 
         // needed to repay lending pair asset before removing collateral and unwinding
-        IERC20(_borrowTkn).safeIncreaseAllowance(_lendingPair, _borrowAssetAmt);
+        IERC20(_borrowTkn).safeIncreaseAllowance(_lendingPair, _borrowAmt);
 
         LeverageFlashProps memory _props;
         _props.method = FlashCallbackMethod.REMOVE;
         _props.positionId = _positionId;
         _props.owner = _owner;
         _props.sender = _sender;
-        bytes memory _additionalInfo =
-            abi.encode(IFraxlendPair(_lendingPair).totalBorrow().toShares(_borrowAssetAmt, false), _remLevConfig);
-        if (_borrowAssetAmt > _userProvidedDebtAmt) {
-            require(_getFlashSource(_positionId) != address(0), "FSVR");
+        bytes memory _additionalInfo = abi.encode(_borrowSharesAmt, _finalRemLevConfig);
+        if (_borrowAmt > _userProvidedDebtAmt) {
             IFlashLoanSource(_getFlashSource(_positionId)).flash(
-                _borrowTkn, _borrowAssetAmt - _userProvidedDebtAmt, address(this), abi.encode(_props, _additionalInfo)
+                _borrowTkn, _borrowAmt - _userProvidedDebtAmt, address(this), abi.encode(_props, _additionalInfo)
             );
         } else {
             _callback(
@@ -292,7 +291,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
             pod: _pod,
             lendingPair: lendingPairs[_pod],
             custodian: address(_custodian),
-            isSelfLending: _isPodSelfLending(_pod),
+            isSelfLending: IDecentralizedIndex(_pod).PAIRED_LP_TOKEN() == lendingPairs[_pod],
             hasSelfLendingPairPod: _hasSelfLendingPairPod
         });
     }
@@ -338,7 +337,6 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _processExtraFlashLoanPayment(_positionId, _sender);
 
         if (_pairedLpDesired > _userProvidedDebtAmt) {
-            require(_getFlashSource(_positionId) != address(0), "FSVA");
             IFlashLoanSource(_getFlashSource(_positionId)).flash(
                 _getBorrowTknForPosition(_positionId),
                 _pairedLpDesired - _userProvidedDebtAmt,
@@ -419,7 +417,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
 
         LeveragePositionProps memory _posProps = positionProps[_props.positionId];
 
-        // allowance increases for borrowAssetAmt prior to flash loaning asset
+        // allowance increases for borrowAmt prior to flash loaning asset
         IFraxlendPair(_posProps.lendingPair).repayAsset(_borrowSharesToRepay, _posProps.custodian);
         LeveragePositionCustodian(_posProps.custodian).removeCollateral(
             _posProps.lendingPair, _collateralAssetRemoveAmt, address(this)
@@ -429,7 +427,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _podAmtRemaining = _podAmtReceived;
 
         // redeem borrow asset from lending pair for self lending positions
-        if (_isPositionSelfLending(_props.positionId)) {
+        if (positionProps[_props.positionId].isSelfLending) {
             // unwrap from self lending pod for lending pair asset
             if (_posProps.hasSelfLendingPairPod) {
                 _pairedAmtReceived =
@@ -485,7 +483,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         // if self-lending swap for lending pair then redeem for borrow token
         if (_borrowAmtNeededToSwap > 0) {
             uint256 _borrowAmtFromSwap;
-            if (_isPositionSelfLending(_props.positionId)) {
+            if (positionProps[_props.positionId].isSelfLending) {
                 address _lendingPair = positionProps[_props.positionId].lendingPair;
                 (_podAmtRemaining, _borrowAmtFromSwap) = _swapPodForBorrowToken(
                     _pod,
@@ -555,17 +553,17 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _pairedLpLeftover = _pairedLpBalBefore - _pairedLpUsed;
     }
 
-    function _spTknToAspTkn(address _spTKN, uint256 _pairedRemainingAmt, LeverageFlashProps memory _props)
+    function _spTknToAspTkn(address _spTkn, uint256 _pairedRemainingAmt, LeverageFlashProps memory _props)
         internal
         returns (uint256 _newAspTkns)
     {
         address _aspTkn = _getAspTkn(_props.positionId);
-        uint256 _stakingBal = IERC20(_spTKN).balanceOf(address(this));
-        IERC20(_spTKN).safeIncreaseAllowance(_aspTkn, _stakingBal);
+        uint256 _stakingBal = IERC20(_spTkn).balanceOf(address(this));
+        IERC20(_spTkn).safeIncreaseAllowance(_aspTkn, _stakingBal);
         _newAspTkns = IERC4626(_aspTkn).deposit(_stakingBal, address(this));
 
         // for self lending pods redeem any extra paired LP asset back into main asset
-        if (_isPositionSelfLending(_props.positionId) && _pairedRemainingAmt > 0) {
+        if (positionProps[_props.positionId].isSelfLending && _pairedRemainingAmt > 0) {
             if (positionProps[_props.positionId].hasSelfLendingPairPod) {
                 address[] memory _noop1;
                 uint8[] memory _noop2;
@@ -580,6 +578,20 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         }
     }
 
+    function _checkAndResetRemoveLeverageConfigFromBorrowAmt(uint256 _borrowAmt, bytes memory _remLevConfig)
+        internal
+        pure
+        returns (uint256 _finalUserProvidedDebtAmt, bytes memory _finalRemLevConfig)
+    {
+        (uint256 _1, uint256 _2, uint256 _3, uint256 _4, uint256 _userProvidedDebtAmt) =
+            abi.decode(_remLevConfig, (uint256, uint256, uint256, uint256, uint256));
+        _finalUserProvidedDebtAmt = _userProvidedDebtAmt;
+        if (_userProvidedDebtAmt > _borrowAmt) {
+            _finalUserProvidedDebtAmt = _borrowAmt;
+        }
+        _finalRemLevConfig = abi.encode(_1, _2, _3, _4, _finalUserProvidedDebtAmt);
+    }
+
     function _processAndGetPairedTknAndAmt(
         uint256 _positionId,
         address _borrowedTkn,
@@ -589,7 +601,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _finalPairedTkn = _borrowedTkn;
         _finalPairedAmt = _borrowedAmt;
         address _lendingPair = positionProps[_positionId].lendingPair;
-        if (_isPositionSelfLending(_positionId)) {
+        if (positionProps[_positionId].isSelfLending) {
             _finalPairedTkn = _lendingPair;
             IERC20(_borrowedTkn).safeIncreaseAllowance(_lendingPair, _finalPairedAmt);
             _finalPairedAmt = IFraxlendPair(_lendingPair).deposit(_finalPairedAmt, address(this));
@@ -612,17 +624,17 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
     ) internal returns (uint256 _podAmtReceived, uint256 _pairedAmtReceived) {
         (, uint256 _podAmtMin, uint256 _pairedAssetAmtMin,,) =
             abi.decode(_remLevConf, (uint256, uint256, uint256, uint256, uint256));
-        address _spTKN = IDecentralizedIndex(_pod).lpStakingPool();
+        address _spTkn = IDecentralizedIndex(_pod).lpStakingPool();
         address _pairedLpToken = IDecentralizedIndex(_pod).PAIRED_LP_TOKEN();
 
         uint256 _podAmtBefore = IERC20(_pod).balanceOf(address(this));
         uint256 _pairedTokenAmtBefore = IERC20(_pairedLpToken).balanceOf(address(this));
 
-        uint256 _spTKNAmtReceived =
+        uint256 _spTknAmtReceived =
             IERC4626(_getAspTkn(_positionId)).redeem(_collateralAssetRemoveAmt, address(this), address(this));
-        IERC20(_spTKN).safeIncreaseAllowance(address(indexUtils), _spTKNAmtReceived);
+        IERC20(_spTkn).safeIncreaseAllowance(address(indexUtils), _spTknAmtReceived);
         indexUtils.unstakeAndRemoveLP(
-            IDecentralizedIndex(_pod), _spTKNAmtReceived, _podAmtMin, _pairedAssetAmtMin, block.timestamp
+            IDecentralizedIndex(_pod), _spTknAmtReceived, _podAmtMin, _pairedAssetAmtMin, block.timestamp
         );
         _podAmtReceived = IERC20(_pod).balanceOf(address(this)) - _podAmtBefore;
         _pairedAmtReceived = IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedTokenAmtBefore;
@@ -637,14 +649,6 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _tkn.approve(_pod, _tkn.balanceOf(address(this)) - _tknBalBefore);
         IDecentralizedIndex(_pod).bond(address(_tkn), _tkn.balanceOf(address(this)) - _tknBalBefore, _amtPtknMintMin);
         IERC20(_pod).balanceOf(address(this)) - _pTknBalBefore;
-    }
-
-    function _isPositionSelfLending(uint256 _positionId) internal view returns (bool) {
-        return positionProps[_positionId].isSelfLending;
-    }
-
-    function _isPodSelfLending(address _pod) internal view returns (bool) {
-        return IDecentralizedIndex(_pod).PAIRED_LP_TOKEN() == lendingPairs[_pod];
     }
 
     function _getBorrowTknForPosition(uint256 _positionId) internal view returns (address) {
