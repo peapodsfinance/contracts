@@ -238,11 +238,10 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         uint256 _pairedOut = _tokenToPairedLpToken(_token, _amountIn);
         if (_pairedOut > 0) {
             uint256 _pairedFee = (_pairedOut * protocolFee) / 1000;
-            if (_pairedFee > 0) {
+            _lpAmtOut = _pairedLpTokenToPodLp(_pairedOut - _pairedFee, _deadline);
+            if (_lpAmtOut > 0 && _pairedFee > 0) {
                 _protocolFees += _pairedFee;
-                _pairedOut -= _pairedFee;
             }
-            _lpAmtOut = _pairedLpTokenToPodLp(_pairedOut, _deadline);
             require(_lpAmtOut >= _amountLpOutMin, "M");
         }
     }
@@ -390,6 +389,7 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
 
     // optimal one-sided supply LP: https://blog.alphaventuredao.io/onesideduniswap/
     function _getSwapAmt(address _t0, address _t1, address _swapT, uint256 _fullAmt) internal view returns (uint256) {
+        (_t0, _t1) = _t0 < _t1 ? (_t0, _t1) : (_t1, _t0);
         (uint112 _r0, uint112 _r1) = DEX_ADAPTER.getReserves(DEX_ADAPTER.getV2Pool(_t0, _t1));
         uint112 _r = _swapT == _t0 ? _r0 : _r1;
         return (_sqrt(_r * (_fullAmt * 3988000 + _r * 3988009)) - (_r * 1997)) / 1994;
