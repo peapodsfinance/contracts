@@ -86,10 +86,10 @@ contract spTKNMinimalOracleTest is PodHelperTest {
             abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(_v2Res))
         );
         uint256 _price18 = oraclePEASDAI.getPodPerBasePrice();
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _price18,
             0.25 ether, // NOTE: At the time of writing test DAI/PEAS == $4, so inverse is 1/4 == 0.25
-            1e18 // NOTE: At the time of writing test DAI/PEAS ~= $4, so _price18 would be ~1/4 == 0.25, so precision to <= 1 here (it's wide I know)
+            0.2e18 // NOTE: At the time of writing test DAI/PEAS ~= $4, so _price18 would be ~1/4 == 0.25, so precision to <= 1 here (it's wide I know)
         );
     }
 
@@ -115,15 +115,15 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         console.log("unsafePrice %s - priceLow %s", _unsafePrice18, _priceLow);
         console.log("unsafePrice %s - priceHigh %s", _unsafePrice18, _priceHigh);
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceLow,
             _unsafePrice18,
-            1e18 // TODO: tighten this up
+            0.2e18 // TODO: tighten this up
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceHigh,
             _unsafePrice18,
-            1e18 // TODO: tighten this up
+            0.2e18 // TODO: tighten this up
         );
         // accounting for unwrap fee makes oracle price a bit higher
         // assertGt(_priceLow, _unsafePrice18); // TODO
@@ -131,27 +131,8 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     }
 
     function test_getPrices_PEASDAI_DIABaseConversionOracle() public {
-        // setup dup PEAS/DAI pod to get price to put into DIA oracle
-        address __podToDup = IStakingPoolToken_OLD(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
-        address __newPod = _dupPodAndSeedLp(__podToDup, address(0), 0, 0);
-        spTKNMinimalOracle _oraclePEASDAI = new spTKNMinimalOracle(
-            abi.encode(
-                address(_clOracle),
-                address(_uniOracle),
-                address(_diaOracle),
-                0x6B175474E89094C44Da98b954EedeAC495271d0F, // DAI
-                false,
-                false,
-                IDecentralizedIndex(__newPod).lpStakingPool(),
-                0xAe750560b09aD1F5246f3b279b3767AfD1D79160 // UniV3: PEAS / DAI
-            ),
-            abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(_v2Res))
-        );
-        uint256 _pTknPerDaiPrice18 = _oraclePEASDAI.getPodPerBasePrice();
-
-        // setup DIA oracle with pod/dai price
         MockDIAOracleV2 _peasDiaOracle = new MockDIAOracleV2();
-        _peasDiaOracle.setValue("DAI/USD", uint128(10 ** (18 + 8) / _pTknPerDaiPrice18), uint128(block.timestamp)); // 8 decimal precision
+        _peasDiaOracle.setValue("DAI/USD", 100000000, uint128(block.timestamp));
 
         address _podToDup = IStakingPoolToken_OLD(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
         address _newPod = _dupPodAndSeedLp(_podToDup, address(0), 0, 0);
@@ -176,15 +157,15 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         console.log("unsafePrice %s - priceLow %s", _unsafePrice18, _priceLow);
         console.log("unsafePrice %s - priceHigh %s", _unsafePrice18, _priceHigh);
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceLow,
             _unsafePrice18,
-            1e18 // TODO: tighten this up
+            0.2e18 // TODO: tighten this up
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceHigh,
             _unsafePrice18,
-            1e18 // TODO: tighten this up
+            0.2e18 // TODO: tighten this up
         );
         // accounting for unwrap fee makes oracle price a bit higher
         // assertGt(_priceLow, _unsafePrice18); // TODO
@@ -192,8 +173,27 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     }
 
     function test_getPrices_PEASDAI_DIAPrimaryOracle() public {
+        // setup dup PEAS/DAI pod to get price to put into DIA oracle
+        address __podToDup = IStakingPoolToken_OLD(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
+        address __newPod = _dupPodAndSeedLp(__podToDup, address(0), 0, 0);
+        spTKNMinimalOracle _oraclePEASDAI = new spTKNMinimalOracle(
+            abi.encode(
+                address(_clOracle),
+                address(_uniOracle),
+                address(_diaOracle),
+                0x6B175474E89094C44Da98b954EedeAC495271d0F, // DAI
+                false,
+                false,
+                IDecentralizedIndex(__newPod).lpStakingPool(),
+                0xAe750560b09aD1F5246f3b279b3767AfD1D79160 // UniV3: PEAS / DAI
+            ),
+            abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(_v2Res))
+        );
+        uint256 _pTknPerDaiPrice18 = _oraclePEASDAI.getPodPerBasePrice();
+
+        // setup DIA oracle with pod/dai price
         MockDIAOracleV2 _peasDiaOracle = new MockDIAOracleV2();
-        _peasDiaOracle.setValue("PEAS/USD", 410000000, uint128(block.timestamp)); // $4.1
+        _peasDiaOracle.setValue("PEAS/USD", uint128(10 ** (18 + 8) / _pTknPerDaiPrice18), uint128(block.timestamp)); // 8 decimal precision
 
         address _podToDup = IStakingPoolToken_OLD(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
         address _newPod = _dupPodAndSeedLp(_podToDup, address(0), 0, 0);
@@ -218,15 +218,15 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         console.log("unsafePrice %s - priceLow %s", _unsafePrice18, _priceLow);
         console.log("unsafePrice %s - priceHigh %s", _unsafePrice18, _priceHigh);
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceLow,
             _unsafePrice18,
-            1e18 // TODO: tighten this up
+            0.2e18 // TODO: tighten this up
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceHigh,
             _unsafePrice18,
-            1e18 // TODO: tighten this up
+            0.2e18 // TODO: tighten this up
         );
         // accounting for unwrap fee makes oracle price a bit higher
         // assertGt(_priceLow, _unsafePrice18); // TODO
@@ -263,16 +263,16 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         console.log("unsafePrice %s - priceLow %s", _unsafePrice18, _priceLow);
         console.log("unsafePrice %s - priceHigh %s", _unsafePrice18, _priceHigh);
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceLow,
             _unsafePrice18,
-            1e18, // TODO: tighten this up
+            0.2e18, // TODO: tighten this up
             "priceLow is not appoximately equal to unsafe price"
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceHigh,
             _unsafePrice18,
-            1e18, // TODO: tighten this up
+            0.2e18, // TODO: tighten this up
             "_priceHigh is not appoximately equal to unsafe price"
         );
         assertEq(_isBadData, false, "Bad data was passed");
