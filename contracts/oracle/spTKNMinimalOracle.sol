@@ -180,16 +180,16 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         uint256 _k = uint256(_reserve0) * _reserve1;
         uint256 _kDec = 10 ** IERC20Metadata(IUniswapV2Pair(_pair).token0()).decimals()
             * 10 ** IERC20Metadata(IUniswapV2Pair(_pair).token1()).decimals();
-        uint256 _avgBaseAssetInLp18 = _sqrt((_priceBasePerPTkn18 * _k) / _kDec) * 10 ** (18 / 2);
+        uint256 _avgBaseAssetInLp27 = _sqrt((_priceBasePerPTkn18 * _k) / _kDec) * 10 ** 18;
         uint256 _pairSupply = IERC20(_pair).totalSupply();
         if (_pairSupply == 0) {
             return 0;
         }
-        uint256 _basePerSpTkn18 = (2 * _avgBaseAssetInLp18 * 10 ** IERC20Metadata(_pair).decimals()) / _pairSupply;
-        if (_basePerSpTkn18 == 0) {
+        uint256 _basePerSpTkn27 = (2 * _avgBaseAssetInLp27 * 10 ** IERC20Metadata(_pair).decimals()) / _pairSupply;
+        if (_basePerSpTkn27 == 0) {
             revert UnableToPriceBasePerSpTkn();
         }
-        _spTknBasePrice18 = 10 ** (18 * 2) / _basePerSpTkn18;
+        _spTknBasePrice18 = 10 ** (27 + 18) / _basePerSpTkn27;
 
         // if the base asset is a pod, we will assume that the CL/chainlink pool(s) are
         // pricing the underlying asset of the base asset pod, and therefore we will
@@ -269,17 +269,22 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         view
         returns (uint256)
     {
-        if (IDecentralizedIndex(_pod).unlocked() != 1) {
-            revert PodLocked();
-        }
         if (_underlying == address(0)) {
             IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_pod).getAllAssets();
             _underlying = _assets[0].token;
         }
         uint256 _pTknAmt =
             (_amtUnderlying * 10 ** IERC20Metadata(_pod).decimals()) / 10 ** IERC20Metadata(_underlying).decimals();
-        return (IDecentralizedIndex(_pod).convertToAssets(_pTknAmt) * 10000)
-            / (10000 - IDecentralizedIndex(_pod).DEBOND_FEE());
+
+        uint256 _assetConv;
+        if (_pod == BASE_TOKEN && IDecentralizedIndex(_pod).isFlashMinting() == 1) {
+            _assetConv = IDecentralizedIndex(_pod).convertToAssetsPreFlashMint(_pTknAmt);
+        } else if (IDecentralizedIndex(_pod).unlocked() == 1) {
+            _assetConv = IDecentralizedIndex(_pod).convertToAssets(_pTknAmt);
+        } else {
+            revert PodLocked();
+        }
+        return (_assetConv * 10000) / (10000 - IDecentralizedIndex(_pod).DEBOND_FEE());
     }
 
     function _accountForUnwrapFeeInPrice(address _pod, uint256 _currentPrice)

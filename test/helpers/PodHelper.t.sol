@@ -15,6 +15,10 @@ import {WeightedIndex} from "../../contracts/WeightedIndex.sol";
 import {WeightedIndexFactory} from "../../contracts/WeightedIndexFactory.sol";
 import {RewardsWhitelist} from "../../contracts/RewardsWhitelist.sol";
 
+interface IDecentralizedIndexOldWithPartner is IDecentralizedIndex {
+    function partner() external view returns (address);
+}
+
 contract PodHelperTest is Test {
     RewardsWhitelist _rewardsWhitelistSub;
     WeightedIndexFactory _podDeployerSub;
@@ -168,6 +172,6 @@ contract PodHelperTest is Test {
     }
 
     function _getPodConfig(address _pod) internal view returns (IDecentralizedIndex.Config memory _c) {
-        _c.partner = IDecentralizedIndex(_pod).partner();
+        _c.partner = IDecentralizedIndexOldWithPartner(_pod).partner();
     }
 }

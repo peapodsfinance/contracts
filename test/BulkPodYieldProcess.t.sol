@@ -207,10 +207,6 @@ contract MockDecentralizedIndex is IDecentralizedIndex {
         return address(0);
     }
 
-    function partner() external pure returns (address) {
-        return address(0);
-    }
-
     function isAsset(address) external pure returns (bool) {
         return false;
     }
@@ -241,6 +237,10 @@ contract MockDecentralizedIndex is IDecentralizedIndex {
         return 0;
     }
 
+    function convertToAssetsPreFlashMint(uint256) external pure returns (uint256) {
+        return 0;
+    }
+
     function setup() external pure {}
     function bond(address, uint256, uint256) external pure {}
     function debond(uint256, address[] memory, uint8[] memory) external pure {}
@@ -255,6 +255,10 @@ contract MockDecentralizedIndex is IDecentralizedIndex {
     function setLpStakingPool(address) external pure {}
 
     function unlocked() external pure returns (uint8) {
+        return 0;
+    }
+
+    function isFlashMinting() external pure override returns (uint8) {
         return 0;
     }
 }

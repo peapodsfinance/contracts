@@ -86,7 +86,15 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
         return 1;
     }
 
+    function isFlashMinting() external pure override returns (uint8) {
+        return 0;
+    }
+
     function convertToAssets(uint256 amount) external pure returns (uint256) {
+        return amount;
+    }
+
+    function convertToAssetsPreFlashMint(uint256 amount) external pure returns (uint256) {
         return amount;
     }
 
@@ -109,10 +117,6 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
 
     function created() external pure returns (uint256) {
         return 0;
-    }
-
-    function partner() external pure returns (address) {
-        return address(0);
     }
 
     function isAsset(address) external pure returns (bool) {

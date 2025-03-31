@@ -87,10 +87,10 @@ contract AutoCompoundingPodLpTest is Test {
 
         mockTokenRewards.setProcessedRewardTokens(rewardTokens);
 
-        assertEq(autoCompoundingPodLp.protocolFee(), 50);
-
-        autoCompoundingPodLp.setProtocolFee(100, 0, block.timestamp);
         assertEq(autoCompoundingPodLp.protocolFee(), 100);
+
+        autoCompoundingPodLp.setProtocolFee(50, 0, block.timestamp);
+        assertEq(autoCompoundingPodLp.protocolFee(), 50);
 
         vm.expectRevert(bytes("MAX"));
         autoCompoundingPodLp.setProtocolFee(1001, 0, block.timestamp);
@@ -200,6 +200,10 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
         return shares;
     }
 
+    function convertToAssetsPreFlashMint(uint256 shares) external pure returns (uint256) {
+        return shares;
+    }
+
     function bond(address, uint256, uint256) external pure override {}
 
     function created() external pure override returns (uint256) {
@@ -226,14 +230,14 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
         return false;
     }
 
-    function partner() external pure override returns (address) {
-        return address(0);
-    }
-
     function processPreSwapFeesAndSwap() external pure override {}
     function removeLiquidityV2(uint256, uint256, uint256, uint256) external pure override {}
 
     function unlocked() external pure override returns (uint8) {
+        return 0;
+    }
+
+    function isFlashMinting() external pure override returns (uint8) {
         return 0;
     }
 }

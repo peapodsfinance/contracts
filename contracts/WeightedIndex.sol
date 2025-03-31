@@ -7,13 +7,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
+import "./libraries/FullMath.sol";
 import "./interfaces/IInitializeSelector.sol";
 import "./DecentralizedIndex.sol";
 
 contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex {
     using SafeERC20 for IERC20;
-
-    uint256 private _totalWeights;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -37,20 +36,16 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
             abi.decode(_baseConfig, (Config, Fees, address[], uint256[], address, bool));
 
         __DecentralizedIndex_init(_name, _symbol, IndexType.WEIGHTED, _config, _fees, _immutables);
-        __WeightedIndex_init(_config, _tokens, _weights, _immutables);
+        __WeightedIndex_init(_tokens, _weights);
     }
 
     function initializeSelector() external pure override returns (bytes4) {
         return this.initialize.selector;
     }
 
-    function __WeightedIndex_init(
-        Config memory _config,
-        address[] memory _tokens,
-        uint256[] memory _weights,
-        bytes memory _immutables
-    ) internal {
+    function __WeightedIndex_init(address[] memory _tokens, uint256[] memory _weights) internal {
         require(_tokens.length == _weights.length, "V");
+        uint256 _totalWeights;
         uint256 _tl = _tokens.length;
         for (uint8 _i; _i < _tl; _i++) {
             require(!_isTokenInIndex[_tokens[_i]], "D");
@@ -67,16 +62,6 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
             _totalWeights += _weights[_i];
             _fundTokenIdx[_tokens[_i]] = _i;
             _isTokenInIndex[_tokens[_i]] = true;
-
-            (address _pairedLpToken,,,,,, address _dexAdapter) =
-                abi.decode(_immutables, (address, address, address, address, address, address, address));
-            if (_config.blacklistTKNpTKNPoolV2 && _tokens[_i] != _pairedLpToken) {
-                address _blkPool = IDexAdapter(_dexAdapter).getV2Pool(address(this), _tokens[_i]);
-                if (_blkPool == address(0)) {
-                    _blkPool = IDexAdapter(_dexAdapter).createV2Pool(address(this), _tokens[_i]);
-                }
-                _blacklist[_blkPool] = true;
-            }
         }
         // at idx == 0, need to find X in [1/X = tokenWeightAtIdx/totalWeights]
         // at idx > 0, need to find Y in (Y/X = tokenWeightAtIdx/totalWeights)
@@ -104,28 +89,43 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
     /// @return _shares Number of pTKN to be minted
     function convertToShares(uint256 _assets) external view override returns (uint256 _shares) {
         bool _firstIn = _isFirstIn();
-        uint256 _tokenAmtSupplyRatioX96 =
-            _firstIn ? FixedPoint96.Q96 : (_assets * FixedPoint96.Q96) / _totalAssets[indexTokens[0].token];
         if (_firstIn) {
-            _shares = (_assets * FixedPoint96.Q96 * 10 ** decimals()) / indexTokens[0].q1;
+            _shares = FullMath.mulDiv(_assets, FixedPoint96.Q96 * 10 ** decimals(), indexTokens[0].q1);
         } else {
-            _shares = (_totalSupply * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+            uint256 _tokenAmtSupplyRatioX96 =
+                FullMath.mulDiv(_assets, FixedPoint96.Q96, _totalAssets[indexTokens[0].token]);
+            _shares = FullMath.mulDiv(_totalSupply, _tokenAmtSupplyRatioX96, FixedPoint96.Q96);
         }
-        _shares -= ((_shares * _fees.bond) / DEN);
+        _shares -= FullMath.mulDiv(_shares, _fees.bond, DEN);
     }
 
     /// @notice The ```convertToAssets``` function returns the number of TKN returned based on burning _shares pTKN excluding fees
     /// @param _shares Number of pTKN to burn
     /// @return _assets Number of TKN[0] to be returned to user from pod
     function convertToAssets(uint256 _shares) external view override returns (uint256 _assets) {
+        _assets = _convertToAssets(_shares, _totalAssets[indexTokens[0].token], _totalSupply);
+    }
+
+    /// @notice The ```convertToAssetsPreFlashMint``` function returns the number of TKN returned based on burning _shares pTKN excluding fees before a flash mint starts
+    /// @param _shares Number of pTKN to burn
+    /// @return _assets Number of TKN[0] to be returned to user from pod
+    function convertToAssetsPreFlashMint(uint256 _shares) external view override returns (uint256 _assets) {
+        _assets = _convertToAssets(_shares, _totalAssets0PreFlashMint, _totalSupplyPreFlashMint);
+    }
+
+    function _convertToAssets(uint256 _shares, uint256 _localTotalAssets0, uint256 _localTotalSupply)
+        internal
+        view
+        returns (uint256 _assets)
+    {
         bool _firstIn = _isFirstIn();
-        uint256 _percSharesX96_2 = _firstIn ? 2 ** (96 / 2) : (_shares * 2 ** (96 / 2)) / _totalSupply;
         if (_firstIn) {
-            _assets = (indexTokens[0].q1 * _percSharesX96_2) / FixedPoint96.Q96 / 2 ** (96 / 2);
+            _assets = FullMath.mulDiv(_shares, indexTokens[0].q1, FixedPoint96.Q96 * 10 ** decimals());
         } else {
-            _assets = (_totalAssets[indexTokens[0].token] * _percSharesX96_2) / 2 ** (96 / 2);
+            uint256 _percSharesX96 = FullMath.mulDiv(_shares, FixedPoint96.Q96, _localTotalSupply);
+            _assets = FullMath.mulDiv(_localTotalAssets0, _percSharesX96, FixedPoint96.Q96);
         }
-        _assets -= ((_assets * _fees.debond) / DEN);
+        _assets -= FullMath.mulDiv(_assets, _fees.debond, DEN);
     }
 
     /// @notice The ```bond``` function wraps a user into a pod and mints new pTKN
@@ -161,7 +161,7 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
         for (uint256 _i; _i < _il; _i++) {
             uint256 _transferAmt = _firstIn
                 ? getInitialAmount(_token, _amount, indexTokens[_i].token)
-                : (_totalAssets[indexTokens[_i].token] * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+                : FullMath.mulDivRoundingUp(_totalAssets[indexTokens[_i].token], _tokenAmtSupplyRatioX96, FixedPoint96.Q96);
             require(_transferAmt > 0, "T0");
             _totalAssets[indexTokens[_i].token] += _transferAmt;
             _transferFromAndValidate(IERC20(indexTokens[_i].token), _user, _transferAmt);

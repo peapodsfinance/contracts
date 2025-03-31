@@ -3,12 +3,13 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/utils/Context.sol";
 import "erc721a/contracts/ERC721A.sol";
+import "../interfaces/ILeveragePositions.sol";
 
-contract LeveragePositions is Context, ERC721A {
+contract LeveragePositions is ILeveragePositions, Context, ERC721A {
     address _controller;
 
-    constructor(string memory _name, string memory _symbol) ERC721A(_name, _symbol) {
-        _controller = _msgSender();
+    constructor(string memory _name, string memory _symbol, address __controller) ERC721A(_name, _symbol) {
+        _controller = __controller;
     }
 
     function mint(address _receiver) external returns (uint256 _tokenId) {

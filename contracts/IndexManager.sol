@@ -31,10 +31,11 @@ contract IndexManager is IIndexManager, Context, Ownable {
         string memory indexName,
         string memory indexSymbol,
         bytes memory baseConfig,
-        bytes memory immutables
+        bytes memory immutables,
+        address _owner
     ) external override returns (address _index) {
         (_index,,) = podFactory.deployPodAndLinkDependencies(indexName, indexSymbol, baseConfig, immutables);
-        _addIndex(_index, _msgSender(), false, false, false);
+        _addIndex(_index, _owner, false, false, false);
     }
 
     function indexLength() external view returns (uint256) {

@@ -38,7 +38,7 @@ contract AutoCompoundingPodLpFactory is Ownable {
         address _lpToken = _pod.lpStakingPool();
         IERC20(_lpToken).safeTransferFrom(_msgSender(), address(this), minimumDepositAtCreation);
         IERC20(_lpToken).safeIncreaseAllowance(_aspAddy, minimumDepositAtCreation);
-        AutoCompoundingPodLp(_aspAddy).deposit(minimumDepositAtCreation, _msgSender());
+        AutoCompoundingPodLp(_aspAddy).deposit(minimumDepositAtCreation, address(0xdead));
     }
 
     function getNewCaFromParams(

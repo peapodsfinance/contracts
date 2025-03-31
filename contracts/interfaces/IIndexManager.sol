@@ -30,6 +30,7 @@ interface IIndexManager {
         string memory indexName,
         string memory indexSymbol,
         bytes memory baseConfig,
-        bytes memory immutables
+        bytes memory immutables,
+        address owner
     ) external returns (address _index);
 }

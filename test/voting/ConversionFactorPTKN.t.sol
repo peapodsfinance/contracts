@@ -7,6 +7,7 @@ import "../../contracts/interfaces/IDecentralizedIndex.sol";
 
 // Mock DecentralizedIndex contract for testing
 contract MockDecentralizedIndex is IDecentralizedIndex {
+    uint8 public isFlashMinting;
     uint8 public unlocked = 1;
     uint256 public conversionRate;
 
@@ -19,6 +20,10 @@ contract MockDecentralizedIndex is IDecentralizedIndex {
     }
 
     function convertToAssets(uint256 shares) external view returns (uint256) {
+        return (shares * conversionRate) / 1e18;
+    }
+
+    function convertToAssetsPreFlashMint(uint256 shares) external view returns (uint256) {
         return (shares * conversionRate) / 1e18;
     }
 
@@ -167,10 +172,6 @@ contract MockDecentralizedIndex is IDecentralizedIndex {
     }
 
     function lpRewardsToken() external pure returns (address) {
-        return address(0);
-    }
-
-    function partner() external pure returns (address) {
         return address(0);
     }
 

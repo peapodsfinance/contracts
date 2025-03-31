@@ -81,11 +81,12 @@ import {MockUniV3Minter} from "./mocks/MockUniV3Minter.sol";
 import {MockV3TwapUtilities} from "./mocks/MockV3TwapUtilities.sol";
 
 import {PodHelperTest} from "../helpers/PodHelper.t.sol";
+import {LVFHelper} from "../helpers/LVFHelper.t.sol";
 
 // bytecode for etching with forge (echidna configures this in echidna.yaml)
 import {Bytecode} from "./helpers/Bytecode.sol";
 
-contract FuzzSetup is PodHelperTest, FuzzBase {
+contract FuzzSetup is PodHelperTest, LVFHelper, FuzzBase {
     /*///////////////////////////////////////////////////////////////
                             GLOBAL VARIABLES
     ///////////////////////////////////////////////////////////////*/
@@ -253,7 +254,7 @@ contract FuzzSetup is PodHelperTest, FuzzBase {
         _deployFraxPairs();
         _deployLendingAssetVault();
         _deployBalancerVault();
-        _deployLeverageManager();
+        _deployLeverageManagerHere();
         _deployFlashSources();
 
         _setupActors();
@@ -994,8 +995,9 @@ contract FuzzSetup is PodHelperTest, FuzzBase {
         }
     }
 
-    function _deployLeverageManager() internal {
-        _leverageManager = new LeverageManager("Test LM", "tLM", IIndexUtils(address(_indexUtils)));
+    function _deployLeverageManagerHere() internal {
+        _leverageManager =
+            LeverageManager(_deployLeverageManager("Test LM", "tLM", address(_indexUtils), address(this)));
 
         _leverageManager.setLendingPair(address(_pod1Peas), address(_fraxLPToken1Peas));
         _leverageManager.setLendingPair(address(_pod1Weth), address(_fraxLPToken1Weth));
