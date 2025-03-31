@@ -45,6 +45,15 @@ interface IDexAdapter {
         address _recipient
     ) external returns (uint256 _amountOut);
 
+    function swapV3Single(
+        address _tokenIn,
+        address _tokenOut,
+        int24 _tickSpacing,
+        uint256 _amountIn,
+        uint256 _amountOutMin,
+        address _recipient
+    ) external returns (uint256 _amountOut);
+
     function addLiquidity(
         address tokenA,
         address tokenB,

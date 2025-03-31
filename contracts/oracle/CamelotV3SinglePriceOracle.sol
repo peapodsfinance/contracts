@@ -6,10 +6,11 @@ import "../libraries/FullMath.sol";
 import "../libraries/TickMath.sol";
 import "../interfaces/IERC20Metadata.sol";
 import "../interfaces/IMinimalSinglePriceOracle.sol";
-import "../interfaces/IUniswapV3Pool.sol";
+import "../interfaces/IAlgebraFactory.sol";
+import "../interfaces/IAlgebraV3Pool.sol";
 import "./ChainlinkSinglePriceOracle.sol";
 
-contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
+contract CamelotV3SinglePriceOracle is ChainlinkSinglePriceOracle {
     constructor(address _sequencer) ChainlinkSinglePriceOracle(_sequencer) {}
 
     function getPriceUSD18(
@@ -37,24 +38,24 @@ contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
         view
         returns (uint256)
     {
-        address _t0 = IUniswapV3Pool(_pricePool).token0();
+        address _t0 = IAlgebraV3Pool(_pricePool).token0();
         return _normalizedPriceX96(
-            IUniswapV3Pool(_pricePool), _interval, _t0 == _priceToken ? IUniswapV3Pool(_pricePool).token1() : _t0
+            IAlgebraV3Pool(_pricePool), _interval, _t0 == _priceToken ? IAlgebraV3Pool(_pricePool).token1() : _t0
         );
     }
 
-    function _getSqrtPriceX96FromPool(IUniswapV3Pool _pool, uint32 _interval)
+    function _getSqrtPriceX96FromPool(IAlgebraV3Pool _pool, uint32 _interval)
         internal
         view
         returns (uint160 _sqrtPriceX96)
     {
         if (_interval == 0) {
-            (_sqrtPriceX96,,,,,,) = _pool.slot0();
+            (_sqrtPriceX96,,,,,,,) = _pool.globalState();
         } else {
             uint32[] memory secondsAgo = new uint32[](2);
             secondsAgo[0] = _interval;
-            secondsAgo[1] = 0; // to (now)
-            (int56[] memory tickCumulatives,) = _pool.observe(secondsAgo);
+            secondsAgo[1] = 0;
+            (int56[] memory tickCumulatives,,,) = _pool.getTimepoints(secondsAgo);
             int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
             int24 arithmeticMeanTick = int24(tickCumulativesDelta / int32(_interval));
             // Always round to negative infinity
@@ -63,7 +64,7 @@ contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
         }
     }
 
-    function _normalizedPriceX96(IUniswapV3Pool _pool, uint32 _twapInterval, address _numeratorToken)
+    function _normalizedPriceX96(IAlgebraV3Pool _pool, uint32 _twapInterval, address _numeratorToken)
         internal
         view
         returns (uint256)

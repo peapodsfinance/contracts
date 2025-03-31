@@ -223,7 +223,7 @@ contract aspTKNMinimalOracleFactoryTest is Test {
         );
 
         bytes memory optionalImmutables =
-            abi.encode(address(0), address(0), address(0), address(0), address(0), address(v2Reserves));
+            abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(v2Reserves));
 
         uint96 salt = 0;
 
@@ -258,7 +258,7 @@ contract aspTKNMinimalOracleFactoryTest is Test {
         );
 
         bytes memory optionalImmutables =
-            abi.encode(address(0), address(0), address(0), address(0), address(0), address(v2Reserves));
+            abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(v2Reserves));
 
         uint96 salt = 1;
 
@@ -293,7 +293,7 @@ contract aspTKNMinimalOracleFactoryTest is Test {
         );
 
         bytes memory optionalImmutables =
-            abi.encode(address(0), address(0), address(0), address(0), address(0), address(v2Reserves));
+            abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(v2Reserves));
 
         uint96 salt = 2;
 
@@ -316,7 +316,7 @@ contract aspTKNMinimalOracleFactoryTest is Test {
         );
 
         bytes memory optionalImmutables =
-            abi.encode(address(0), address(0), address(0), address(0), address(0), address(v2Reserves));
+            abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(v2Reserves));
 
         uint96 salt = 3;
 

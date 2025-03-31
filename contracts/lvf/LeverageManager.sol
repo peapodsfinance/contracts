@@ -646,7 +646,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         uint256 _tknBalBefore = _tkn.balanceOf(address(this));
         _tkn.safeTransferFrom(_user, address(this), _tknAmt);
         uint256 _pTknBalBefore = IERC20(_pod).balanceOf(address(this));
-        _tkn.approve(_pod, _tkn.balanceOf(address(this)) - _tknBalBefore);
+        _tkn.safeIncreaseAllowance(_pod, _tkn.balanceOf(address(this)) - _tknBalBefore);
         IDecentralizedIndex(_pod).bond(address(_tkn), _tkn.balanceOf(address(this)) - _tknBalBefore, _amtPtknMintMin);
         IERC20(_pod).balanceOf(address(this)) - _pTknBalBefore;
     }

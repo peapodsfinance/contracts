@@ -212,8 +212,7 @@ contract TokenRewards is Initializable, IInitializeSelector, ContextUpgradeable,
             _allRewardsTokens.push(_token);
         }
         if (totalShares == 0) {
-            require(_token == rewardsToken, "R");
-            _burnRewards(_amountTotal);
+            _burnRewards(_token, _amountTotal);
             return;
         }
 
@@ -223,7 +222,7 @@ contract TokenRewards is Initializable, IInitializeSelector, ContextUpgradeable,
             if (_yieldBurnFee > 0) {
                 uint256 _burnAmount = (_amountTotal * _yieldBurnFee) / PROTOCOL_FEE_ROUTER.protocolFees().DEN();
                 if (_burnAmount > 0) {
-                    _burnRewards(_burnAmount);
+                    _burnRewards(rewardsToken, _burnAmount);
                     _depositAmount -= _burnAmount;
                 }
             }
@@ -258,14 +257,19 @@ contract TokenRewards is Initializable, IInitializeSelector, ContextUpgradeable,
     function _resetExcluded(address _wallet) internal {
         for (uint256 _i; _i < _allRewardsTokens.length; _i++) {
             address _token = _allRewardsTokens[_i];
+
+            if (REWARDS_WHITELISTER.paused(_token)) {
+                continue;
+            }
+
             rewards[_token][_wallet].excluded = _cumulativeRewards(_token, shares[_wallet], true);
         }
     }
 
-    function _burnRewards(uint256 _burnAmount) internal {
-        try IPEAS(rewardsToken).burn(_burnAmount) {}
+    function _burnRewards(address _token, uint256 _burnAmount) internal {
+        try IPEAS(_token).burn(_burnAmount) {}
         catch {
-            IERC20(rewardsToken).safeTransfer(address(0xdead), _burnAmount);
+            IERC20(_token).safeTransfer(OwnableUpgradeable(address(V3_TWAP_UTILS)).owner(), _burnAmount);
         }
     }
 

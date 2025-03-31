@@ -177,7 +177,7 @@ contract LeverageFactoryTest is LVFHelper, PodHelperTest {
                 pod.lpStakingPool(),
                 0xAe750560b09aD1F5246f3b279b3767AfD1D79160 // UniV3: PEAS/DAI
             ),
-            abi.encode(address(0), address(0), address(0), address(0), address(0), address(_v2Res)),
+            abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(_v2Res)),
             // dummy data that is only needed for the fraxlend deployer mock
             abi.encode(uint32(0), address(0), uint64(0), uint256(0), uint256(0), uint256(0), uint256(0))
         );
@@ -543,7 +543,7 @@ contract LeverageFactoryTest is LVFHelper, PodHelperTest {
             abi.encode(
                 address(_clOracle), address(_uniOracle), address(_diaOracle), dai, false, false, address(0), peasClPool
             ),
-            abi.encode(address(0), address(0), address(0), address(0), address(0), address(_v2Res)),
+            abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(_v2Res)),
             // dummy data that is only needed for the fraxlend deployer mock
             abi.encode(uint32(0), address(0), uint64(0), uint256(0), uint256(0), uint256(0), uint256(0)),
             _isSelfLending

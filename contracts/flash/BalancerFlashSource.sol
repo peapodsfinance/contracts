@@ -53,6 +53,6 @@ contract BalancerFlashSource is FlashSourceBase, IBalancerFlashRecipient {
         FlashData memory _fData = abi.decode(_userData, (FlashData));
         _fData.fee = _feeAmounts[0];
         IERC20(_fData.token).safeTransfer(_fData.recipient, _fData.amount);
-        IFlashLoanRecipient(_fData.recipient).callback(_userData);
+        IFlashLoanRecipient(_fData.recipient).callback(abi.encode(_fData));
     }
 }

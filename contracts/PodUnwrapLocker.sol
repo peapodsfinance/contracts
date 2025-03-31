@@ -66,13 +66,16 @@ contract PodUnwrapLocker is Context, ReentrancyGuard {
         IDecentralizedIndex _podContract = IDecentralizedIndex(_pod);
         IDecentralizedIndex.IndexAssetInfo[] memory _podTokens = _podContract.getAllAssets();
         address[] memory _tokens = new address[](_podTokens.length);
+        address[] memory _tokenChecked = new address[](_podTokens.length);
         uint256[] memory _balancesBefore = new uint256[](_tokens.length);
 
         // Get token addresses and balances before debonding
         for (uint256 i = 0; i < _tokens.length; i++) {
             _tokens[i] = _podTokens[i].token;
+            _tokenChecked[i] = _tokens[i];
             _balancesBefore[i] = IERC20(_tokens[i]).balanceOf(address(this));
         }
+        require(!_doesAddressArrayHaveDup(_tokenChecked), "NOD");
         _podContract.debond(_amount, new address[](0), new uint8[](0));
 
         uint256[] memory _receivedAmounts = new uint256[](_tokens.length);
@@ -160,6 +163,18 @@ contract PodUnwrapLocker is Context, ReentrancyGuard {
         }
 
         emit TokensWithdrawn(_lockId, _user, _lock.tokens, _lock.amounts);
+    }
+
+    function _doesAddressArrayHaveDup(address[] memory _ary) internal pure returns (bool _hasDup) {
+        address _current;
+        for (uint256 i = 0; i < _ary.length; i++) {
+            _current = _ary[i];
+            for (uint256 j = 0; j < _ary.length; j++) {
+                if ((j != i) && (_current == _ary[j])) {
+                    _hasDup = true;
+                }
+            }
+        }
     }
 
     /**

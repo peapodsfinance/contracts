@@ -273,8 +273,14 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
         IERC20(dai).approve(address(leverageManager), pairedLpDesired);
         leverageManager.removeLeverage(
             positionId,
-            pairedLpDesired,
-            abi.encode(MockFraxlendPair(lendingPair).userCollateralBalance(custodian) / 2, 0, 0, 0, pairedLpDesired)
+            pairedLpDesired / 2,
+            abi.encode(MockFraxlendPair(lendingPair).userCollateralBalance(custodian) / 2, 0, 0, 0, pairedLpDesired / 2)
+        );
+        // one more time to make sure it doesn't break :)
+        leverageManager.removeLeverage(
+            positionId,
+            pairedLpDesired / 2,
+            abi.encode(MockFraxlendPair(lendingPair).userCollateralBalance(custodian) / 2, 0, 0, 0, pairedLpDesired / 2)
         );
 
         vm.stopPrank();
@@ -286,7 +292,7 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
             aspTkn.balanceOf(address(leverageManager)), 0, 1, "Collateral balance should not change for leverageManager"
         );
         assertApproxEqAbs(
-            IERC20(dai).balanceOf(address(leverageManager)), 0, 1, "Asset balance should not change for leverageManager"
+            IERC20(dai).balanceOf(address(leverageManager)), 0, 2, "Asset balance should not change for leverageManager"
         );
 
         // Verify the balance changes in the mock contracts

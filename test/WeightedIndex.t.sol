@@ -11,6 +11,7 @@ import {IDecentralizedIndex} from "../contracts/interfaces/IDecentralizedIndex.s
 import {IFlashLoanSource} from "../contracts/interfaces/IFlashLoanSource.sol";
 import {IStakingPoolToken} from "../contracts/interfaces/IStakingPoolToken.sol";
 import {WeightedIndex} from "../contracts/WeightedIndex.sol";
+import {FullMath} from "../contracts/libraries/FullMath.sol";
 import {MockFlashMintRecipient} from "./mocks/MockFlashMintRecipient.sol";
 import {PodHelperTest} from "./helpers/PodHelper.t.sol";
 import "forge-std/console.sol";
@@ -329,6 +330,14 @@ contract WeightedIndexTest is PodHelperTest {
         assertEq(assets, shares - ((shares * fee) / 10000), "Should return same amount when supply is 0");
     }
 
+    function test_convertToAssets_ZeroSupply_LargeNumbers() public view {
+        // When totalSupply is 0, convertToAssets should return the input amount
+        // as there's a 1:1 ratio when no shares exist
+        uint256 shares = type(uint256).max / 1e9;
+        uint256 assets = pod.convertToAssets(shares);
+        assertEq(assets, shares - ((shares * fee) / 10000), "Should return same amount when supply is 0");
+    }
+
     function test_convertToAssets_OneToOneRatio() public {
         // First bond to create initial supply with 1:1 ratio (minus fees)
         peas.approve(address(pod), bondAmt);
@@ -340,7 +349,18 @@ contract WeightedIndexTest is PodHelperTest {
         assertEq(assets, shares - ((shares * fee) / 10000), "Should maintain 1:1 ratio");
     }
 
-    function test_convertToAssets_DifferentRatio() public {
+    function test_convertToAssets_OneToOneRatio_LargeNumbers() public {
+        // First bond to create initial supply with 1:1 ratio (minus fees)
+        peas.approve(address(pod), bondAmt);
+        pod.bond(address(peas), bondAmt, 0);
+
+        // Calculate expected assets (should be same as shares since ratio is 1:1)
+        uint256 shares = type(uint256).max / 1e18;
+        uint256 assets = pod.convertToAssets(shares);
+        assertApproxEqAbs(assets, shares - FullMath.mulDiv(shares, fee, 10000), 1, "Should maintain 1:1 ratio");
+    }
+
+    function test_convertToAssets_DifferentRatio_2to1() public {
         // First bond to create initial supply
         peas.approve(address(pod), bondAmt);
         pod.bond(address(peas), bondAmt, 0);
@@ -356,10 +376,53 @@ contract WeightedIndexTest is PodHelperTest {
         assertEq(assets, shares * 2 - ((shares * 2 * fee) / 10000), "Should reflect 2:1 asset to share ratio");
     }
 
+    function test_convertToAssets_DifferentRatio_3to2() public {
+        // First bond to create initial supply
+        peas.approve(address(pod), bondAmt);
+        pod.bond(address(peas), bondAmt, 0);
+
+        // Create asset value increase by bonding and burning shares
+        peas.approve(address(pod), bondAmt / 2);
+        pod.bond(address(peas), bondAmt / 2, 0);
+        pod.burn(bondAmt / 2);
+
+        // Now 2 shares should be worth 3 assets
+        uint256 shares = 1e18;
+        uint256 assets = pod.convertToAssets(shares);
+        uint256 newAssets = (shares * 3) / 2;
+        assertEq(assets, newAssets - ((newAssets * fee) / 10000), "Should reflect 3:2 asset to share ratio");
+    }
+
+    function test_convertToAssets_DifferentRatio_LargeNumbers() public {
+        // First bond to create initial supply
+        peas.approve(address(pod), bondAmt);
+        pod.bond(address(peas), bondAmt, 0);
+
+        // Create asset value increase by bonding and burning shares
+        peas.approve(address(pod), bondAmt);
+        pod.bond(address(peas), bondAmt, 0);
+        pod.burn(bondAmt);
+
+        // Now 1 share should be worth 2 assets
+        uint256 shares = type(uint256).max / 2 ** (256 / 2) - 1;
+        uint256 assets = pod.convertToAssets(shares);
+        assertApproxEqAbs(
+            assets, shares * 2 - ((shares * 2 * fee) / 10000), 1, "Should reflect 2:1 asset to share ratio"
+        );
+    }
+
     function test_convertToShares_ZeroSupply() public view {
         // When totalSupply is 0, convertToShares should return the input amount
         // as there's a 1:1 ratio when no shares exist
         uint256 assets = 1e18;
+        uint256 shares = pod.convertToShares(assets);
+        assertEq(shares, assets - ((assets * fee) / 10000), "Should return same amount when supply is 0");
+    }
+
+    function test_convertToShares_ZeroSupply_LargeNumbers() public view {
+        // When totalSupply is 0, convertToShares should return the input amount
+        // as there's a 1:1 ratio when no shares exist
+        uint256 assets = type(uint256).max / 1e9;
         uint256 shares = pod.convertToShares(assets);
         assertEq(shares, assets - ((assets * fee) / 10000), "Should return same amount when supply is 0");
     }
@@ -375,7 +438,18 @@ contract WeightedIndexTest is PodHelperTest {
         assertEq(shares, assets - ((assets * fee) / 10000), "Should maintain 1:1 ratio");
     }
 
-    function test_convertToShares_DifferentRatio() public {
+    function test_convertToShares_OneToOneRatio_LargeNumbers() public {
+        // First bond to create initial supply with 1:1 ratio (minus fees)
+        peas.approve(address(pod), bondAmt);
+        pod.bond(address(peas), bondAmt, 0);
+
+        // Calculate expected shares (should be same as assets since ratio is 1:1)
+        uint256 assets = type(uint256).max / 1e18;
+        uint256 shares = pod.convertToShares(assets);
+        assertApproxEqAbs(shares, assets - ((assets * fee) / 10000), 1, "Should maintain 1:1 ratio");
+    }
+
+    function test_convertToShares_DifferentRatio_1to2() public {
         // First bond to create initial supply
         peas.approve(address(pod), bondAmt);
         pod.bond(address(peas), bondAmt, 0);
@@ -387,6 +461,39 @@ contract WeightedIndexTest is PodHelperTest {
 
         // Now 2 assets should be worth 1 share (inverse of convertToAssets ratio)
         uint256 assets = 2e18;
+        uint256 shares = pod.convertToShares(assets);
+        assertEq(shares, assets / 2 - (((assets / 2) * fee) / 10000), "Should reflect 1:2 share to asset ratio");
+    }
+
+    function test_convertToShares_DifferentRatio_2to3() public {
+        // First bond to create initial supply
+        peas.approve(address(pod), bondAmt);
+        pod.bond(address(peas), bondAmt, 0);
+
+        // Create asset value increase by bonding and burning shares
+        peas.approve(address(pod), bondAmt / 2);
+        pod.bond(address(peas), bondAmt / 2, 0);
+        pod.burn(bondAmt / 2);
+
+        // Now 3 assets should be worth 2 share (inverse of convertToAssets ratio)
+        uint256 assets = 3e18;
+        uint256 shares = pod.convertToShares(assets);
+        uint256 newShares = (assets * 2) / 3;
+        assertEq(shares, newShares - ((newShares * fee) / 10000), "Should reflect 2:3 share to asset ratio");
+    }
+
+    function test_convertToShares_DifferentRatio_LargeNumbers() public {
+        // First bond to create initial supply
+        peas.approve(address(pod), bondAmt);
+        pod.bond(address(peas), bondAmt, 0);
+
+        // Create asset value increase by bonding and burning shares
+        peas.approve(address(pod), bondAmt);
+        pod.bond(address(peas), bondAmt, 0);
+        pod.burn(bondAmt);
+
+        // Now 2 assets should be worth 1 share (inverse of convertToAssets ratio)
+        uint256 assets = type(uint256).max / 1e18;
         uint256 shares = pod.convertToShares(assets);
         assertEq(shares, assets / 2 - (((assets / 2) * fee) / 10000), "Should reflect 1:2 share to asset ratio");
     }
