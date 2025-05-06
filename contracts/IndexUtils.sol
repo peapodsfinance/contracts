@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/IPeripheryImmutableState.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "./libraries/FullMath.sol";
 import "./interfaces/IDecentralizedIndex.sol";
 import "./interfaces/IDexAdapter.sol";
 import "./interfaces/IIndexUtils.sol";
@@ -33,7 +34,9 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
         for (uint256 _i; _i < _al; _i++) {
             uint256 _amountNeeded = _indexFund.totalSupply() == 0
                 ? _indexFund.getInitialAmount(_token, _amount, _assets[_i].token)
-                : (_indexFund.totalAssets(_assets[_i].token) * _tokenAmtSupplyRatioX96) / FixedPoint96.Q96;
+                : FullMath.mulDivRoundingUp(
+                    _indexFund.totalAssets(_assets[_i].token), _tokenAmtSupplyRatioX96, FixedPoint96.Q96
+                );
             _balsBefore[_i] = IERC20(_assets[_i].token).balanceOf(address(this));
             IERC20(_assets[_i].token).safeTransferFrom(_msgSender(), address(this), _amountNeeded);
             IERC20(_assets[_i].token).safeIncreaseAllowance(address(_indexFund), _amountNeeded);

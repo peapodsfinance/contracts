@@ -268,7 +268,7 @@ contract LendingAssetVault is IERC4626, ILendingAssetVault, ERC20, ERC20Permit, 
             uint256 _newVaultCbr = _totalAsset.toAmount(PRECISION, false);
 
             uint256 _vaultAssetRatioChange = _prevVaultCbr > _newVaultCbr
-                ? ((PRECISION * _prevVaultCbr) / _newVaultCbr) - PRECISION
+                ? PRECISION - ((PRECISION * _newVaultCbr) / _prevVaultCbr)
                 : ((PRECISION * _newVaultCbr) / _prevVaultCbr) - PRECISION;
             uint256 _currentAssetsUtilized = vaultUtilization[_vault];
             uint256 _changeUtilizedState = (_currentAssetsUtilized * _vaultAssetRatioChange) / PRECISION;

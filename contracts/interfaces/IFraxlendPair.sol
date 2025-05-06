@@ -53,6 +53,10 @@ interface IFraxlendPair is IERC20 {
         external
         returns (uint256, uint256, uint256, CurrentRateInfo memory, VaultAccount memory, VaultAccount memory);
 
+    function updateExchangeRate()
+        external
+        returns (bool _isBorrowAllowed, uint256 _lowExchangeRate, uint256 _highExchangeRate);
+
     function deposit(uint256 _amount, address _receiver) external returns (uint256 _sharesReceived);
 
     function redeem(uint256 _shares, address _receiver, address _owner) external returns (uint256 _amountToReturn);

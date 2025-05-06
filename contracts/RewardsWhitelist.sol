@@ -20,10 +20,10 @@ contract RewardsWhitelist is IRewardsWhitelister, Ownable {
         return _whitelistAry;
     }
 
-    function setOmitFromDebondFees(address _address, bool _isWhitelisted) external onlyOwner {
+    function setWhitelistFromDebondFees(address _address, bool _isWhitelisted) external onlyOwner {
         require(isWhitelistedFromDebondFee[_address] != _isWhitelisted, "T");
         isWhitelistedFromDebondFee[_address] = _isWhitelisted;
-        emit SetOmitFromDebondFees(_address, _isWhitelisted);
+        emit SetWhitelistFromDebondFees(_address, _isWhitelisted);
     }
 
     function setPaused(address _token, bool _isPaused) external onlyOwner {

@@ -27,24 +27,24 @@ contract RewardsWhitelistTest is Test {
         assertFalse(whitelist.whitelist(token1));
     }
 
-    function testSetOmitFromDebondFees() public {
-        whitelist.setOmitFromDebondFees(token1, true);
+    function testSetWhitelistFromDebondFees() public {
+        whitelist.setWhitelistFromDebondFees(token1, true);
         assertTrue(whitelist.isWhitelistedFromDebondFee(token1));
 
-        whitelist.setOmitFromDebondFees(token1, false);
+        whitelist.setWhitelistFromDebondFees(token1, false);
         assertFalse(whitelist.isWhitelistedFromDebondFee(token1));
     }
 
-    function testSetOmitFromDebondFeesOnlyOwner() public {
+    function testSetWhitelistFromDebondFeesOnlyOwner() public {
         vm.prank(user);
         vm.expectRevert();
-        whitelist.setOmitFromDebondFees(token1, true);
+        whitelist.setWhitelistFromDebondFees(token1, true);
     }
 
-    function testSetOmitFromDebondFeesSameValue() public {
-        whitelist.setOmitFromDebondFees(token1, true);
+    function testSetWhitelistFromDebondFeesSameValue() public {
+        whitelist.setWhitelistFromDebondFees(token1, true);
         vm.expectRevert();
-        whitelist.setOmitFromDebondFees(token1, true);
+        whitelist.setWhitelistFromDebondFees(token1, true);
     }
 
     function testSetPaused() public {

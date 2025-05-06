@@ -13,6 +13,19 @@ import "../interfaces/IMinimalSinglePriceOracle.sol";
 import "../interfaces/IV2Reserves.sol";
 
 contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
+    enum PriceSourceType {
+        DEX_CL,
+        CHAINLINK,
+        DIA
+    }
+
+    struct PriceSource {
+        PriceSourceType priceType;
+        address singlePriceOracle;
+        address quoteFeed;
+        address baseFeed;
+    }
+
     /// @dev The base token we will price against in the oracle. Will be either pairedLpAsset
     /// @dev or the borrow token in a lending pair
     address public immutable BASE_TOKEN;
@@ -37,6 +50,9 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     address public immutable CHAINLINK_BASE_PRICE_FEED;
     address public immutable CHAINLINK_QUOTE_PRICE_FEED;
 
+    /// @dev DIA oracle config to fetch a 2nd price for the oracle
+    address public immutable DIA_QUOTE_PRICE_FEED;
+
     /// @dev Single price oracle helpers to get already formatted prices that are easy to convert/use
     address public immutable CHAINLINK_SINGLE_PRICE_ORACLE;
     address public immutable UNISWAP_V3_SINGLE_PRICE_ORACLE;
@@ -45,6 +61,9 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     /// @dev Different networks will use different forked implementations of UniswapV2, so
     /// @dev this allows us to define a uniform interface to fetch the reserves of each asset in a pair
     IV2Reserves public immutable V2_RESERVES;
+
+    // the price feed sources stored and used for pricing in oracle
+    PriceSource[] public priceFeeds;
 
     /// @dev The pod staked LP token and oracle quote token that custodies UniV2 LP tokens
     address public spTkn; // QUOTE_TOKEN
@@ -59,7 +78,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     error NotValidSpTkn();
     error OnlyOneOrNoBaseConversionsRequired();
     error PodLocked();
-    error PrimaryOracleNotPresent();
+    error PrimaryOracleConfigInvalid();
     error QuoteAndBaseChainlinkFeedsNotProvided();
     error SpTknAlreadySet();
     error UnableToPriceBasePerSpTkn();
@@ -87,21 +106,52 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
             BASE_CONVERSION_DIA_FEED,
             CHAINLINK_BASE_PRICE_FEED,
             CHAINLINK_QUOTE_PRICE_FEED,
+            DIA_QUOTE_PRICE_FEED,
             _v2Reserves
-        ) = abi.decode(_optionalImmutables, (address, address, address, address, address, address));
+        ) = abi.decode(_optionalImmutables, (address, address, address, address, address, address, address));
         V2_RESERVES = IV2Reserves(_v2Reserves);
 
-        if (
-            UNDERLYING_TKN_CL_POOL == address(0) && CHAINLINK_BASE_PRICE_FEED == address(0)
-                && CHAINLINK_QUOTE_PRICE_FEED == address(0)
-        ) {
-            revert PrimaryOracleNotPresent();
-        }
         if (
             (CHAINLINK_QUOTE_PRICE_FEED != address(0) && CHAINLINK_BASE_PRICE_FEED == address(0))
                 || (CHAINLINK_QUOTE_PRICE_FEED == address(0) && CHAINLINK_BASE_PRICE_FEED != address(0))
         ) {
             revert QuoteAndBaseChainlinkFeedsNotProvided();
+        }
+
+        // build price feeds array to be used for pricing in oracle
+        if (UNDERLYING_TKN_CL_POOL != address(0)) {
+            priceFeeds.push(
+                PriceSource({
+                    priceType: PriceSourceType.DEX_CL,
+                    singlePriceOracle: UNISWAP_V3_SINGLE_PRICE_ORACLE,
+                    quoteFeed: UNDERLYING_TKN_CL_POOL,
+                    baseFeed: address(0)
+                })
+            );
+        }
+        if (CHAINLINK_QUOTE_PRICE_FEED != address(0)) {
+            priceFeeds.push(
+                PriceSource({
+                    priceType: PriceSourceType.CHAINLINK,
+                    singlePriceOracle: CHAINLINK_SINGLE_PRICE_ORACLE,
+                    quoteFeed: CHAINLINK_QUOTE_PRICE_FEED,
+                    baseFeed: CHAINLINK_BASE_PRICE_FEED
+                })
+            );
+        }
+        if (DIA_QUOTE_PRICE_FEED != address(0)) {
+            priceFeeds.push(
+                PriceSource({
+                    priceType: PriceSourceType.DIA,
+                    singlePriceOracle: DIA_SINGLE_PRICE_ORACLE,
+                    quoteFeed: DIA_QUOTE_PRICE_FEED,
+                    baseFeed: address(0)
+                })
+            );
+        }
+        // first source must have quote feed and there should only be two sources provided
+        if (priceFeeds[0].quoteFeed == address(0) || priceFeeds.length > 2) {
+            revert PrimaryOracleConfigInvalid();
         }
 
         // only one (or neither) of the base conversion config should be populated
@@ -139,36 +189,41 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         override
         returns (bool _isBadData, uint256 _priceLow, uint256 _priceHigh)
     {
-        uint256 _priceOne18;
         uint8 _baseDec = IERC20Metadata(BASE_TOKEN).decimals();
-        if (UNDERLYING_TKN_CL_POOL != address(0)) {
-            uint256 _priceSpTKNBase = _calculateSpTknPerBase(0);
-            _isBadData = _priceSpTKNBase == 0;
-            _priceOne18 = _priceSpTKNBase * 10 ** (_baseDec > 18 ? _baseDec - 18 : 18 - _baseDec);
+        uint256[] memory _prices = new uint256[](2);
+        for (uint256 _i; _i < priceFeeds.length; _i++) {
+            if (priceFeeds[_i].priceType == PriceSourceType.DEX_CL) {
+                uint256 _priceSpTKNBase = _calculateSpTknPerBase(0);
+                _isBadData = _isBadData || _priceSpTKNBase == 0;
+                _prices[_i] = _priceSpTKNBase * 10 ** (_baseDec > 18 ? _baseDec - 18 : 18 - _baseDec);
+            } else if (priceFeeds[_i].priceType == PriceSourceType.CHAINLINK) {
+                uint256 _clPrice18 = _chainlinkBasePerPaired18();
+                uint256 _clPriceBaseSpTKN = _calculateSpTknPerBase(_clPrice18);
+                _prices[_i] = _clPriceBaseSpTKN * 10 ** (_baseDec > 18 ? _baseDec - 18 : 18 - _baseDec);
+                _isBadData = _isBadData || _clPrice18 == 0;
+            } else if (priceFeeds[_i].priceType == PriceSourceType.DIA) {
+                (bool _subBadData, uint256 _diaPrice18) = IMinimalSinglePriceOracle(DIA_SINGLE_PRICE_ORACLE)
+                    .getPriceUSD18(BASE_CONVERSION_CHAINLINK_FEED, underlyingTkn, priceFeeds[_i].quoteFeed, 0);
+                (bool _subBadData2, uint256 _diaPrice182) = _applyBaseConversionToPrice(_diaPrice18, false);
+                uint256 _diaPriceBaseSpTKN = _calculateSpTknPerBase(_diaPrice182);
+                _prices[_i] = _diaPriceBaseSpTKN * 10 ** (_baseDec > 18 ? _baseDec - 18 : 18 - _baseDec);
+                _isBadData = _isBadData || _subBadData || _subBadData2;
+            }
         }
 
-        uint256 _priceTwo18 = _priceOne18;
-        if (CHAINLINK_BASE_PRICE_FEED != address(0) && CHAINLINK_QUOTE_PRICE_FEED != address(0)) {
-            uint256 _clPrice18 = _chainlinkBasePerPaired18();
-            uint256 _clPriceBaseSpTKN = _calculateSpTknPerBase(_clPrice18);
-            _priceTwo18 = _clPriceBaseSpTKN * 10 ** (_baseDec > 18 ? _baseDec - 18 : 18 - _baseDec);
-            _isBadData = _isBadData || _clPrice18 == 0;
-        }
-
-        if (_priceOne18 == 0 && _priceTwo18 == 0) {
+        if (_prices[0] == 0 && _prices[1] == 0) {
             revert NoPriceAvailableFromSources();
         }
 
-        if (_priceOne18 == 0) {
-            _priceLow = _priceTwo18;
-            _priceHigh = _priceTwo18;
-        } else if (_priceTwo18 == 0) {
-            _priceLow = _priceOne18;
-            _priceHigh = _priceOne18;
+        if (_prices[0] == 0) {
+            _priceLow = _prices[1];
+            _priceHigh = _prices[1];
+        } else if (_prices[1] == 0) {
+            _priceLow = _prices[0];
+            _priceHigh = _prices[0];
         } else {
             // If the prices are the same it means the CL price was pulled as the UniV3 price
-            (_priceLow, _priceHigh) =
-                _priceOne18 > _priceTwo18 ? (_priceTwo18, _priceOne18) : (_priceOne18, _priceTwo18);
+            (_priceLow, _priceHigh) = _prices[0] > _prices[1] ? (_prices[1], _prices[0]) : (_prices[0], _prices[1]);
         }
     }
 
@@ -206,7 +261,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         // pull from UniV3 TWAP if passed as 0
         if (_price18 == 0) {
             bool _isBadData;
-            (_isBadData, _price18) = _getDefaultPrice18();
+            (_isBadData, _price18) = _getDefaultPriceBasePerQuote18();
             if (_isBadData) {
                 return 0;
             }
@@ -220,15 +275,36 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         _basePerPTkn18 = _accountForUnwrapFeeInPrice(pod, _basePerPTkn18);
     }
 
-    function _getDefaultPrice18() internal view returns (bool _isBadData, uint256 _price18) {
-        (_isBadData, _price18) = IMinimalSinglePriceOracle(UNISWAP_V3_SINGLE_PRICE_ORACLE).getPriceUSD18(
-            BASE_CONVERSION_CHAINLINK_FEED, underlyingTkn, UNDERLYING_TKN_CL_POOL, twapInterval
-        );
+    function _getDefaultPriceBasePerQuote18() internal view returns (bool _isBadData, uint256 _price18) {
+        if (priceFeeds[0].priceType == PriceSourceType.CHAINLINK) {
+            (_isBadData, _price18) = IMinimalSinglePriceOracle(priceFeeds[0].singlePriceOracle).getPriceUSD18(
+                priceFeeds[0].quoteFeed, priceFeeds[0].baseFeed, address(0), 0
+            );
+        } else {
+            (_isBadData, _price18) = IMinimalSinglePriceOracle(priceFeeds[0].singlePriceOracle).getPriceUSD18(
+                BASE_CONVERSION_CHAINLINK_FEED, underlyingTkn, priceFeeds[0].quoteFeed, twapInterval
+            );
+        }
         if (_isBadData) {
             return (true, 0);
         }
+        (_isBadData, _price18) = _applyBaseConversionToPrice(_price18, false);
+    }
 
-        if (BASE_CONVERSION_DIA_FEED != address(0)) {
+    function _applyBaseConversionToPrice(uint256 _inputPrice18, bool _includeChainlink)
+        internal
+        view
+        returns (bool _isBadData, uint256 _price18)
+    {
+        _price18 = _inputPrice18;
+        if (_includeChainlink && BASE_CONVERSION_CHAINLINK_FEED != address(0)) {
+            (bool _subBadData, uint256 _baseConvPrice18) = IMinimalSinglePriceOracle(CHAINLINK_SINGLE_PRICE_ORACLE)
+                .getPriceUSD18(CHAINLINK_QUOTE_PRICE_FEED, CHAINLINK_BASE_PRICE_FEED, address(0), 0);
+            if (_subBadData) {
+                return (true, 0);
+            }
+            _price18 = (10 ** 18 * _price18) / _baseConvPrice18;
+        } else if (BASE_CONVERSION_DIA_FEED != address(0)) {
             (bool _subBadData, uint256 _baseConvPrice18) = IMinimalSinglePriceOracle(DIA_SINGLE_PRICE_ORACLE)
                 .getPriceUSD18(address(0), BASE_IN_CL, BASE_CONVERSION_DIA_FEED, 0);
             if (_subBadData) {

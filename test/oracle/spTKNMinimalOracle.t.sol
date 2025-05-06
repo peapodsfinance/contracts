@@ -54,6 +54,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 address(0),
                 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6, // CL: USDC / USD
                 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // CL: BTC / USD
+                address(0),
                 address(_v2Res)
             )
         );
@@ -82,13 +83,13 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 IDecentralizedIndex(_newPod).lpStakingPool(),
                 0xAe750560b09aD1F5246f3b279b3767AfD1D79160 // UniV3: PEAS / DAI
             ),
-            abi.encode(address(0), address(0), address(0), address(0), address(0), address(_v2Res))
+            abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(_v2Res))
         );
         uint256 _price18 = oraclePEASDAI.getPodPerBasePrice();
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _price18,
             0.25 ether, // NOTE: At the time of writing test DAI/PEAS == $4, so inverse is 1/4 == 0.25
-            1e18 // NOTE: At the time of writing test DAI/PEAS ~= $4, so _price18 would be ~1/4 == 0.25, so precision to <= 1 here (it's wide I know)
+            0.2e18 // NOTE: At the time of writing test DAI/PEAS ~= $4, so _price18 would be ~1/4 == 0.25, so precision to <= 1 here (it's wide I know)
         );
     }
 
@@ -106,7 +107,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 IDecentralizedIndex(_newPod).lpStakingPool(),
                 0xAe750560b09aD1F5246f3b279b3767AfD1D79160 // UniV3: PEAS / DAI
             ),
-            abi.encode(address(0), address(0), address(0), address(0), address(0), address(_v2Res))
+            abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(_v2Res))
         );
         (bool _isBadData, uint256 _priceLow, uint256 _priceHigh) = oraclePEASDAI.getPrices();
 
@@ -114,22 +115,22 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         console.log("unsafePrice %s - priceLow %s", _unsafePrice18, _priceLow);
         console.log("unsafePrice %s - priceHigh %s", _unsafePrice18, _priceHigh);
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceLow,
             _unsafePrice18,
-            1e18 // TODO: tighten this up
+            0.2e18 // TODO: tighten this up
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceHigh,
             _unsafePrice18,
-            1e18 // TODO: tighten this up
+            0.2e18 // TODO: tighten this up
         );
         // accounting for unwrap fee makes oracle price a bit higher
         // assertGt(_priceLow, _unsafePrice18); // TODO
         assertEq(_isBadData, false, "Bad data was passed");
     }
 
-    function test_getPrices_PEASDAI_DIAOracle() public {
+    function test_getPrices_PEASDAI_DIABaseConversionOracle() public {
         MockDIAOracleV2 _peasDiaOracle = new MockDIAOracleV2();
         _peasDiaOracle.setValue("DAI/USD", 100000000, uint128(block.timestamp));
 
@@ -146,7 +147,9 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 IDecentralizedIndex(_newPod).lpStakingPool(),
                 0xAe750560b09aD1F5246f3b279b3767AfD1D79160 // UniV3: PEAS / DAI
             ),
-            abi.encode(address(0), address(0), address(_peasDiaOracle), address(0), address(0), address(_v2Res))
+            abi.encode(
+                address(0), address(0), address(_peasDiaOracle), address(0), address(0), address(0), address(_v2Res)
+            )
         );
         (bool _isBadData, uint256 _priceLow, uint256 _priceHigh) = oraclePEASDAI_DIA.getPrices();
 
@@ -154,15 +157,76 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         console.log("unsafePrice %s - priceLow %s", _unsafePrice18, _priceLow);
         console.log("unsafePrice %s - priceHigh %s", _unsafePrice18, _priceHigh);
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceLow,
             _unsafePrice18,
-            1e18 // TODO: tighten this up
+            0.2e18 // TODO: tighten this up
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceHigh,
             _unsafePrice18,
-            1e18 // TODO: tighten this up
+            0.2e18 // TODO: tighten this up
+        );
+        // accounting for unwrap fee makes oracle price a bit higher
+        // assertGt(_priceLow, _unsafePrice18); // TODO
+        assertEq(_isBadData, false, "Bad data was passed");
+    }
+
+    function test_getPrices_PEASDAI_DIAPrimaryOracle() public {
+        // setup dup PEAS/DAI pod to get price to put into DIA oracle
+        address __podToDup = IStakingPoolToken_OLD(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
+        address __newPod = _dupPodAndSeedLp(__podToDup, address(0), 0, 0);
+        spTKNMinimalOracle _oraclePEASDAI = new spTKNMinimalOracle(
+            abi.encode(
+                address(_clOracle),
+                address(_uniOracle),
+                address(_diaOracle),
+                0x6B175474E89094C44Da98b954EedeAC495271d0F, // DAI
+                false,
+                false,
+                IDecentralizedIndex(__newPod).lpStakingPool(),
+                0xAe750560b09aD1F5246f3b279b3767AfD1D79160 // UniV3: PEAS / DAI
+            ),
+            abi.encode(address(0), address(0), address(0), address(0), address(0), address(0), address(_v2Res))
+        );
+        uint256 _pTknPerDaiPrice18 = _oraclePEASDAI.getPodPerBasePrice();
+
+        // setup DIA oracle with pod/dai price
+        MockDIAOracleV2 _peasDiaOracle = new MockDIAOracleV2();
+        _peasDiaOracle.setValue("PEAS/USD", uint128(10 ** (18 + 8) / _pTknPerDaiPrice18), uint128(block.timestamp)); // 8 decimal precision
+
+        address _podToDup = IStakingPoolToken_OLD(0x4D57ad8FB14311e1Fc4b3fcaC62129506FF373b1).indexFund(); // spPDAI
+        address _newPod = _dupPodAndSeedLp(_podToDup, address(0), 0, 0);
+        spTKNMinimalOracle oraclePEASDAI_DIA = new spTKNMinimalOracle(
+            abi.encode(
+                address(_clOracle),
+                address(_uniOracle),
+                address(_diaOracle),
+                0x6B175474E89094C44Da98b954EedeAC495271d0F, // DAI
+                false,
+                false,
+                IDecentralizedIndex(_newPod).lpStakingPool(),
+                address(0)
+            ),
+            abi.encode(
+                address(0), address(0), address(0), address(0), address(0), address(_peasDiaOracle), address(_v2Res)
+            )
+        );
+        (bool _isBadData, uint256 _priceLow, uint256 _priceHigh) = oraclePEASDAI_DIA.getPrices();
+
+        uint256 _unsafePrice18 = _getUnsafeSpTknPrice18(address(oraclePEASDAI_DIA));
+        console.log("unsafePrice %s - priceLow %s", _unsafePrice18, _priceLow);
+        console.log("unsafePrice %s - priceHigh %s", _unsafePrice18, _priceHigh);
+
+        assertApproxEqRel(
+            _priceLow,
+            _unsafePrice18,
+            0.2e18 // TODO: tighten this up
+        );
+        assertApproxEqRel(
+            _priceHigh,
+            _unsafePrice18,
+            0.2e18 // TODO: tighten this up
         );
         // accounting for unwrap fee makes oracle price a bit higher
         // assertGt(_priceLow, _unsafePrice18); // TODO
@@ -189,6 +253,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 address(0),
                 address(0),
                 address(0),
+                address(0),
                 address(_v2Res)
             )
         );
@@ -198,16 +263,16 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         console.log("unsafePrice %s - priceLow %s", _unsafePrice18, _priceLow);
         console.log("unsafePrice %s - priceHigh %s", _unsafePrice18, _priceHigh);
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceLow,
             _unsafePrice18,
-            1e18, // TODO: tighten this up
+            0.2e18, // TODO: tighten this up
             "priceLow is not appoximately equal to unsafe price"
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             _priceHigh,
             _unsafePrice18,
-            1e18, // TODO: tighten this up
+            0.2e18, // TODO: tighten this up
             "_priceHigh is not appoximately equal to unsafe price"
         );
         assertEq(_isBadData, false, "Bad data was passed");
@@ -231,6 +296,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
             abi.encode(
                 address(0),
                 0x88051B0eea095007D3bEf21aB287Be961f3d8598, // UniV3: OHM / WETH
+                address(0),
                 address(0),
                 address(0),
                 address(0),
@@ -281,6 +347,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 address(0),
                 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6, // CL: USDC / USD
                 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // CL: BTC / USD
+                address(0),
                 address(_v2Res)
             )
         );
@@ -312,7 +379,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     //     address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
     //     address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 20, 0); // $20 pOHM, $1 USDC, 20/1 = 20
 
-    //     vm.expectRevert(spTKNMinimalOracle.PrimaryOracleNotPresent.selector);
+    //     vm.expectRevert(spTKNMinimalOracle.PrimaryOracleConfigInvalid.selector);
     //     new spTKNMinimalOracle(
     //         abi.encode(
     //             address(_clOracle),
@@ -330,6 +397,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     //             address(0),
     //             address(0), // *** no chainink base feed provided
     //             address(0), // *** no chainlink quote feed provided
+    //             address(0),
     //             address(_v2Res)
     //         )
     //     );
@@ -352,6 +420,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     //             address(0),
     //             address(0), // *** no chainink base feed provided
     //             0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // CL: BTC / USD
+    //             address(0),
     //             address(_v2Res)
     //         )
     //     );
@@ -378,6 +447,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 address(0),
                 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6, // CL: USDC / USD
                 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // CL: BTC / USD
+                address(0),
                 address(_v2Res)
             )
         );
@@ -407,7 +477,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     function test_getPrices_BTCUSDC_BTCWETH_ClPool() public {
         address _usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
         address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 22, 0); // $22 pOHM, $1 USDC, 22/1
+        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 28, 0); // $28 pOHM, $1 USDC, 28/1
         spTKNMinimalOracle oracleBTCUSDC1 = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),
@@ -425,6 +495,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 address(0),
                 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6, // CL: USDC / USD
                 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // CL: BTC / USD
+                address(0),
                 address(_v2Res)
             )
         );
@@ -447,6 +518,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 address(0),
                 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6, // CL: USDC / USD
                 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // CL: BTC / USD
+                address(0),
                 address(_v2Res)
             )
         );
@@ -491,7 +563,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     function test_getPrices_BTCWETH() public {
         address weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
         address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, weth, 0, 122); // $2700 ETH, $22 pOHM, 2700/22
+        address _newPod = _dupPodAndSeedLp(_podToDup, weth, 0, 64); // $1800 ETH, $28 pOHM, 1800/28
         spTKNMinimalOracle oracleBTCWETH = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),
@@ -509,6 +581,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 address(0),
                 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419, // CL: ETH / USD
                 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // CL: BTC / USD
+                address(0),
                 address(_v2Res)
             )
         );
@@ -558,6 +631,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 address(0),
                 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419, // CL: ETH / USD
                 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // CL: BTC / USD
+                address(0),
                 address(_v2Res)
             )
         );
@@ -596,6 +670,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
                 address(0),
                 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419, // CL: ETH / USD
                 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // CL: BTC / USD
+                address(0),
                 address(_v2Res)
             )
         );

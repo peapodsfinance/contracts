@@ -118,6 +118,13 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
         }
     }
 
+    function updateExchangeRate()
+        external
+        view
+        override
+        returns (bool _isBorrowAllowed, uint256 _lowExchangeRate, uint256 _highExchangeRate)
+    {}
+
     function deposit(uint256 _amount, address _receiver) external override returns (uint256 _sharesReceived) {
         IERC20(_asset).transferFrom(msg.sender, address(this), _amount);
 
@@ -159,8 +166,10 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
         _shares = _totalBorrow.shares == 0 ? _borrowAmount : (_borrowAmount * _totalBorrow.shares) / _totalBorrow.amount;
         if (_shares == 0) _shares = _borrowAmount;
 
-        _userBorrowShares[_receiver] += _shares;
-        _userCollateralBalance[_receiver] += _collateralAmount;
+        _userBorrowShares[msg.sender] += _shares;
+        if (_collateralAmount > 0) {
+            _addCollateral(_collateralAmount, msg.sender);
+        }
 
         // Update total borrow tracking
         _totalBorrow.amount += uint128(_borrowAmount);
@@ -187,13 +196,17 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
     }
 
     function addCollateral(uint256 _collateralAmount, address _borrower) external override {
+        _addCollateral(_collateralAmount, _borrower);
+    }
+
+    function _addCollateral(uint256 _collateralAmount, address _borrower) internal {
         IERC20(_collateralContract).transferFrom(msg.sender, address(this), _collateralAmount);
         _userCollateralBalance[_borrower] += _collateralAmount;
     }
 
     function removeCollateral(uint256 _collateralAmount, address _receiver) external override {
-        require(_userCollateralBalance[_receiver] >= _collateralAmount, "Insufficient collateral");
-        _userCollateralBalance[_receiver] -= _collateralAmount;
-        IERC20(_collateralContract).transfer(msg.sender, _collateralAmount);
+        require(_userCollateralBalance[msg.sender] >= _collateralAmount, "Insufficient collateral");
+        _userCollateralBalance[msg.sender] -= _collateralAmount;
+        IERC20(_collateralContract).transfer(_receiver, _collateralAmount);
     }
 }

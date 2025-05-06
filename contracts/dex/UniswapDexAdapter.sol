@@ -137,6 +137,16 @@ contract UniswapDexAdapter is IDexAdapter, Context {
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }
 
+    function swapV3Single(address, address, int24, uint256, uint256, address)
+        external
+        virtual
+        override
+        returns (uint256 _amountOut)
+    {
+        _amountOut;
+        require(false, "NI3");
+    }
+
     function addLiquidity(
         address _tokenA,
         address _tokenB,

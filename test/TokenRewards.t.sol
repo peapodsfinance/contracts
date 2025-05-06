@@ -65,6 +65,10 @@ contract MockDexAdapter {
 }
 
 contract MockV3TwapUtilities {
+    function owner() public pure returns (address) {
+        return address(0x111);
+    }
+
     function sqrtPriceX96FromPoolAndInterval(address) public pure returns (uint160) {
         return 0;
     }
@@ -229,13 +233,17 @@ contract TokenRewardsTest is Test {
 
         // Deposit rewards when no shares exist
         uint256 depositAmount = 100e18;
-        uint256 balanceBefore = rewardsToken.balanceOf(address(0xdead));
+        uint256 balanceBefore = rewardsToken.balanceOf(v3TwapUtilities.owner());
 
         tokenRewards.depositRewards(address(rewardsToken), depositAmount);
 
-        // Rewards should be burned when total shares are zero
-        uint256 balanceAfter = rewardsToken.balanceOf(address(0xdead));
-        assertEq(balanceAfter - balanceBefore, depositAmount, "Rewards should be burned when no shares exist");
+        // Rewards should be sent to protocol if no burn method when total shares are zero
+        uint256 balanceAfter = rewardsToken.balanceOf(address(v3TwapUtilities.owner()));
+        assertEq(
+            balanceAfter - balanceBefore,
+            depositAmount,
+            "Rewards should be sent to protocol if no burn method when no shares exist"
+        );
     }
 
     // function testPausedAndWhitelistedInteraction() public {
