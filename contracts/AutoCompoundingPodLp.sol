@@ -379,9 +379,6 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
             DEX_ADAPTER.swapV2Single(_path[0], _path[1], _amountIn, _twoHops ? 0 : _amountOutMin, address(this));
         if (_twoHops) {
             uint256 _intermediateBal = _amountOut > 0 ? _amountOut : IERC20(_path[1]).balanceOf(address(this));
-            if (maxSwap[_path[1]] > 0 && _intermediateBal > maxSwap[_path[1]]) {
-                _intermediateBal = maxSwap[_path[1]];
-            }
             IERC20(_path[1]).safeIncreaseAllowance(address(DEX_ADAPTER), _intermediateBal);
             _amountOut = DEX_ADAPTER.swapV2Single(_path[1], _path[2], _intermediateBal, _amountOutMin, address(this));
         }
