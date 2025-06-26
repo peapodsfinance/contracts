@@ -13,23 +13,26 @@ To deploy Peapods protocol in its entirety, follow these steps to execute Foundr
 1. Deploy your protocol token, or `forge script script/DeployPEAS.s.sol --verify`
 2. `forge script script/DeployPodBeacons.s.sol --verify`
 3. Deploy core contracts, and add implementation & beacon env vars to set in pod factory, `forge script script/DeployCore.s.sol --verify`
-4. `forge script script/DeployUniswapDexAdapter.s.sol --verify`
+4. `forge script script/DeployUniswapDexAdapterAndIndexUtils.s.sol --verify`
 5. `forge script script/DeployVerificationPod.s.sol --verify`
 
 ### Deploy LVF on top of Peapods (Optional)
 
 6. Deploy LendingAssetVault for pairedLpTkn `forge script script/DeployLendingAssetVault.s.sol`
 7. Deploy LeverageManager `forge script script/DeployLeverageManager.s.sol`
-8. Deploy necessary flash sources for supported pairedLpTkns `forge script script/DeployBalancerFlashSource.s.sol` and others
-9. Deploy ChainlinkSinglePriceOracle, UniswapV3SinglePriceOracle, and optionally DIAOracleV2SinglePriceOracle `forge script sciprt/DeployAllSinglePriceOracles.s.sol`
-10. Deploy VariableInterestRate.sol for fraxlend pair(s) (`DeployVIR.s.sol` foundry script in fraxlend repo)
+8. Deploy Fraxlend core contracts `forge script script/DeployCore.s.sol` in fraxlend repo
+9. Deploy LeverageFactory `forge script script/DeployLeverageFactory.s.sol`
+10. In Fraxlend repo, `forge script script/SetWhitelistDeployerInCore.s.sol`
+11. Deploy necessary flash sources for supported pairedLpTkns `forge script script/DeployFlashSources.s.sol` and others
+12. Deploy ChainlinkSinglePriceOracle, UniswapV3SinglePriceOracle, and optionally DIAOracleV2SinglePriceOracle `forge script sciprt/DeployAllSinglePriceOracles.s.sol`
+13. Deploy VariableInterestRate.sol for fraxlend pair(s) (`DeployVIR.s.sol` foundry script in fraxlend repo)
 
 ### Turn on LVF for a pod (Optional)
 
-11. Deploy aspTKN for pod `forge script script/DeployAutoCompoundingPodLp.s.sol`
-12. Deploy aspTKN/pairedLpTkn oracle `forge script script/DeployAspTknMinimalOracle.s.sol`
-13. Deploy FraxlendLendingPair.sol for aspTKN collateral, pairedLpTkn borrow token, aspTKN oracle
-14. Set pod-specific info in LeverageManager `forge script script/SetPodLeverageManager.s.sol`
+14. Deploy aspTKN for pod `forge script script/DeployAutoCompoundingPodLp.s.sol`
+15. Deploy aspTKN/pairedLpTkn oracle `forge script script/DeployAspTknMinimalOracle.s.sol`
+16. Deploy FraxlendLendingPair.sol for aspTKN collateral, pairedLpTkn borrow token, aspTKN oracle
+17. Set pod-specific info in LeverageManager `forge script script/SetPodLeverageManager.s.sol`
 
 ## Deploy (Legacy - Hardhat)
 

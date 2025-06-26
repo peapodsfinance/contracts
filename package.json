@@ -21,10 +21,13 @@
     "@openzeppelin/contracts": "^5.1.0",
     "@openzeppelin/contracts-upgradeable": "^5.1.0",
     "@openzeppelin/hardhat-upgrades": "^1.28.0",
+    "@safe-global/sdk-starter-kit": "^2.0.2",
     "@uniswap/v2-core": "^1.0.1",
     "@uniswap/v2-periphery": "^1.1.0-beta.0",
     "@uniswap/v3-core": "^1.0.1",
     "@uniswap/v3-periphery": "^1.4.4",
+    "axios": "^1.9.0",
+    "bignumber.js": "^9.3.0",
     "chai": "^4.3.4",
     "dotenv": "^16.3.1",
     "erc721a": "^4.3.0",
@@ -40,6 +43,7 @@
     "solidity-coverage": "^0.8.4",
     "solmate": "^6.8.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "viem": "^2.30.0"
   }
 }

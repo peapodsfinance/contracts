@@ -36,6 +36,7 @@ const chainIds = {
   mainnet: 1,
   mode: 34443,
   sepolia: 11155111,
+  sonic: 146,
   opsep: 11155420,
 }
 
@@ -73,10 +74,10 @@ const config = {
   defaultNetwork: 'hardhat',
   etherscan: {
     // apiKey: process.env.ARBISCAN_API_KEY,
-    // apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: process.env.ETHERSCAN_API_KEY,
     // apiKey: process.env.BASESCAN_API_KEY,
     // apiKey: process.env.BSCSCAN_API_KEY,
-    apiKey: process.env.MODE_API_KEY,
+    // apiKey: process.env.MODE_API_KEY,
     // apiKey: process.env.POLYGONSCAN_API_KEY,
 
     customChains: [
@@ -94,6 +95,14 @@ const config = {
         urls: {
           apiURL: 'https://explorer.mode.network/api',
           browserURL: 'https://explorer.mode.network',
+        },
+      },
+      {
+        network: 'sonic',
+        chainId: 146,
+        urls: {
+          apiURL: 'https://api.sonicscan.org/api',
+          browserURL: 'https://sonicscan.org',
         },
       },
     ],
@@ -129,6 +138,7 @@ const config = {
     mode: createConfig('mode', 'https://mainnet.mode.network'),
     goerli: createConfig('goerli'),
     sepolia: createConfig('sepolia', 'https://ethereum-sepolia.publicnode.com'),
+    sonic: createConfig('sonic', 'https://rpc.soniclabs.com'),
     opsep: createConfig('opsep', 'https://sepolia.optimism.io'),
   },
   paths: {
@@ -138,7 +148,7 @@ const config = {
     tests: './test',
   },
   solidity: {
-    version: '0.8.19',
+    version: '0.8.28',
     settings: {
       metadata: {
         // Not including the metadata hash
