@@ -106,6 +106,12 @@ contract AutoCompoundingPodLpTest is Test {
 
         uint256 lpAmountOut = 50 * 1e18;
         mockDexAdapter.setSwapV3SingleReturn(lpAmountOut);
+
+        // Set up V2 swaps for reward tokens to paired LP token
+        mockDexAdapter.setSwapV2SingleReturn(address(rewardToken1), address(pairedLpToken), lpAmountOut);
+        mockDexAdapter.setSwapV2SingleReturn(address(rewardToken2), address(pairedLpToken), lpAmountOut);
+        mockDexAdapter.setSwapV2SingleReturn(address(pairedLpToken), address(mockPod), lpAmountOut);
+
         deal(autoCompoundingPodLp.pod().PAIRED_LP_TOKEN(), address(autoCompoundingPodLp), lpAmountOut);
         mockIndexUtils.setAddLPAndStakeReturn(lpAmountOut);
 
@@ -295,7 +301,7 @@ contract MockDexAdapter is IDexAdapter, Test {
     }
 
     function getReserves(address) external pure override returns (uint112, uint112) {
-        return (uint112(0), uint112(0));
+        return (uint112(1000000 * 1e18), uint112(1000000 * 1e18)); // Mock reserves for proper swap calculation
     }
 
     // Implement other required functions with default values
@@ -322,7 +328,7 @@ contract MockDexAdapter is IDexAdapter, Test {
     }
 
     function getV2Pool(address, address) external pure returns (address) {
-        return address(0);
+        return address(0x7); // Return a non-zero address for proper pool calculation
     }
 
     function removeLiquidity(address, address, uint256, uint256, uint256, address, uint256) external pure {}

@@ -230,9 +230,16 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     function _calculateSpTknPerBase(uint256 _price18) internal view returns (uint256 _spTknBasePrice18) {
         uint256 _priceBasePerPTkn18 = _calculateBasePerPTkn(_price18);
         address _pair = _getPair();
+        address _pairedLpTkn = IDecentralizedIndex(pod).PAIRED_LP_TOKEN();
 
         (uint112 _reserve0, uint112 _reserve1) = V2_RESERVES.getReserves(_pair);
         uint256 _k = uint256(_reserve0) * _reserve1;
+
+        // if pairedLpTkn != baseTkn assume self lending and account for fTKN CBR
+        // in k to effectively convert value back from pairedLpTkn/fTKN to baseTkn
+        if (_pairedLpTkn != BASE_TOKEN) {
+            _k = IFraxlendPair(_pairedLpTkn).convertToAssets(_k);
+        }
         uint256 _kDec = 10 ** IERC20Metadata(IUniswapV2Pair(_pair).token0()).decimals()
             * 10 ** IERC20Metadata(IUniswapV2Pair(_pair).token1()).decimals();
         uint256 _avgBaseAssetInLp27 = _sqrt((_priceBasePerPTkn18 * _k) / _kDec) * 10 ** 18;

@@ -32,6 +32,10 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
         return _asset;
     }
 
+    function owner() external view override returns (address) {
+        return address(0);
+    }
+
     function collateralContract() external view override returns (address) {
         return _collateralContract;
     }
@@ -208,5 +212,9 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
         require(_userCollateralBalance[msg.sender] >= _collateralAmount, "Insufficient collateral");
         _userCollateralBalance[msg.sender] -= _collateralAmount;
         IERC20(_collateralContract).transfer(_receiver, _collateralAmount);
+    }
+
+    function withdrawFees(uint128, address) external returns (uint256) {
+        return 0;
     }
 }

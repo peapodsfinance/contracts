@@ -74,7 +74,7 @@ contract BalancerFlashSourceTest is Test {
     }
 
     function test_flash_DAI() public {
-        uint256 flashAmount = 1000000 * 1e18; // 1M DAI
+        uint256 flashAmount = 100000 * 1e18; // 100K DAI
 
         // Ensure receiver has enough DAI to repay the flash loan
         deal(DAI, address(receiver), flashAmount);

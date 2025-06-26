@@ -311,6 +311,9 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
     function _pairedLpTokenToPodLp(uint256 _amountIn, uint256 _deadline) internal returns (uint256 _amountOut) {
         address _pairedLpToken = pod.PAIRED_LP_TOKEN();
         uint256 _pairedSwapAmt = _getSwapAmt(_pairedLpToken, address(pod), _pairedLpToken, _amountIn);
+        if (_pairedSwapAmt == 0) {
+            return _amountOut;
+        }
         uint256 _pairedRemaining = _amountIn - _pairedSwapAmt;
         uint256 _minPtknOut;
         if (address(podOracle) != address(0)) {
@@ -389,7 +392,10 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         (_t0, _t1) = _t0 < _t1 ? (_t0, _t1) : (_t1, _t0);
         (uint112 _r0, uint112 _r1) = DEX_ADAPTER.getReserves(DEX_ADAPTER.getV2Pool(_t0, _t1));
         uint112 _r = _swapT == _t0 ? _r0 : _r1;
-        return (_sqrt(_r * (_fullAmt * 3988000 + _r * 3988009)) - (_r * 1997)) / 1994;
+        uint256 _a = _sqrt(_r * (_fullAmt * 3988000 + _r * 3988009));
+        uint256 _b = _r * 1997;
+        if (_a < _b) return 0;
+        return (_a - _b) / 1994;
     }
 
     function _sqrt(uint256 y) private pure returns (uint256 z) {
