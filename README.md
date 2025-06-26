@@ -1,12 +1,24 @@
 # Peapods Finance (PEAS)
 
+## Install
+
+This was originally a hardhat project but has been converted to support foundry. Dependencies however still require npm.
+
+```sh
+$ git clone https://github.com/peapodsfinance/contracts
+$ cd contracts
+$ npm install
+```
+
 ## Compile
 
 ```sh
+$ forge compile
+$ # or
 $ npx hardhat compile
 ```
 
-## Deploy (Foundry)
+## Deploy Core (Foundry)
 
 To deploy Peapods protocol in its entirety, follow these steps to execute Foundry scripts to stand up all contracts:
 
@@ -72,14 +84,6 @@ $ # show logs in tests
 $ forge test -vv --no-match-test invariant --fork-url https://eth.llamarpc.com
 $ # full trace of all calls
 $ forge test -vvvv --no-match-test invariant --fork-url https://eth.llamarpc.com
-```
-
-## Flatten
-
-You generally should not need to do this simply to verify in today's compiler version (0.8.x), but should you ever want to:
-
-```sh
-$ npx hardhat flatten {contract file location} > output.sol
 ```
 
 ## Leveraged Volatility Farming
