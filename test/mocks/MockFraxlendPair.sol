@@ -12,6 +12,7 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
     VaultAccount public _totalBorrow;
     address public _asset;
     address public _collateralContract;
+    address public _rateContract;
     mapping(address => uint256) public _userCollateralBalance;
     mapping(address => uint256) public _userBorrowShares;
 
@@ -46,6 +47,10 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
 
     function userBorrowShares(address user) external view override returns (uint256) {
         return _userBorrowShares[user];
+    }
+
+    function rateContract() external view override returns (address) {
+        return _rateContract;
     }
 
     function convertToAssets(uint256 shares) external view returns (uint256) {
@@ -212,6 +217,18 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
         require(_userCollateralBalance[msg.sender] >= _collateralAmount, "Insufficient collateral");
         _userCollateralBalance[msg.sender] -= _collateralAmount;
         IERC20(_collateralContract).transfer(_receiver, _collateralAmount);
+    }
+
+    function liquidate(uint128 _sharesToLiquidate, uint256 _deadline, address _borrower) external override {
+        // No-op
+    }
+
+    function setExternalAssetVault(address _vault) external override {
+        // No-op
+    }
+
+    function setRateContract(address _newRateContract) external override {
+        _rateContract = _newRateContract;
     }
 
     function withdrawFees(uint128, address) external returns (uint256) {
