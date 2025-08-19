@@ -41,6 +41,12 @@ interface IFraxlendPair is IERC20 {
 
     function rateContract() external view returns (address);
 
+    function timelockAddress() external view returns (address);
+
+    function externalAssetVault() external view returns (address);
+
+    function maxRedeem(address _owner) external view returns (uint256 _maxShares);
+
     function previewAddInterest()
         external
         view
@@ -69,6 +75,10 @@ interface IFraxlendPair is IERC20 {
         external
         returns (uint256 _shares);
 
+    function acceptTransferTimelock() external;
+
+    function transferTimelock(address _newTimelock) external;
+
     function liquidate(uint128 _sharesToLiquidate, uint256 _deadline, address _borrower) external;
 
     function repayAsset(uint256 _shares, address _borrower) external returns (uint256 _amountToRepay);
@@ -78,6 +88,8 @@ interface IFraxlendPair is IERC20 {
     function removeCollateral(uint256 _collateralAmount, address _receiver) external;
 
     function setExternalAssetVault(address _vault) external;
+
+    function setOracle(address _newOracle, uint32 _newMaxOracleDeviation) external;
 
     function setRateContract(address _newRateContract) external;
 

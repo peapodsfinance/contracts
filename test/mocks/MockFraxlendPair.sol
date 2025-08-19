@@ -13,6 +13,7 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
     address public _asset;
     address public _collateralContract;
     address public _rateContract;
+    address public externalAssetVault;
     mapping(address => uint256) public _userCollateralBalance;
     mapping(address => uint256) public _userBorrowShares;
 
@@ -51,6 +52,10 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
 
     function rateContract() external view override returns (address) {
         return _rateContract;
+    }
+
+    function timelockAddress() external view override returns (address) {
+        return address(0);
     }
 
     function convertToAssets(uint256 shares) external view returns (uint256) {
@@ -219,11 +224,27 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
         IERC20(_collateralContract).transfer(_receiver, _collateralAmount);
     }
 
+    function maxRedeem(address _owner) external view returns (uint256 _maxShares) {
+        _maxShares = 0;
+    }
+
+    function acceptTransferTimelock() external {
+        // No-op
+    }
+
+    function transferTimelock(address _newTimelock) external {
+        // No-op
+    }
+
     function liquidate(uint128 _sharesToLiquidate, uint256 _deadline, address _borrower) external override {
         // No-op
     }
 
     function setExternalAssetVault(address _vault) external override {
+        // No-op
+    }
+
+    function setOracle(address _newOracle, uint32 _newMaxOracleDeviation) external override {
         // No-op
     }
 

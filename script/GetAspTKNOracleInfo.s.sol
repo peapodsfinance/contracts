@@ -86,10 +86,6 @@ contract GetAspTKNOracleInfo is Script {
             uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
             vm.startBroadcast(deployerPrivateKey);
 
-            if (_timelock != vm.addr(deployerPrivateKey)) {
-                IFraxPair(_lendingPair).acceptTransferTimelock();
-            }
-
             address _newOracle = _createNewOracle(_aspTknOracleFactory, _oracle, _diaPriceFeed);
             console.log("new aspTKNMinimalOracle", _newOracle);
 
@@ -107,6 +103,9 @@ contract GetAspTKNOracleInfo is Script {
 
             try vm.envBool("SET_IN_PAIR") returns (bool _setInPair) {
                 if (_setInPair) {
+                    if (_timelock != vm.addr(deployerPrivateKey)) {
+                        IFraxPair(_lendingPair).acceptTransferTimelock();
+                    }
                     IFraxPair(_lendingPair).setOracle(_newOracle, _maxOracleDeviation);
                     if (_timelock != vm.addr(deployerPrivateKey)) {
                         IFraxPair(_lendingPair).transferTimelock(_timelock);

@@ -88,7 +88,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         uint256 _price18 = oraclePEASDAI.getPodPerBasePrice();
         assertApproxEqRel(
             _price18,
-            0.33 ether, // NOTE: At the time of writing test DAI/PEAS == $3, so inverse is 1/3 == 0.33
+            0.2 ether, // NOTE: At the time of writing test DAI/PEAS == $5, so inverse is 1/5 == 0.2
             0.2e18 // NOTE: At the time of writing test DAI/PEAS ~= $3, so _price18 would be ~1/3 == 0.33, so precision to <= 1 here (it's wide I know)
         );
     }
@@ -477,7 +477,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     function test_getPrices_BTCUSDC_BTCWETH_ClPool() public {
         address _usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
         address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 20, 0); // $20 pOHM, $1 USDC, 20/1
+        address _newPod = _dupPodAndSeedLp(_podToDup, _usdc, 22, 0); // $22 pOHM, $1 USDC, 22/1
         spTKNMinimalOracle oracleBTCUSDC1 = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),
@@ -563,7 +563,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     function test_getPrices_BTCWETH() public {
         address weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
         address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, weth, 0, 120); // $2400 ETH, $20 pOHM, 2400/20
+        address _newPod = _dupPodAndSeedLp(_podToDup, weth, 0, 200); // $4400 ETH, $22 pOHM, 4400/22
         spTKNMinimalOracle oracleBTCWETH = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),
