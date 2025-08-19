@@ -10,6 +10,11 @@ import "../interfaces/IUniswapV3Pool.sol";
 import "./ChainlinkSinglePriceOracle.sol";
 
 contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
+    uint256 constant PRECISION = 1e6;
+
+    uint256 public twapPriceAllowedPercentageDiff = 100;
+    uint256 public twapPriceAltDivisor = 10;
+
     constructor(address _sequencer) ChainlinkSinglePriceOracle(_sequencer) {}
 
     function getPriceUSD18(
@@ -24,6 +29,17 @@ contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
         uint256 _updatedAt = block.timestamp;
         if (_clBaseConversionPoolPriceFeed != address(0)) {
             (_basePrice18, _updatedAt, _isBadData) = _getChainlinkPriceFeedPrice18(_clBaseConversionPoolPriceFeed);
+        }
+
+        // check diff between alt price which is a smaller TWAP to ensure no big spikes in price which can
+        // indicate potential exploitation attempt or similar from a bad actor
+        uint256 _quotePriceAltX96 =
+            _getPoolPriceTokenDenomenator(_quoteToken, _quoteV3Pool, uint32(_twapInterval / twapPriceAltDivisor));
+        uint256 _quotePriceDiffPerc = _quotePriceX96 > _quotePriceAltX96
+            ? ((_quotePriceX96 - _quotePriceAltX96) * PRECISION) / _quotePriceX96
+            : ((_quotePriceAltX96 - _quotePriceX96) * PRECISION) / _quotePriceX96;
+        if (_quotePriceDiffPerc > twapPriceAllowedPercentageDiff * PRECISION) {
+            _isBadData = true;
         }
         _price18 = (_quotePriceX96 * _basePrice18) / FixedPoint96.Q96;
         uint256 _maxDelay = feedMaxOracleDelay[_clBaseConversionPoolPriceFeed] > 0
@@ -77,5 +93,13 @@ contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
         return _token1 == _numeratorToken
             ? (_correctedPriceX96 * 10 ** _decimals0) / 10 ** _decimals1
             : (_correctedPriceX96 * 10 ** _decimals1) / 10 ** _decimals0;
+    }
+
+    function setAltPriceThresholds(uint256 _twapPriceAllowedPercentageDiff, uint256 _twapPriceAltDivisor)
+        external
+        onlyOwner
+    {
+        twapPriceAllowedPercentageDiff = _twapPriceAllowedPercentageDiff;
+        twapPriceAltDivisor = _twapPriceAltDivisor;
     }
 }
