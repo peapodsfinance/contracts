@@ -215,9 +215,10 @@ contract LeverageFactory is Ownable {
             address _rateContract,
             uint64 _fullUtilizationRate,
             uint256 _maxLTV,
+            uint256 _maxBorrowLTV,
             uint256 _liquidationFee,
             uint256 _protocolLiquidationFee
-        ) = abi.decode(_providedData, (uint32, address, uint64, uint256, uint256, uint256));
+        ) = abi.decode(_providedData, (uint32, address, uint64, uint256, uint256, uint256, uint256));
         _finalConfigData = abi.encode(
             _borrowTkn,
             _aspTkn,
@@ -226,6 +227,7 @@ contract LeverageFactory is Ownable {
             _rateContract,
             _fullUtilizationRate,
             _maxLTV,
+            _maxBorrowLTV,
             _liquidationFee,
             _protocolLiquidationFee
         );

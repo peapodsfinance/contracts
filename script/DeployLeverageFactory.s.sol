@@ -10,6 +10,8 @@ contract DeployLeverageFactory is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
+        address _currentFactory = vm.envAddress("FACTORY");
+
         LeverageFactory _levFactory = new LeverageFactory(
             vm.envAddress("INDEX_UTILS"),
             vm.envAddress("DEX_ADAPTER"),
@@ -21,9 +23,14 @@ contract DeployLeverageFactory is Script {
             vm.envAddress("ASP_OWNER")
         );
 
-        Ownable(vm.envAddress("LVF")).transferOwnership(address(_levFactory));
-        Ownable(vm.envAddress("ASP_FACTORY")).transferOwnership(address(_levFactory));
-        Ownable(vm.envAddress("ASP_ORACLE_FACTORY")).transferOwnership(address(_levFactory));
+        // Ownable(vm.envAddress("LVF")).transferOwnership(address(_levFactory));
+        // Ownable(vm.envAddress("ASP_FACTORY")).transferOwnership(address(_levFactory));
+        // Ownable(vm.envAddress("ASP_ORACLE_FACTORY")).transferOwnership(address(_levFactory));
+        LeverageFactory(_currentFactory).transferContractOwnership(vm.envAddress("LVF"), address(_levFactory));
+        LeverageFactory(_currentFactory).transferContractOwnership(vm.envAddress("ASP_FACTORY"), address(_levFactory));
+        LeverageFactory(_currentFactory).transferContractOwnership(
+            vm.envAddress("ASP_ORACLE_FACTORY"), address(_levFactory)
+        );
 
         vm.stopBroadcast();
 
