@@ -324,7 +324,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
                         _closeBorrowTreasuryFees -= _partnerAmt;
                     }
                     if (insurance != address(0) && insuranceFee > 0) {
-                        uint256 _insBorrowAmt = (_closeBorrowTreasuryFees * insuranceFee) / PRECISION;
+                        uint256 _insBorrowAmt = (_closeBorrowTotalFees * insuranceFee) / PRECISION;
                         IERC20(_borrowTkn).safeTransfer(insurance, _insBorrowAmt);
                         _closeBorrowTreasuryFees -= _insBorrowAmt;
                     }
