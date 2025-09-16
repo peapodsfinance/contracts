@@ -19,23 +19,51 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
     using SafeERC20 for IERC20;
     using VaultAccountingLibrary for VaultAccount;
 
+    /// @notice Used in calculations for various fees and percentage calculations
+    uint16 constant PRECISION = 10000;
+
+    /// @notice IndexUtils contract for handling LP operations and staking
     IIndexUtils public indexUtils;
+
+    /// @notice Position NFT contract that manages leverage position ownership
     ILeveragePositions public positionNFT;
 
+    /// @notice Address that receives protocol fees
     address public feeReceiver;
-    uint16 public openFeePerc; // 10000 precision
-    uint16 public closeFeePerc; // 10000 precision
 
-    // positionId => position props
+    /// @notice Fee percentage for opening positions (PRECISION, e.g., 100 = 1%)
+    uint16 public openFeePerc;
+
+    /// @notice Fee percentage for closing positions (PRECISION, e.g., 100 = 1%)
+    uint16 public closeFeePerc;
+
+    /// @notice Mapping from position ID to position properties
+    /// @dev positionId => position props
     mapping(uint256 => LeveragePositionProps) public positionProps;
 
+    /// @notice Private variable to track workflow initialization state
+    bool private _workflowInitialized;
+
+    /// @dev pod => partner address
+    mapping(address => address) public partner;
+    mapping(address => uint16) public partnerFeeOpen; // PRECISION, e.g., 100 = 1%
+    mapping(address => uint16) public partnerFeeClose; // PRECISION, e.g., 100 = 1%
+    mapping(address => uint256) public partnerExpiration; // timestamp when the partner will no longer receive fees
+
+    /// @notice insurance wallet to receive open/close fees
+    address public insurance;
+    uint16 public insuranceFee; // PRECISION, e.g., 100 = 1%
+
+    /// @notice Modifier to ensure only the position owner can perform certain actions
+    /// @param _positionId The ID of the position to check ownership for
     modifier onlyPositionOwner(uint256 _positionId) {
         require(positionNFT.ownerOf(_positionId) == _msgSender(), "A0");
         _;
     }
 
-    bool private _workflowInitialized;
-
+    /// @notice Modifier to manage workflow state for add/remove leverage operations
+    /// @param _starting True when starting a workflow, false when ending
+    /// @dev Prevents reentrancy and ensures proper workflow state management
     modifier workflow(bool _starting) {
         if (_starting) {
             require(!_workflowInitialized, "W0");
@@ -52,6 +80,10 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _disableInitializers();
     }
 
+    /// @notice Initializes the LeverageManager contract with required dependencies
+    /// @param _positionNFT Address of the position NFT contract
+    /// @param _idxUtils Address of the IndexUtils contract
+    /// @param _feeReceiver Address that will receive protocol fees
     function initialize(address _positionNFT, address _idxUtils, address _feeReceiver) public initializer {
         super.initialize();
         positionNFT = ILeveragePositions(_positionNFT);
@@ -218,7 +250,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         );
         if (openFeePerc > 0) {
             address _borrowTkn = IFraxlendPair(positionProps[_positionId].lendingPair).asset();
-            uint256 _openFeeAmt = (_borrowAmt * openFeePerc) / 10000;
+            uint256 _openFeeAmt = (_borrowAmt * openFeePerc) / PRECISION;
             IERC20(_borrowTkn).safeTransfer(feeReceiver, _openFeeAmt);
             IERC20(_borrowTkn).safeTransfer(_recipient, _borrowAmt - _openFeeAmt);
         }
@@ -246,6 +278,9 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _callback(_userData);
     }
 
+    /// @notice Internal callback function that handles flash loan callbacks for add/remove leverage operations
+    /// @param _userData Encoded flash loan data containing position properties and additional information
+    /// @dev This function is called after flash loan execution to complete leverage operations
     function _callback(bytes memory _userData) internal workflow(false) {
         IFlashLoanSource.FlashData memory _d = abi.decode(_userData, (IFlashLoanSource.FlashData));
         (LeverageFlashProps memory _posProps,) = abi.decode(_d.data, (LeverageFlashProps, bytes));
@@ -261,18 +296,40 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
             (uint256 _ptknToUserAmt, uint256 _borrowTknToUser) = _removeLeveragePostCallback(_userData);
             if (_ptknToUserAmt > 0) {
                 if (closeFeePerc > 0) {
-                    uint256 _closeFeePtknAmt = (_ptknToUserAmt * closeFeePerc) / 10000;
-                    IERC20(_pod).safeTransfer(feeReceiver, _closeFeePtknAmt);
-                    _ptknToUserAmt -= _closeFeePtknAmt;
+                    uint256 _closePtknTotalFees = (_ptknToUserAmt * closeFeePerc) / PRECISION;
+                    uint256 _closePtknTreasuryFees = _closePtknTotalFees;
+                    if (partner[_pod] != address(0) && partnerFeeClose[_pod] > 0) {
+                        uint256 _partnerAmt = (_closePtknTotalFees * partnerFeeClose[_pod]) / PRECISION;
+                        IERC20(_pod).safeTransfer(partner[_pod], _partnerAmt);
+                        _closePtknTreasuryFees -= _partnerAmt;
+                    }
+                    if (insurance != address(0) && insuranceFee > 0) {
+                        uint256 _insPtknAmt = (_closePtknTotalFees * insuranceFee) / PRECISION;
+                        IERC20(_pod).safeTransfer(insurance, _insPtknAmt);
+                        _closePtknTreasuryFees -= _insPtknAmt;
+                    }
+                    IERC20(_pod).safeTransfer(feeReceiver, _closePtknTreasuryFees);
+                    _ptknToUserAmt -= _closePtknTotalFees;
                 }
                 IERC20(_pod).safeTransfer(_posProps.owner, _ptknToUserAmt);
             }
             if (_borrowTknToUser > 0) {
                 address _borrowTkn = _getBorrowTknForPosition(_posProps.positionId);
                 if (closeFeePerc > 0) {
-                    uint256 _closeFeeBorrowAmt = (_borrowTknToUser * closeFeePerc) / 10000;
-                    IERC20(_borrowTkn).safeTransfer(feeReceiver, _closeFeeBorrowAmt);
-                    _borrowTknToUser -= _closeFeeBorrowAmt;
+                    uint256 _closeBorrowTotalFees = (_borrowTknToUser * closeFeePerc) / PRECISION;
+                    uint256 _closeBorrowTreasuryFees = _closeBorrowTotalFees;
+                    if (partner[_pod] != address(0) && partnerFeeClose[_pod] > 0) {
+                        uint256 _partnerAmt = (_closeBorrowTotalFees * partnerFeeClose[_pod]) / PRECISION;
+                        IERC20(_borrowTkn).safeTransfer(partner[_pod], _partnerAmt);
+                        _closeBorrowTreasuryFees -= _partnerAmt;
+                    }
+                    if (insurance != address(0) && insuranceFee > 0) {
+                        uint256 _insBorrowAmt = (_closeBorrowTreasuryFees * insuranceFee) / PRECISION;
+                        IERC20(_borrowTkn).safeTransfer(insurance, _insBorrowAmt);
+                        _closeBorrowTreasuryFees -= _insBorrowAmt;
+                    }
+                    IERC20(_borrowTkn).safeTransfer(feeReceiver, _closeBorrowTreasuryFees);
+                    _borrowTknToUser -= _closeBorrowTotalFees;
                 }
                 IERC20(_borrowTkn).safeTransfer(_posProps.owner, _borrowTknToUser);
             }
@@ -281,6 +338,11 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         }
     }
 
+    /// @notice Internal function to initialize a new leverage position
+    /// @param _pod The pod address to create the position for
+    /// @param _recipient The address that will receive the position NFT
+    /// @param _hasSelfLendingPairPod Whether the self lending pod's paired LP asset is podded
+    /// @return _positionId The ID of the newly created position
     function _initializePosition(address _pod, address _recipient, bool _hasSelfLendingPairPod)
         internal
         returns (uint256 _positionId)
@@ -296,6 +358,10 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         });
     }
 
+    /// @notice Internal function to handle extra flash loan payment requirements
+    /// @param _positionId The position ID to get flash source for
+    /// @param _user The user address to transfer payment from
+    /// @dev Some flash loan sources require additional payment tokens beyond the borrowed amount
     function _processExtraFlashLoanPayment(uint256 _positionId, address _user) internal {
         address _posFlashSrc = _getFlashSource(_positionId);
         IFlashLoanSource _flashLoanSource = IFlashLoanSource(_posFlashSrc);
@@ -307,6 +373,15 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         }
     }
 
+    /// @notice Internal function to handle pre-callback logic for adding leverage
+    /// @param _sender The address initiating the leverage addition
+    /// @param _positionId The position ID (0 for new position)
+    /// @param _pod The pod address for the position
+    /// @param _pTknAmt Amount of pod tokens to use
+    /// @param _pairedLpDesired Total amount of paired LP tokens desired
+    /// @param _userProvidedDebtAmt Amount of debt token provided by user
+    /// @param _hasSelfLendingPairPod Whether self lending pair pod is used
+    /// @param _config Configuration parameters for the leverage operation
     function _addLeveragePreCallback(
         address _sender,
         uint256 _positionId,
@@ -358,6 +433,10 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         }
     }
 
+    /// @notice Internal function to handle post-callback logic for adding leverage
+    /// @param _data Encoded flash loan data containing position and configuration information
+    /// @return _ptknRefundAmt Amount of pod tokens to refund to the user
+    /// @dev Processes LP addition, staking, collateral deposit, and flash loan repayment
     function _addLeveragePostCallback(bytes memory _data) internal returns (uint256 _ptknRefundAmt) {
         IFlashLoanSource.FlashData memory _d = abi.decode(_data, (IFlashLoanSource.FlashData));
         (LeverageFlashProps memory _props,) = abi.decode(_d.data, (LeverageFlashProps, bytes));
@@ -366,9 +445,20 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         uint256 _borrowTknAmtToLp = _props.pairedLpDesired;
         // if there's an open fee send debt/borrow token to protocol
         if (openFeePerc > 0) {
-            uint256 _openFeeAmt = (_borrowTknAmtToLp * openFeePerc) / 10000;
-            IERC20(_d.token).safeTransfer(feeReceiver, _openFeeAmt);
-            _borrowTknAmtToLp -= _openFeeAmt;
+            uint256 _openTotalFees = (_borrowTknAmtToLp * openFeePerc) / PRECISION;
+            uint256 _openTreasuryFees = _openTotalFees;
+            if (partner[_pod] != address(0) && partnerFeeOpen[_pod] > 0) {
+                uint256 _partnerAmt = (_openTotalFees * partnerFeeOpen[_pod]) / PRECISION;
+                IERC20(_d.token).safeTransfer(partner[_pod], _partnerAmt);
+                _openTreasuryFees -= _partnerAmt;
+            }
+            if (insurance != address(0) && insuranceFee > 0) {
+                uint256 _insAmt = (_openTotalFees * insuranceFee) / PRECISION;
+                IERC20(_d.token).safeTransfer(insurance, _insAmt);
+                _openTreasuryFees -= _insAmt;
+            }
+            IERC20(_d.token).safeTransfer(feeReceiver, _openTreasuryFees);
+            _borrowTknAmtToLp -= _openTotalFees;
         }
         (uint256 _pTknAmtUsed,, uint256 _pairedLeftover) = _lpAndStakeInPod(_d.token, _borrowTknAmtToLp, _props);
         _ptknRefundAmt = _props.pTknAmt - _pTknAmtUsed;
@@ -398,6 +488,11 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         emit AddLeverage(_props.positionId, _props.owner, _pTknAmtUsed, _aspTknCollateralBal, _borrowAmt);
     }
 
+    /// @notice Internal function to handle post-callback logic for removing leverage
+    /// @param _userData Encoded flash loan data containing position and removal configuration
+    /// @return _podAmtRemaining Amount of pod tokens remaining after removal
+    /// @return _borrowAmtRemaining Amount of borrow tokens remaining after flash loan repayment
+    /// @dev Processes collateral removal, LP unstaking, and flash loan repayment
     function _removeLeveragePostCallback(bytes memory _userData)
         internal
         returns (uint256 _podAmtRemaining, uint256 _borrowAmtRemaining)
@@ -455,6 +550,11 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         emit RemoveLeverage(_props.positionId, _props.owner, _collateralAssetRemoveAmt);
     }
 
+    /// @notice Internal function to debond tokens from a self-lending pod
+    /// @param _pod The pod address to debond from
+    /// @param _amount The amount of pod tokens to debond
+    /// @return _amtOut The amount of underlying tokens received after debonding
+    /// @dev Debonds 100% of the specified amount to the first underlying asset
     function _debondFromSelfLendingPod(address _pod, uint256 _amount) internal returns (uint256 _amtOut) {
         IDecentralizedIndex.IndexAssetInfo[] memory _podAssets = IDecentralizedIndex(_pod).getAllAssets();
         address[] memory _tokens = new address[](1);
@@ -465,6 +565,16 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _amtOut = IERC20(_tokens[0]).balanceOf(address(this));
     }
 
+    /// @notice Internal function to acquire borrow tokens for flash loan repayment by swapping pod tokens
+    /// @param _props Leverage flash properties containing position information
+    /// @param _pod The pod address to swap tokens from
+    /// @param _borrowToken The borrow token address needed for repayment
+    /// @param _borrowNeeded The amount of borrow tokens needed
+    /// @param _podAmtReceived The amount of pod tokens available for swapping
+    /// @param _removeLevConf Configuration data for leverage removal
+    /// @return _podAmtRemaining Amount of pod tokens remaining after swap
+    /// @return _borrowAmtReceived Amount of borrow tokens acquired from swap
+    /// @dev Handles both self-lending and regular lending scenarios
     function _acquireBorrowTokenForRepayment(
         LeverageFlashProps memory _props,
         address _pod,
@@ -504,6 +614,15 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         }
     }
 
+    /// @notice Internal function to swap pod tokens for borrow tokens using DEX adapter
+    /// @param _pod The pod token address to swap from
+    /// @param _targetToken The target token address to swap to
+    /// @param _podAmt The amount of pod tokens available for swapping
+    /// @param _targetNeededAmt The amount of target tokens needed
+    /// @param _podPairedLiquidityPrice18 Price of pod LP with 18 decimal precision
+    /// @return _podRemainingAmt Amount of pod tokens remaining after swap
+    /// @return _targetReceivedAmt Amount of target tokens received from swap
+    /// @dev Uses price information to optimize swap amounts and includes slippage protection
     function _swapPodForBorrowToken(
         address _pod,
         address _targetToken,
@@ -527,6 +646,14 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _podRemainingAmt = _podAmt - (_podBalBefore - IERC20(_pod).balanceOf(address(this)));
     }
 
+    /// @notice Internal function to add liquidity to a pod and stake the LP tokens
+    /// @param _borrowToken The borrowed token address used for LP
+    /// @param _borrowAmt The amount of borrowed tokens to use for LP
+    /// @param _props Leverage flash properties containing position and configuration data
+    /// @return _pTknAmtUsed Amount of pod tokens used in the LP operation
+    /// @return _pairedLpUsed Amount of paired LP tokens used in the operation
+    /// @return _pairedLpLeftover Amount of paired LP tokens remaining after operation
+    /// @dev Processes borrowed tokens into appropriate paired tokens and adds LP with staking
     function _lpAndStakeInPod(address _borrowToken, uint256 _borrowAmt, LeverageFlashProps memory _props)
         internal
         returns (uint256 _pTknAmtUsed, uint256 _pairedLpUsed, uint256 _pairedLpLeftover)
@@ -553,6 +680,12 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _pairedLpLeftover = _pairedLpBalBefore - _pairedLpUsed;
     }
 
+    /// @notice Internal function to convert staking pool tokens to ASP tokens and handle remaining paired assets
+    /// @param _spTkn The staking pool token address
+    /// @param _pairedRemainingAmt Amount of paired tokens remaining after LP operations
+    /// @param _props Leverage flash properties containing position information
+    /// @return _newAspTkns Amount of new ASP tokens created from staking pool tokens
+    /// @dev Deposits staking tokens into ASP vault and handles self-lending pod redemptions
     function _spTknToAspTkn(address _spTkn, uint256 _pairedRemainingAmt, LeverageFlashProps memory _props)
         internal
         returns (uint256 _newAspTkns)
@@ -578,6 +711,12 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         }
     }
 
+    /// @notice Internal function to validate and adjust remove leverage configuration based on borrow amount
+    /// @param _borrowAmt The actual borrow amount to be repaid
+    /// @param _remLevConfig The original remove leverage configuration
+    /// @return _finalUserProvidedDebtAmt The adjusted user provided debt amount
+    /// @return _finalRemLevConfig The adjusted remove leverage configuration
+    /// @dev Ensures user provided debt amount doesn't exceed the actual borrow amount
     function _checkAndResetRemoveLeverageConfigFromBorrowAmt(uint256 _borrowAmt, bytes memory _remLevConfig)
         internal
         pure
@@ -592,6 +731,14 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _finalRemLevConfig = abi.encode(_1, _2, _3, _4, _finalUserProvidedDebtAmt);
     }
 
+    /// @notice Internal function to process borrowed tokens and convert them to appropriate paired tokens for LP
+    /// @param _positionId The position ID to get lending pair information
+    /// @param _borrowedTkn The borrowed token address
+    /// @param _borrowedAmt The amount of borrowed tokens
+    /// @param _hasSelfLendingPairPod Whether the self lending pair pod is used
+    /// @return _finalPairedTkn The final paired token address for LP operations
+    /// @return _finalPairedAmt The final amount of paired tokens for LP operations
+    /// @dev Handles conversion for self-lending scenarios including podded lending pairs
     function _processAndGetPairedTknAndAmt(
         uint256 _positionId,
         address _borrowedTkn,
@@ -616,6 +763,14 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         }
     }
 
+    /// @notice Internal function to unstake LP tokens and remove liquidity from a pod
+    /// @param _positionId The position ID to get ASP token information
+    /// @param _pod The pod address to remove LP from
+    /// @param _collateralAssetRemoveAmt Amount of collateral (ASP tokens) to remove
+    /// @param _remLevConf Remove leverage configuration containing slippage parameters
+    /// @return _podAmtReceived Amount of pod tokens received from LP removal
+    /// @return _pairedAmtReceived Amount of paired tokens received from LP removal
+    /// @dev Redeems ASP tokens for staking tokens, then unstakes and removes LP
     function _unstakeAndRemoveLP(
         uint256 _positionId,
         address _pod,
@@ -640,6 +795,12 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _pairedAmtReceived = IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedTokenAmtBefore;
     }
 
+    /// @notice Internal function to bond underlying tokens to a pod to mint pod tokens
+    /// @param _user The user address to transfer underlying tokens from
+    /// @param _pod The pod address to bond tokens to
+    /// @param _tknAmt The amount of underlying tokens to bond
+    /// @param _amtPtknMintMin The minimum amount of pod tokens expected to be minted
+    /// @dev Transfers underlying tokens from user and bonds them to the pod
     function _bondToPod(address _user, address _pod, uint256 _tknAmt, uint256 _amtPtknMintMin) internal {
         IDecentralizedIndex.IndexAssetInfo[] memory _podAssets = IDecentralizedIndex(_pod).getAllAssets();
         IERC20 _tkn = IERC20(_podAssets[0].token);
@@ -651,18 +812,34 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         IERC20(_pod).balanceOf(address(this)) - _pTknBalBefore;
     }
 
+    /// @notice Internal view function to get the borrow token address for a position
+    /// @param _positionId The position ID to get borrow token for
+    /// @return The address of the borrow token (lending pair asset)
     function _getBorrowTknForPosition(uint256 _positionId) internal view returns (address) {
         return IFraxlendPair(positionProps[_positionId].lendingPair).asset();
     }
 
+    /// @notice Internal view function to get the flash loan source address for a position
+    /// @param _positionId The position ID to get flash source for
+    /// @return The address of the flash loan source for the position's borrow token
     function _getFlashSource(uint256 _positionId) internal view returns (address) {
         return flashSource[_getBorrowTknForPosition(_positionId)];
     }
 
+    /// @notice Internal view function to get the ASP token address for a position
+    /// @param _positionId The position ID to get ASP token for
+    /// @return The address of the ASP token (lending pair collateral contract)
     function _getAspTkn(uint256 _positionId) internal view returns (address) {
         return IFraxlendPair(positionProps[_positionId].lendingPair).collateralContract();
     }
 
+    /// @notice Internal view function to encode flash loan data for adding leverage
+    /// @param _positionId The position ID for the leverage operation
+    /// @param _sender The address initiating the leverage addition
+    /// @param _pTknAmt Amount of pod tokens to use
+    /// @param _pairedLpDesired Total amount of paired LP tokens desired
+    /// @param _config Configuration parameters for the leverage operation
+    /// @return Encoded flash loan data for add leverage operation
     function _getFlashDataAddLeverage(
         uint256 _positionId,
         address _sender,
@@ -684,24 +861,36 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         );
     }
 
+    /// @notice Sets the position NFT contract address
+    /// @param _posNFT The new position NFT contract address
+    /// @dev Only callable by the contract owner
     function setPositionNFT(ILeveragePositions _posNFT) external onlyOwner {
         address _oldPosNFT = address(positionNFT);
         positionNFT = _posNFT;
         emit SetPositionsNFT(_oldPosNFT, address(_posNFT));
     }
 
+    /// @notice Sets the IndexUtils contract address
+    /// @param _utils The new IndexUtils contract address
+    /// @dev Only callable by the contract owner
     function setIndexUtils(IIndexUtils _utils) external onlyOwner {
         address _old = address(indexUtils);
         indexUtils = _utils;
         emit SetIndexUtils(_old, address(_utils));
     }
 
+    /// @notice Sets the fee receiver address
+    /// @param _receiver The new fee receiver address
+    /// @dev Only callable by the contract owner
     function setFeeReceiver(address _receiver) external onlyOwner {
         address _currentReceiver = feeReceiver;
         feeReceiver = _receiver;
         emit SetFeeReceiver(_currentReceiver, _receiver);
     }
 
+    /// @notice Sets the opening fee percentage
+    /// @param _newFee The new opening fee percentage (max 2500 = 25%)
+    /// @dev Only callable by the contract owner, fee cannot exceed 25%
     function setOpenFeePerc(uint16 _newFee) external onlyOwner {
         require(_newFee <= 2500, "MAX");
         uint16 _oldFee = openFeePerc;
@@ -709,6 +898,9 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         emit SetOpenFeePerc(_oldFee, _newFee);
     }
 
+    /// @notice Sets the closing fee percentage
+    /// @param _newFee The new closing fee percentage (max 2500 = 25%)
+    /// @dev Only callable by the contract owner, fee cannot exceed 25%
     function setCloseFeePerc(uint16 _newFee) external onlyOwner {
         require(_newFee <= 2500, "MAX");
         uint16 _oldFee = closeFeePerc;
@@ -716,14 +908,43 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         emit SetCloseFeePerc(_oldFee, _newFee);
     }
 
+    function setPartnerConfig(
+        address _pod,
+        address _partner,
+        uint16 _partnerFeeOpen,
+        uint16 _partnerFeeClose,
+        uint256 _partnerExpiration
+    ) external onlyOwner {
+        require(_partnerFeeOpen <= 6000, "MAX1");
+        require(_partnerFeeClose <= 6000, "MAX2");
+        partner[_pod] = _partner;
+        partnerFeeOpen[_pod] = _partnerFeeOpen;
+        partnerFeeClose[_pod] = _partnerFeeClose;
+        partnerExpiration[_pod] = _partnerExpiration;
+        emit SetPartnerConfig(_pod, _partner, _partnerFeeOpen, _partnerFeeClose, _partnerExpiration);
+    }
+
+    function setInsuranceConfig(address _insuranceAddress, uint16 _insuranceFee) external onlyOwner {
+        require(_insuranceFee <= 2500, "MAX");
+        insurance = _insuranceAddress;
+        insuranceFee = _insuranceFee;
+        emit SetInsuranceConfig(_insuranceAddress, _insuranceFee);
+    }
+
+    /// @notice Emergency function to rescue ETH from the contract
+    /// @dev Only callable by the contract owner
     function rescueETH() external onlyOwner {
         (bool _s,) = payable(_msgSender()).call{value: address(this).balance}("");
         require(_s, "S");
     }
 
+    /// @notice Emergency function to rescue ERC20 tokens from the contract
+    /// @param _token The ERC20 token contract to rescue
+    /// @dev Only callable by the contract owner
     function rescueTokens(IERC20 _token) external onlyOwner {
         _token.safeTransfer(_msgSender(), _token.balanceOf(address(this)));
     }
 
+    /// @dev Allow receiving ETH
     receive() external payable {}
 }
