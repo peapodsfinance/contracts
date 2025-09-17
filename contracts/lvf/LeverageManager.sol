@@ -1,26 +1,26 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "../interfaces/IDecentralizedIndex.sol";
-import "../interfaces/IDexAdapter.sol";
-import "../interfaces/IFlashLoanRecipient.sol";
-import "../interfaces/IIndexUtils.sol";
-import "../interfaces/ILeverageManager.sol";
-import "../interfaces/ILeveragePositions.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {IDecentralizedIndex} from "../interfaces/IDecentralizedIndex.sol";
+import {IDexAdapter} from "../interfaces/IDexAdapter.sol";
+import {IFlashLoanRecipient} from "../interfaces/IFlashLoanRecipient.sol";
+import {IFlashLoanSource} from "../interfaces/IFlashLoanSource.sol";
+import {IFraxlendPair} from "../interfaces/IFraxlendPair.sol";
+import {IIndexUtils} from "../interfaces/IIndexUtils.sol";
+import {ILeverageFeeProcessor} from "../interfaces/ILeverageFeeProcessor.sol";
+import {ILeverageManager} from "../interfaces/ILeverageManager.sol";
+import {ILeveragePositions} from "../interfaces/ILeveragePositions.sol";
 import {VaultAccount, VaultAccountingLibrary} from "../libraries/VaultAccount.sol";
-import "./LeverageManagerAccessControl.sol";
-import "./LeveragePositionCustodian.sol";
+import {LeverageManagerAccessControl} from "./LeverageManagerAccessControl.sol";
+import {LeveragePositionCustodian} from "./LeveragePositionCustodian.sol";
 
 contract LeverageManager is Initializable, LeverageManagerAccessControl, ILeverageManager, IFlashLoanRecipient {
     using SafeERC20 for IERC20;
     using VaultAccountingLibrary for VaultAccount;
-
-    /// @notice Used in calculations for various fees and percentage calculations
-    uint16 constant PRECISION = 10000;
 
     /// @notice IndexUtils contract for handling LP operations and staking
     IIndexUtils public indexUtils;
@@ -44,15 +44,11 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
     /// @notice Private variable to track workflow initialization state
     bool private _workflowInitialized;
 
-    /// @dev pod => partner address
-    mapping(address => address) public partner;
-    mapping(address => uint16) public partnerFeeOpen; // PRECISION, e.g., 100 = 1%
-    mapping(address => uint16) public partnerFeeClose; // PRECISION, e.g., 100 = 1%
-    mapping(address => uint256) public partnerExpiration; // timestamp when the partner will no longer receive fees
+    /// @notice Used in calculations for various fees and percentage calculations
+    uint16 constant PRECISION = 10000;
 
-    /// @notice insurance wallet to receive open/close fees
-    address public insurance;
-    uint16 public insuranceFee; // PRECISION, e.g., 100 = 1%
+    /// @notice A smart contract to process fees as needed
+    address public feeProcessor;
 
     /// @notice Modifier to ensure only the position owner can perform certain actions
     /// @param _positionId The ID of the position to check ownership for
@@ -84,7 +80,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
     /// @param _positionNFT Address of the position NFT contract
     /// @param _idxUtils Address of the IndexUtils contract
     /// @param _feeReceiver Address that will receive protocol fees
-    function initialize(address _positionNFT, address _idxUtils, address _feeReceiver) public initializer {
+    function initialize(address _positionNFT, address _idxUtils, address _feeReceiver) external initializer {
         super.initialize();
         positionNFT = ILeveragePositions(_positionNFT);
         indexUtils = IIndexUtils(_idxUtils);
@@ -297,18 +293,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
             if (_ptknToUserAmt > 0) {
                 if (closeFeePerc > 0) {
                     uint256 _closePtknTotalFees = (_ptknToUserAmt * closeFeePerc) / PRECISION;
-                    uint256 _closePtknTreasuryFees = _closePtknTotalFees;
-                    if (partner[_pod] != address(0) && partnerFeeClose[_pod] > 0) {
-                        uint256 _partnerAmt = (_closePtknTotalFees * partnerFeeClose[_pod]) / PRECISION;
-                        IERC20(_pod).safeTransfer(partner[_pod], _partnerAmt);
-                        _closePtknTreasuryFees -= _partnerAmt;
-                    }
-                    if (insurance != address(0) && insuranceFee > 0) {
-                        uint256 _insPtknAmt = (_closePtknTotalFees * insuranceFee) / PRECISION;
-                        IERC20(_pod).safeTransfer(insurance, _insPtknAmt);
-                        _closePtknTreasuryFees -= _insPtknAmt;
-                    }
-                    IERC20(_pod).safeTransfer(feeReceiver, _closePtknTreasuryFees);
+                    _processFees(_pod, _pod, _closePtknTotalFees, false);
                     _ptknToUserAmt -= _closePtknTotalFees;
                 }
                 IERC20(_pod).safeTransfer(_posProps.owner, _ptknToUserAmt);
@@ -317,18 +302,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
                 address _borrowTkn = _getBorrowTknForPosition(_posProps.positionId);
                 if (closeFeePerc > 0) {
                     uint256 _closeBorrowTotalFees = (_borrowTknToUser * closeFeePerc) / PRECISION;
-                    uint256 _closeBorrowTreasuryFees = _closeBorrowTotalFees;
-                    if (partner[_pod] != address(0) && partnerFeeClose[_pod] > 0) {
-                        uint256 _partnerAmt = (_closeBorrowTotalFees * partnerFeeClose[_pod]) / PRECISION;
-                        IERC20(_borrowTkn).safeTransfer(partner[_pod], _partnerAmt);
-                        _closeBorrowTreasuryFees -= _partnerAmt;
-                    }
-                    if (insurance != address(0) && insuranceFee > 0) {
-                        uint256 _insBorrowAmt = (_closeBorrowTotalFees * insuranceFee) / PRECISION;
-                        IERC20(_borrowTkn).safeTransfer(insurance, _insBorrowAmt);
-                        _closeBorrowTreasuryFees -= _insBorrowAmt;
-                    }
-                    IERC20(_borrowTkn).safeTransfer(feeReceiver, _closeBorrowTreasuryFees);
+                    _processFees(_pod, _borrowTkn, _closeBorrowTotalFees, false);
                     _borrowTknToUser -= _closeBorrowTotalFees;
                 }
                 IERC20(_borrowTkn).safeTransfer(_posProps.owner, _borrowTknToUser);
@@ -446,18 +420,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         // if there's an open fee send debt/borrow token to protocol
         if (openFeePerc > 0) {
             uint256 _openTotalFees = (_borrowTknAmtToLp * openFeePerc) / PRECISION;
-            uint256 _openTreasuryFees = _openTotalFees;
-            if (partner[_pod] != address(0) && partnerFeeOpen[_pod] > 0) {
-                uint256 _partnerAmt = (_openTotalFees * partnerFeeOpen[_pod]) / PRECISION;
-                IERC20(_d.token).safeTransfer(partner[_pod], _partnerAmt);
-                _openTreasuryFees -= _partnerAmt;
-            }
-            if (insurance != address(0) && insuranceFee > 0) {
-                uint256 _insAmt = (_openTotalFees * insuranceFee) / PRECISION;
-                IERC20(_d.token).safeTransfer(insurance, _insAmt);
-                _openTreasuryFees -= _insAmt;
-            }
-            IERC20(_d.token).safeTransfer(feeReceiver, _openTreasuryFees);
+            _processFees(_pod, _d.token, _openTotalFees, true);
             _borrowTknAmtToLp -= _openTotalFees;
         }
         (uint256 _pTknAmtUsed,, uint256 _pairedLeftover) = _lpAndStakeInPod(_d.token, _borrowTknAmtToLp, _props);
@@ -861,6 +824,14 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         );
     }
 
+    /// @notice Processes fees to both any partner configured or insurance funds
+    function _processFees(address _pod, address _tkn, uint256 _totalFees, bool _isOpening) internal {
+        if (_totalFees > 0 && feeProcessor != address(0)) {
+            IERC20(_tkn).safeTransfer(feeProcessor, _totalFees);
+            ILeverageFeeProcessor(feeProcessor).processFees(_pod, _tkn, _totalFees, feeReceiver, _isOpening);
+        }
+    }
+
     /// @notice Sets the position NFT contract address
     /// @param _posNFT The new position NFT contract address
     /// @dev Only callable by the contract owner
@@ -888,11 +859,17 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         emit SetFeeReceiver(_currentReceiver, _receiver);
     }
 
+    function setFeeProcessor(address _processor) external onlyOwner {
+        address _currentProcessor = feeProcessor;
+        feeProcessor = _processor;
+        emit SetFeeProcessor(_currentProcessor, _processor);
+    }
+
     /// @notice Sets the opening fee percentage
     /// @param _newFee The new opening fee percentage (max 2500 = 25%)
     /// @dev Only callable by the contract owner, fee cannot exceed 25%
     function setOpenFeePerc(uint16 _newFee) external onlyOwner {
-        require(_newFee <= 2500, "MAX");
+        require(_newFee <= 2500, "M");
         uint16 _oldFee = openFeePerc;
         openFeePerc = _newFee;
         emit SetOpenFeePerc(_oldFee, _newFee);
@@ -902,40 +879,10 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
     /// @param _newFee The new closing fee percentage (max 2500 = 25%)
     /// @dev Only callable by the contract owner, fee cannot exceed 25%
     function setCloseFeePerc(uint16 _newFee) external onlyOwner {
-        require(_newFee <= 2500, "MAX");
+        require(_newFee <= 2500, "M");
         uint16 _oldFee = closeFeePerc;
         closeFeePerc = _newFee;
         emit SetCloseFeePerc(_oldFee, _newFee);
-    }
-
-    function setPartnerConfig(
-        address _pod,
-        address _partner,
-        uint16 _partnerFeeOpen,
-        uint16 _partnerFeeClose,
-        uint256 _partnerExpiration
-    ) external onlyOwner {
-        require(_partnerFeeOpen <= 6000, "MAX1");
-        require(_partnerFeeClose <= 6000, "MAX2");
-        partner[_pod] = _partner;
-        partnerFeeOpen[_pod] = _partnerFeeOpen;
-        partnerFeeClose[_pod] = _partnerFeeClose;
-        partnerExpiration[_pod] = _partnerExpiration;
-        emit SetPartnerConfig(_pod, _partner, _partnerFeeOpen, _partnerFeeClose, _partnerExpiration);
-    }
-
-    function setInsuranceConfig(address _insuranceAddress, uint16 _insuranceFee) external onlyOwner {
-        require(_insuranceFee <= 2500, "MAX");
-        insurance = _insuranceAddress;
-        insuranceFee = _insuranceFee;
-        emit SetInsuranceConfig(_insuranceAddress, _insuranceFee);
-    }
-
-    /// @notice Emergency function to rescue ETH from the contract
-    /// @dev Only callable by the contract owner
-    function rescueETH() external onlyOwner {
-        (bool _s,) = payable(_msgSender()).call{value: address(this).balance}("");
-        require(_s, "S");
     }
 
     /// @notice Emergency function to rescue ERC20 tokens from the contract
@@ -944,7 +891,4 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
     function rescueTokens(IERC20 _token) external onlyOwner {
         _token.safeTransfer(_msgSender(), _token.balanceOf(address(this)));
     }
-
-    /// @dev Allow receiving ETH
-    receive() external payable {}
 }

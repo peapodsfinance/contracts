@@ -37,15 +37,11 @@ interface ILeverageManager {
 
     event SetFeeReceiver(address oldReceiver, address newReceiver);
 
+    event SetFeeProcessor(address oldProcessor, address newProcessor);
+
     event SetOpenFeePerc(uint16 oldFee, uint16 newFee);
 
     event SetCloseFeePerc(uint16 oldFee, uint16 newFee);
-
-    event SetPartnerConfig(
-        address pod, address partner, uint16 partnerFeeOpen, uint16 partnerFeeClose, uint256 partnerExpiration
-    );
-
-    event SetInsuranceConfig(address insuranceAddress, uint16 feePercent);
 
     function initializePosition(address _pod, address _recipient, bool _hasSelfLendingPairPod)
         external
