@@ -27,6 +27,8 @@ contract LeverageFeeProcessor is ILeverageFeeProcessor, Ownable {
 
     constructor() Ownable(msg.sender) {}
 
+    /// @notice Processes fees sent to this address based on fee configuration
+    /// @dev _totalFees amount of _tkn should be transferred to this contract before calling
     function processFees(address _pod, address _tkn, uint256 _totalFees, address _mainFeeReceiver, bool _isOpen)
         external
     {
