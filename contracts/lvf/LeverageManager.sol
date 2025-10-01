@@ -293,7 +293,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
             if (_ptknToUserAmt > 0) {
                 if (closeFeePerc > 0) {
                     uint256 _closePtknTotalFees = (_ptknToUserAmt * closeFeePerc) / PRECISION;
-                    _processFees(_pod, _pod, _closePtknTotalFees, false);
+                    _closePtknTotalFees = _processFees(_pod, _pod, _closePtknTotalFees, false);
                     _ptknToUserAmt -= _closePtknTotalFees;
                 }
                 IERC20(_pod).safeTransfer(_posProps.owner, _ptknToUserAmt);
@@ -302,7 +302,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
                 address _borrowTkn = _getBorrowTknForPosition(_posProps.positionId);
                 if (closeFeePerc > 0) {
                     uint256 _closeBorrowTotalFees = (_borrowTknToUser * closeFeePerc) / PRECISION;
-                    _processFees(_pod, _borrowTkn, _closeBorrowTotalFees, false);
+                    _closeBorrowTotalFees = _processFees(_pod, _borrowTkn, _closeBorrowTotalFees, false);
                     _borrowTknToUser -= _closeBorrowTotalFees;
                 }
                 IERC20(_borrowTkn).safeTransfer(_posProps.owner, _borrowTknToUser);
@@ -420,7 +420,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         // if there's an open fee send debt/borrow token to protocol
         if (openFeePerc > 0) {
             uint256 _openTotalFees = (_borrowTknAmtToLp * openFeePerc) / PRECISION;
-            _processFees(_pod, _d.token, _openTotalFees, true);
+            _openTotalFees = _processFees(_pod, _d.token, _openTotalFees, true);
             _borrowTknAmtToLp -= _openTotalFees;
         }
         (uint256 _pTknAmtUsed,, uint256 _pairedLeftover) = _lpAndStakeInPod(_d.token, _borrowTknAmtToLp, _props);
@@ -825,10 +825,14 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
     }
 
     /// @notice Processes fees to both any partner configured or insurance funds
-    function _processFees(address _pod, address _tkn, uint256 _totalFees, bool _isOpening) internal {
+    function _processFees(address _pod, address _tkn, uint256 _totalFees, bool _isOpening)
+        internal
+        returns (uint256 _totalFeesProcessed)
+    {
         if (_totalFees > 0 && feeProcessor != address(0)) {
             IERC20(_tkn).safeTransfer(feeProcessor, _totalFees);
             ILeverageFeeProcessor(feeProcessor).processFees(_pod, _tkn, _totalFees, feeReceiver, _isOpening);
+            _totalFeesProcessed = _totalFees;
         }
     }
 
