@@ -37,6 +37,8 @@ interface ILeverageManager {
 
     event SetFeeReceiver(address oldReceiver, address newReceiver);
 
+    event SetFeeProcessor(address oldProcessor, address newProcessor);
+
     event SetOpenFeePerc(uint16 oldFee, uint16 newFee);
 
     event SetCloseFeePerc(uint16 oldFee, uint16 newFee);

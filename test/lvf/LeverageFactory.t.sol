@@ -29,6 +29,7 @@ import {UniswapDexAdapter} from "../../contracts/dex/UniswapDexAdapter.sol";
 import {BalancerFlashSource} from "../../contracts/flash/BalancerFlashSource.sol";
 import {LeverageManager} from "../../contracts/lvf/LeverageManager.sol";
 import {LeverageFactory} from "../../contracts/lvf/LeverageFactory.sol";
+import {LeverageFeeProcessor} from "../../contracts/lvf/LeverageFeeProcessor.sol";
 import {MockFraxlendPairDeployer} from "../mocks/MockFraxlendPairDeployer.sol";
 import {PodHelperTest} from "../helpers/PodHelper.t.sol";
 import {LVFHelper} from "../helpers/LVFHelper.t.sol";
@@ -299,6 +300,11 @@ contract LeverageFactoryTest is LVFHelper, PodHelperTest {
     function test_createPodAndAddLvfSupport_SelfLending_WithOpenFee() public {
         leverageFactory.transferContractOwnership(address(leverageManager), address(this));
         leverageManager.setOpenFeePerc(100);
+
+        // Deploy and set fee processor
+        LeverageFeeProcessor feeProcessor = new LeverageFeeProcessor();
+        leverageManager.setFeeProcessor(address(feeProcessor));
+
         leverageManager.transferOwnership(address(leverageFactory));
         uint256 _feeReceiverBalBefore = IERC20(dai).balanceOf(address(0x23));
 

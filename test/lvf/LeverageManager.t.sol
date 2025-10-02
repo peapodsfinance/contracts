@@ -15,6 +15,7 @@ import {UniswapDexAdapter} from "../../contracts/dex/UniswapDexAdapter.sol";
 import {BalancerFlashSource} from "../../contracts/flash/BalancerFlashSource.sol";
 import {PodFlashMintSource} from "../../contracts/flash/PodFlashMintSource.sol";
 import {LeverageManager} from "../../contracts/lvf/LeverageManager.sol";
+import {LeverageFeeProcessor} from "../../contracts/lvf/LeverageFeeProcessor.sol";
 import {MockFraxlendPair} from "../mocks/MockFraxlendPair.sol";
 import {PodHelperTest} from "../helpers/PodHelper.t.sol";
 import {LVFHelper} from "../helpers/LVFHelper.t.sol";
@@ -438,11 +439,17 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
     function test_addLeverage_WithOpenFee() public {
         leverageManager.setOpenFeePerc(100);
 
+        // Deploy and set fee processor
+        LeverageFeeProcessor feeProcessor = new LeverageFeeProcessor();
+        leverageManager.setFeeProcessor(address(feeProcessor));
+
         uint256 pTknAmt = 100 * 1e18;
         uint256 pairedLpDesired = 50 * 1e18;
         bytes memory config = abi.encode(0, 1000, block.timestamp + 1 hours);
 
         deal(address(peas), ALICE, pTknAmt * 100);
+
+        uint256 _adminDaiBalBefore = IERC20(dai).balanceOf(address(this));
 
         vm.startPrank(ALICE);
 
@@ -476,6 +483,9 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
             "Incorrect Pod Token balance after adding leverage"
         );
         assertEq(IERC20(dai).balanceOf(ALICE), aliceAssetBalanceBefore, "Asset balance should not change for ALICE");
+
+        // Verify the open fee was processed through fee processor
+        assertGt(IERC20(dai).balanceOf(address(this)), _adminDaiBalBefore, "Protocol fee successfully collected");
 
         // Verify the state of the LeverageManager contract
         (address returnedPod, address lendingPair, address custodian, bool isSelfLending, bool hasSelfLendingPairPod) =
@@ -802,10 +812,14 @@ contract LeverageManagerTest is LVFHelper, PodHelperTest {
 
         deal(address(peas), ALICE, pTknAmt * 100);
 
-        uint16 openFeePerc = 100; // 10% open fee
+        uint16 openFeePerc = 100; // 1% open fee
 
         // Set open fee
         leverageManager.setOpenFeePerc(openFeePerc);
+
+        // Deploy and set fee processor
+        LeverageFeeProcessor feeProcessor = new LeverageFeeProcessor();
+        leverageManager.setFeeProcessor(address(feeProcessor));
 
         uint256 _adminDaiBalBefore = IERC20(dai).balanceOf(address(this));
 
