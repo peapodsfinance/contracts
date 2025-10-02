@@ -3,8 +3,9 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "../contracts/IndexManager.sol";
-import "../contracts/lvf/LeverageManager.sol";
+import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IIndexManager, IndexManager} from "../contracts/IndexManager.sol";
+import {LeverageManager} from "../contracts/lvf/LeverageManager.sol";
 import {FraxlendPair} from "../test/invariant/modules/fraxlend/FraxlendPair.sol";
 
 contract WithdrawFees is Script {

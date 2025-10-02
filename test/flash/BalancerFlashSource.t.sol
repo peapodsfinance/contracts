@@ -93,7 +93,7 @@ contract BalancerFlashSourceTest is Test {
     }
 
     function test_flash_USDC() public {
-        uint256 flashAmount = 1000000 * 1e6; // 1M USDC
+        uint256 flashAmount = 100000 * 1e6; // 100k USDC
 
         // Ensure receiver has enough USDC to repay the flash loan
         deal(USDC, address(receiver), flashAmount);

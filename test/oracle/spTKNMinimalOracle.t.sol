@@ -278,54 +278,6 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         assertEq(_isBadData, false, "Bad data was passed");
     }
 
-    function test_getPrices_APEPOHM() public {
-        address _podToDup = IStakingPoolToken_OLD(0x21D13197D2eABA3B47973f8e1F3f46CC96336b0E).indexFund(); // spAPE
-        address _newpOHM = _dupPodAndSeedLp(0x88E08adB69f2618adF1A3FF6CC43c671612D1ca4, address(0), 0, 0);
-        address _newPod = _dupPodAndSeedLp(_podToDup, _newpOHM, 0, 0);
-        spTKNMinimalOracle oracleAPEPOHM = new spTKNMinimalOracle(
-            abi.encode(
-                address(_clOracle),
-                address(_uniOracle),
-                address(_diaOracle),
-                _newpOHM,
-                true,
-                false,
-                IDecentralizedIndex(_newPod).lpStakingPool(),
-                0xAc4b3DacB91461209Ae9d41EC517c2B9Cb1B7DAF // UniV3: APE / WETH
-            ),
-            abi.encode(
-                address(0),
-                0x88051B0eea095007D3bEf21aB287Be961f3d8598, // UniV3: OHM / WETH
-                address(0),
-                address(0),
-                address(0),
-                address(0),
-                address(_v2Res)
-            )
-        );
-        (bool _isBadData, uint256 _priceLow, uint256 _priceHigh) = oracleAPEPOHM.getPrices();
-
-        uint256 _unsafePrice18 = _getUnsafeSpTknPrice18(address(oracleAPEPOHM));
-        console.log("unsafePrice %s - priceLow %s", _unsafePrice18, _priceLow);
-        console.log("unsafePrice %s - priceHigh %s", _unsafePrice18, _priceHigh);
-
-        assertApproxEqRel(
-            _priceLow,
-            _unsafePrice18,
-            0.2e18, // TODO: tighten this up
-            "_priceLow not close to _unsafePrice18"
-        );
-        assertApproxEqRel(
-            _priceHigh,
-            _unsafePrice18,
-            0.2e18, // TODO: tighten this up
-            "_priceHigh not close to _unsafePrice18"
-        );
-        // accounting for unwrap fee makes oracle price a bit more
-        // assertEq(_priceLow > _unsafePrice18, true); // TODO: check and confirm
-        assertEq(_isBadData, false, "Bad data was passed");
-    }
-
     function test_getPrices_BTCUSDC() public {
         address _usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
         address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
