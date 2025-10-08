@@ -13,6 +13,11 @@ contract LeverageManagerAccessControl is Initializable, OwnableUpgradeable, ILev
     // borrow asset (USDC, DAI, pOHM, etc.) => flash source
     mapping(address => address) public override flashSource;
 
+    modifier onlyLeverageFactoryOrOwner() virtual {
+        _checkOwner();
+        _;
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -22,7 +27,7 @@ contract LeverageManagerAccessControl is Initializable, OwnableUpgradeable, ILev
         __Ownable_init(_msgSender());
     }
 
-    function setLendingPair(address _pod, address _pair) external override onlyOwner {
+    function setLendingPair(address _pod, address _pair) external override onlyLeverageFactoryOrOwner {
         if (_pair != address(0)) {
             require(IFraxlendPair(_pair).collateralContract() != address(0), "LPS");
         }

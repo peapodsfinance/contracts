@@ -50,6 +50,9 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
     /// @notice A smart contract to process fees as needed
     address public feeProcessor;
 
+    /// @notice Leverage factory address for access control
+    address public override leverageFactory;
+
     /// @notice Modifier to ensure only the position owner can perform certain actions
     /// @param _positionId The ID of the position to check ownership for
     modifier onlyPositionOwner(uint256 _positionId) {
@@ -67,6 +70,14 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         } else {
             require(_workflowInitialized, "W1");
             _workflowInitialized = false;
+        }
+        _;
+    }
+
+    /// @notice Modifier to allow only the owner or leverage factory to perform certain actions
+    modifier onlyLeverageFactoryOrOwner() override {
+        if (owner() != _msgSender() && leverageFactory != _msgSender()) {
+            revert OwnableLeverageFactoryUnauthorizedAccount(_msgSender());
         }
         _;
     }
@@ -887,6 +898,11 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         uint16 _oldFee = closeFeePerc;
         closeFeePerc = _newFee;
         emit SetCloseFeePerc(_oldFee, _newFee);
+    }
+
+    function setLeverageFactory(address _factory) external override onlyOwner {
+        leverageFactory = _factory;
+        emit SetLeverageFactory(_factory);
     }
 
     /// @notice Emergency function to rescue ERC20 tokens from the contract

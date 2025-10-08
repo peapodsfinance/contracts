@@ -25,6 +25,8 @@ interface ILeverageManager {
         bool hasSelfLendingPairPod;
     }
 
+    error OwnableLeverageFactoryUnauthorizedAccount(address _sender);
+
     event AddLeverage(
         uint256 indexed positionId, address indexed user, uint256 pTknAmtUsed, uint256 collateralAmt, uint256 borrowAmt
     );
@@ -42,6 +44,10 @@ interface ILeverageManager {
     event SetOpenFeePerc(uint16 oldFee, uint16 newFee);
 
     event SetCloseFeePerc(uint16 oldFee, uint16 newFee);
+
+    event SetLeverageFactory(address _factory);
+
+    function leverageFactory() external view returns (address _leverageFactory);
 
     function initializePosition(address _pod, address _recipient, bool _hasSelfLendingPairPod)
         external
@@ -69,4 +75,6 @@ interface ILeverageManager {
     ) external;
 
     function removeLeverage(uint256 _positionId, uint256 _borrowAssetAmt, bytes memory _remLevConfig) external;
+
+    function setLeverageFactory(address _factory) external;
 }
