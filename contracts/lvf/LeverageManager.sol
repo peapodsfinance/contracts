@@ -576,7 +576,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
                     IFraxlendPair(_lendingPair).convertToShares(_borrowAmtNeededToSwap),
                     _podPairedLiquidityPrice18
                 );
-                IFraxlendPair(_lendingPair).redeem(
+                _borrowAmtFromSwap = IFraxlendPair(_lendingPair).redeem(
                     IERC20(_lendingPair).balanceOf(address(this)), address(this), address(this)
                 );
             } else {
