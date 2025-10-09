@@ -569,7 +569,7 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
             uint256 _borrowAmtFromSwap;
             if (positionProps[_props.positionId].isSelfLending) {
                 address _lendingPair = positionProps[_props.positionId].lendingPair;
-                (_podAmtRemaining, _borrowAmtFromSwap) = _swapPodForBorrowToken(
+                (_podAmtRemaining,) = _swapPodForBorrowToken(
                     _pod,
                     _lendingPair,
                     _podAmtReceived,
