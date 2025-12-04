@@ -24,8 +24,7 @@ contract FlashSourceReceiverTest is IFlashLoanRecipient {
         IFlashLoanSource.FlashData memory _parsedData = abi.decode(_data, (IFlashLoanSource.FlashData));
         address _source = abi.decode(_parsedData.data, (address));
         require(msg.sender == _source, "SRC");
-        IERC20(_parsedData.token).safeTransfer(
-            IFlashLoanSource(msg.sender).source(), _parsedData.amount + _parsedData.fee
-        );
+        IERC20(_parsedData.token)
+            .safeTransfer(IFlashLoanSource(msg.sender).source(), _parsedData.amount + _parsedData.fee);
     }
 }

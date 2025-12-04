@@ -4,11 +4,12 @@ pragma solidity ^0.8.28;
 import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
 import "../libraries/FullMath.sol";
 import "../libraries/TickMath.sol";
+import "../interfaces/IAlgebraKimV3Pool.sol";
+import "../interfaces/IAlgebraKimVolatilityOracle.sol";
 import "../interfaces/IERC20Metadata.sol";
-import "../interfaces/IUniswapV3Pool.sol";
 import "./ChainlinkSinglePriceOracle.sol";
 
-contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
+contract HydrexV3SinglePriceOracle is ChainlinkSinglePriceOracle {
     uint256 constant PRECISION = 1e6;
 
     uint256 public twapPriceAllowedPercentageDiff = 100;
@@ -52,24 +53,25 @@ contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
         view
         returns (uint256)
     {
-        address _t0 = IUniswapV3Pool(_pricePool).token0();
+        address _t0 = IAlgebraKimV3Pool(_pricePool).token0();
         return _normalizedPriceX96(
-            IUniswapV3Pool(_pricePool), _interval, _t0 == _priceToken ? IUniswapV3Pool(_pricePool).token1() : _t0
+            IAlgebraKimV3Pool(_pricePool), _interval, _t0 == _priceToken ? IAlgebraKimV3Pool(_pricePool).token1() : _t0
         );
     }
 
-    function _getSqrtPriceX96FromPool(IUniswapV3Pool _pool, uint32 _interval)
+    function _getSqrtPriceX96FromPool(IAlgebraKimV3Pool _pool, uint32 _interval)
         internal
         view
         returns (uint160 _sqrtPriceX96)
     {
         if (_interval == 0) {
-            (_sqrtPriceX96,,,,,,) = _pool.slot0();
+            (_sqrtPriceX96,,,,,) = _pool.globalState();
         } else {
+            IAlgebraKimVolatilityOracle _plugin = IAlgebraKimVolatilityOracle(_pool.plugin());
             uint32[] memory secondsAgo = new uint32[](2);
             secondsAgo[0] = _interval;
-            secondsAgo[1] = 0; // to (now)
-            (int56[] memory tickCumulatives,) = _pool.observe(secondsAgo);
+            secondsAgo[1] = 0;
+            (int56[] memory tickCumulatives,) = _plugin.getTimepoints(secondsAgo);
             int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
             int24 arithmeticMeanTick = int24(tickCumulativesDelta / int32(_interval));
             // Always round to negative infinity
@@ -78,7 +80,7 @@ contract UniswapV3SinglePriceOracle is ChainlinkSinglePriceOracle {
         }
     }
 
-    function _normalizedPriceX96(IUniswapV3Pool _pool, uint32 _twapInterval, address _numeratorToken)
+    function _normalizedPriceX96(IAlgebraKimV3Pool _pool, uint32 _twapInterval, address _numeratorToken)
         internal
         view
         returns (uint256)

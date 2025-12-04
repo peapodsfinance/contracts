@@ -174,7 +174,7 @@ contract VariableInterestRate is IRateCalculatorV2 {
             _newRatePerSec = uint64(
                 _vertexInterest
                     + ((_utilization - VERTEX_UTILIZATION) * (_newFullUtilizationInterest - _vertexInterest))
-                        / (UTIL_PREC - VERTEX_UTILIZATION)
+                    / (UTIL_PREC - VERTEX_UTILIZATION)
             );
         }
     }

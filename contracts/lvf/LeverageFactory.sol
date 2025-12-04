@@ -111,9 +111,8 @@ contract LeverageFactory is Ownable {
         address _aspTknAddy = _getOrCreateAspTkn(
             _podConstructorArgs, "", "", address(0), dexAdapter, indexUtils, _isSelfLending, _isSelfLending
         );
-        _aspTknOracle = IAspTknOracleFactory(aspTknOracleFactory).create(
-            _aspTknAddy, _aspTknOracleRequiredImmutables, _aspTknOracleOptionalImmutables, 0
-        );
+        _aspTknOracle = IAspTknOracleFactory(aspTknOracleFactory)
+            .create(_aspTknAddy, _aspTknOracleRequiredImmutables, _aspTknOracleOptionalImmutables, 0);
         _fraxlendPair = _createFraxlendPair(_borrowTkn, _aspTknAddy, _aspTknOracle, _fraxlendPairConfigData);
         _newPod = _createPodWithArgs(_podConstructorArgs, _isSelfLending ? _fraxlendPair : address(0));
 
@@ -157,9 +156,8 @@ contract LeverageFactory is Ownable {
         _aspTkn = _getOrCreateAspTkn(
             "", IERC20Metadata(_pod).name(), IERC20Metadata(_pod).symbol(), _pod, dexAdapter, indexUtils, false, false
         );
-        _aspTknOracle = IAspTknOracleFactory(aspTknOracleFactory).create(
-            _aspTkn, _aspTknOracleRequiredImmutables, _aspTknOracleOptionalImmutables, 0
-        );
+        _aspTknOracle = IAspTknOracleFactory(aspTknOracleFactory)
+            .create(_aspTkn, _aspTknOracleRequiredImmutables, _aspTknOracleOptionalImmutables, 0);
         _fraxlendPair = _createFraxlendPair(_borrowTkn, _aspTkn, _aspTknOracle, _fraxlendPairConfigData);
 
         // this effectively is what "turns on" LVF for the pair
@@ -239,8 +237,9 @@ contract LeverageFactory is Ownable {
         address _aspTknOracle,
         bytes memory _fraxlendPairConfigData
     ) internal returns (address _fraxlendPair) {
-        bytes memory _finalFraxlendPairConfig =
-            _buildFinalFraxlendConfigData(_borrowTkn, _aspTkn, _aspTknOracle, _fraxlendPairConfigData);
+        bytes memory _finalFraxlendPairConfig = _buildFinalFraxlendConfigData(
+            _borrowTkn, _aspTkn, _aspTknOracle, _fraxlendPairConfigData
+        );
         uint256 _fraxMinDep = IFraxlendPairFactory(fraxlendPairFactory).defaultDepositAmt();
         if (_fraxMinDep > 0) {
             IERC20(_borrowTkn).safeTransferFrom(_msgSender(), address(this), _fraxMinDep);
@@ -265,25 +264,27 @@ contract LeverageFactory is Ownable {
         string memory _aspName = string.concat("Auto Compounding LP for ", _podName);
         string memory _aspSymbol = string.concat("as", _podSymbol);
         if (_onlyComputeAddress) {
-            _aspTkn = IAspTknFactory(aspTknFactory).getNewCaFromParams(
-                _aspName,
-                _aspSymbol,
-                _isSelfLending,
-                IDecentralizedIndex(_pod),
-                IDexAdapter(_dexAdapter),
-                IIndexUtils(_indexUtils),
-                0
-            );
+            _aspTkn = IAspTknFactory(aspTknFactory)
+                .getNewCaFromParams(
+                    _aspName,
+                    _aspSymbol,
+                    _isSelfLending,
+                    IDecentralizedIndex(_pod),
+                    IDexAdapter(_dexAdapter),
+                    IIndexUtils(_indexUtils),
+                    0
+                );
         } else {
-            _aspTkn = IAspTknFactory(aspTknFactory).create(
-                _aspName,
-                _aspSymbol,
-                _isSelfLending,
-                IDecentralizedIndex(_pod),
-                IDexAdapter(_dexAdapter),
-                IIndexUtils(_indexUtils),
-                0
-            );
+            _aspTkn = IAspTknFactory(aspTknFactory)
+                .create(
+                    _aspName,
+                    _aspSymbol,
+                    _isSelfLending,
+                    IDecentralizedIndex(_pod),
+                    IDexAdapter(_dexAdapter),
+                    IIndexUtils(_indexUtils),
+                    0
+                );
         }
     }
 
@@ -298,15 +299,16 @@ contract LeverageFactory is Ownable {
             bytes memory immutables,
             address owner
         ) = abi.decode(_podConstructorArgs, (string, string, bytes, bytes, address));
-        _newPod = IIndexManager(indexManager).deployNewIndex(
-            indexName,
-            indexSymbol,
-            baseConfig,
-            _overridePairedLpTkn == address(0)
-                ? immutables
-                : _getSelfLendingPodImmutables(_overridePairedLpTkn, immutables),
-            owner
-        );
+        _newPod = IIndexManager(indexManager)
+            .deployNewIndex(
+                indexName,
+                indexSymbol,
+                baseConfig,
+                _overridePairedLpTkn == address(0)
+                    ? immutables
+                    : _getSelfLendingPodImmutables(_overridePairedLpTkn, immutables),
+                owner
+            );
     }
 
     function _getSelfLendingPodImmutables(address _fraxlendPair, bytes memory _immutables)

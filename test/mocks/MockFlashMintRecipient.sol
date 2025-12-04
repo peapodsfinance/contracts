@@ -28,8 +28,9 @@ contract MockFlashMintRecipient is IFlashLoanRecipient {
         }
 
         // Transfer the flash minted tokens back to the pod
-        IERC20(flashData.token).transfer(
-            shouldUseShource ? IFlashLoanSource(msg.sender).source() : msg.sender, flashData.amount + flashData.fee
-        );
+        IERC20(flashData.token)
+            .transfer(
+                shouldUseShource ? IFlashLoanSource(msg.sender).source() : msg.sender, flashData.amount + flashData.fee
+            );
     }
 }

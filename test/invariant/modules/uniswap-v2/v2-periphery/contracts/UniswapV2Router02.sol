@@ -130,8 +130,9 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         address to,
         uint256 deadline
     ) public virtual override ensure(deadline) returns (uint256 amountToken, uint256 amountETH) {
-        (amountToken, amountETH) =
-            removeLiquidity(token, WETH, liquidity, amountTokenMin, amountETHMin, address(this), deadline);
+        (amountToken, amountETH) = removeLiquidity(
+            token, WETH, liquidity, amountTokenMin, amountETHMin, address(this), deadline
+        );
         TransferHelper.safeTransfer(token, to, amountToken);
         IWETH(WETH).withdraw(amountETH);
         TransferHelper.safeTransferETH(to, amountETH);
@@ -219,9 +220,8 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
             (uint256 amount0Out, uint256 amount1Out) =
                 input == token0 ? (uint256(0), amountOut) : (amountOut, uint256(0));
             address to = i < path.length - 2 ? UniswapV2Library.pairFor(factory, output, path[i + 2]) : _to;
-            IUniswapV2Pair(UniswapV2Library.pairFor(factory, input, output)).swap(
-                amount0Out, amount1Out, to, new bytes(0)
-            );
+            IUniswapV2Pair(UniswapV2Library.pairFor(factory, input, output))
+                .swap(amount0Out, amount1Out, to, new bytes(0));
         }
     }
 

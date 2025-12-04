@@ -16,9 +16,8 @@ contract AddLeverageLeverageManager is Script {
         uint256 positionId = vm.envUint("POS_ID");
 
         IERC20(pod).approve(lvf, ptknAmt);
-        LeverageManager(payable(lvf)).addLeverage(
-            positionId, pod, ptknAmt, ptknAmt, 0, false, abi.encode(0, 1000, block.timestamp + 120)
-        );
+        LeverageManager(payable(lvf))
+            .addLeverage(positionId, pod, ptknAmt, ptknAmt, 0, false, abi.encode(0, 1000, block.timestamp + 120));
 
         vm.stopBroadcast();
 

@@ -167,12 +167,7 @@ contract MockRewardsWhitelister {
 }
 
 contract MockDexAdapter {
-    function swapV3Single(address, address, uint24, uint256, uint256, address)
-        external
-        pure
-        virtual
-        returns (uint256)
-    {
+    function swapV3Single(address, address, uint24, uint256, uint256, address) external pure virtual returns (uint256) {
         return 0;
     }
 

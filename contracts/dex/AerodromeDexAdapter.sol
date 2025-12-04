@@ -66,15 +66,13 @@ contract AerodromeDexAdapter is UniswapDexAdapter {
         }
         IAerodromeRouter.Route[] memory _routes = new IAerodromeRouter.Route[](1);
         _routes[0] = IAerodromeRouter.Route({
-            from: _tokenIn,
-            to: _tokenOut,
-            stable: false,
-            factory: IAerodromeRouter(V2_ROUTER).defaultFactory()
+            from: _tokenIn, to: _tokenOut, stable: false, factory: IAerodromeRouter(V2_ROUTER).defaultFactory()
         });
         IERC20(_tokenIn).safeIncreaseAllowance(V2_ROUTER, _amountIn);
-        IAerodromeRouter(V2_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            _amountIn, _amountOutMin, _routes, _recipient, block.timestamp
-        );
+        IAerodromeRouter(V2_ROUTER)
+            .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                _amountIn, _amountOutMin, _routes, _recipient, block.timestamp
+            );
 
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }
@@ -119,9 +117,10 @@ contract AerodromeDexAdapter is UniswapDexAdapter {
         IERC20(_tokenB).safeTransferFrom(_msgSender(), address(this), _amountBDesired);
         IERC20(_tokenA).safeIncreaseAllowance(V2_ROUTER, _amountADesired);
         IERC20(_tokenB).safeIncreaseAllowance(V2_ROUTER, _amountBDesired);
-        IAerodromeRouter(V2_ROUTER).addLiquidity(
-            _tokenA, _tokenB, false, _amountADesired, _amountBDesired, _amountAMin, _amountBMin, _to, _deadline
-        );
+        IAerodromeRouter(V2_ROUTER)
+            .addLiquidity(
+                _tokenA, _tokenB, false, _amountADesired, _amountBDesired, _amountAMin, _amountBMin, _to, _deadline
+            );
         if (IERC20(_tokenA).balanceOf(address(this)) > _aBefore) {
             IERC20(_tokenA).safeTransfer(_to, IERC20(_tokenA).balanceOf(address(this)) - _aBefore);
         }
@@ -143,9 +142,8 @@ contract AerodromeDexAdapter is UniswapDexAdapter {
         uint256 _lpBefore = IERC20(_pool).balanceOf(address(this));
         IERC20(_pool).safeTransferFrom(_msgSender(), address(this), _liquidity);
         IERC20(_pool).safeIncreaseAllowance(V2_ROUTER, _liquidity);
-        IAerodromeRouter(V2_ROUTER).removeLiquidity(
-            _tokenA, _tokenB, false, _liquidity, _amountAMin, _amountBMin, _to, _deadline
-        );
+        IAerodromeRouter(V2_ROUTER)
+            .removeLiquidity(_tokenA, _tokenB, false, _liquidity, _amountAMin, _amountBMin, _to, _deadline);
         if (IERC20(_pool).balanceOf(address(this)) > _lpBefore) {
             IERC20(_pool).safeTransfer(_to, IERC20(_pool).balanceOf(address(this)) - _lpBefore);
         }

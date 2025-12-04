@@ -115,8 +115,7 @@ contract MockFraxlendPair is IFraxlendPair, ERC20 {
         (
             uint256 interestEarned,
             uint256 feesAmount,
-            uint256 feesShare,
-            ,
+            uint256 feesShare,,
             VaultAccount memory newTotalAsset,
             VaultAccount memory newTotalBorrow
         ) = this.previewAddInterest();

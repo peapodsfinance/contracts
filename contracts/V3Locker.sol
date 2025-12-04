@@ -22,10 +22,7 @@ contract V3Locker is Ownable {
     function collect(uint256 _lpId) external {
         V3_POS_MGR.collect(
             INonfungiblePositionManager.CollectParams({
-                tokenId: _lpId,
-                recipient: owner(),
-                amount0Max: type(uint128).max,
-                amount1Max: type(uint128).max
+                tokenId: _lpId, recipient: owner(), amount0Max: type(uint128).max, amount1Max: type(uint128).max
             })
         );
     }

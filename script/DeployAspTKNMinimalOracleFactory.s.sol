@@ -13,9 +13,10 @@ contract DeployAspTKNMinimalOracleFactory is Script {
 
         aspTKNMinimalOracleFactory aspOracleFactory = new aspTKNMinimalOracleFactory();
         Ownable(address(aspOracleFactory)).transferOwnership(vm.envAddress("LEV_FACTORY"));
-        LeverageFactory(vm.envAddress("LEV_FACTORY")).setLevMgrAndFactories(
-            address(0), address(0), address(0), address(0), address(0), address(aspOracleFactory), address(0)
-        );
+        LeverageFactory(vm.envAddress("LEV_FACTORY"))
+            .setLevMgrAndFactories(
+                address(0), address(0), address(0), address(0), address(0), address(aspOracleFactory), address(0)
+            );
 
         vm.stopBroadcast();
 

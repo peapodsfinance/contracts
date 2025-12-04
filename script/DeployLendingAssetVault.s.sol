@@ -18,30 +18,33 @@ contract DeployLendingAssetVault is Script {
 
         // asset1
         IERC20(asset1).approve(factory, _depAmount);
-        address lav1 = LendingAssetVaultFactory(factory).create(
-            string.concat("Peapods Metavault for ", IERC20Metadata(asset1).name()),
-            string.concat("pv", IERC20Metadata(asset1).symbol()),
-            asset1,
-            0
-        );
+        address lav1 = LendingAssetVaultFactory(factory)
+            .create(
+                string.concat("Peapods Metavault for ", IERC20Metadata(asset1).name()),
+                string.concat("pv", IERC20Metadata(asset1).symbol()),
+                asset1,
+                0
+            );
 
         // asset2
         IERC20(asset2).approve(factory, _depAmount);
-        address lav2 = LendingAssetVaultFactory(factory).create(
-            string.concat("Peapods Metavault for ", IERC20Metadata(asset2).name()),
-            string.concat("pv", IERC20Metadata(asset2).symbol()),
-            asset2,
-            0
-        );
+        address lav2 = LendingAssetVaultFactory(factory)
+            .create(
+                string.concat("Peapods Metavault for ", IERC20Metadata(asset2).name()),
+                string.concat("pv", IERC20Metadata(asset2).symbol()),
+                asset2,
+                0
+            );
 
         // asset3
         IERC20(asset3).approve(factory, _depAmount);
-        address lav3 = LendingAssetVaultFactory(factory).create(
-            string.concat("Peapods Metavault for ", IERC20Metadata(asset3).name()),
-            string.concat("pv", IERC20Metadata(asset3).symbol()),
-            asset3,
-            0
-        );
+        address lav3 = LendingAssetVaultFactory(factory)
+            .create(
+                string.concat("Peapods Metavault for ", IERC20Metadata(asset3).name()),
+                string.concat("pv", IERC20Metadata(asset3).symbol()),
+                asset3,
+                0
+            );
 
         vm.stopBroadcast();
 

@@ -52,12 +52,7 @@ contract MockV3TwapUtilities is IV3TwapUtilities, Ownable {
         return (_priceStableWETH9X96 * _priceMainX96) / FixedPoint96.Q96;
     }
 
-    function sqrtPriceX96FromPoolAndInterval(address _poolAddress)
-        public
-        view
-        override
-        returns (uint160 sqrtPriceX96)
-    {
+    function sqrtPriceX96FromPoolAndInterval(address _poolAddress) public view override returns (uint160 sqrtPriceX96) {
         sqrtPriceX96 = _sqrtPriceX96FromPoolAndInterval(_poolAddress, INTERVAL);
     }
 

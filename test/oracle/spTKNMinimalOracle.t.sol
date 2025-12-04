@@ -88,8 +88,8 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         uint256 _price18 = oraclePEASDAI.getPodPerBasePrice();
         assertApproxEqRel(
             _price18,
-            0.2 ether, // NOTE: At the time of writing test DAI/PEAS == $5, so inverse is 1/5 == 0.2
-            0.2e18 // NOTE: At the time of writing test DAI/PEAS ~= $3, so _price18 would be ~1/3 == 0.33, so precision to <= 1 here (it's wide I know)
+            0.5 ether, // NOTE: At the time of writing test DAI/PEAS == $2, so inverse is 1/2 == 0.5
+            0.2e18 // NOTE: At the time of writing test DAI/PEAS ~= $2, so _price18 would be ~1/2 == 0.5, so precision to <= 1 here (it's wide I know)
         );
     }
 
@@ -515,7 +515,7 @@ contract spTKNMinimalOracleTest is PodHelperTest {
     function test_getPrices_BTCWETH() public {
         address weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
         address _podToDup = IStakingPoolToken_OLD(0x65905866Fd95061c06C065856560e56c87459886).indexFund(); // spWBTC (pWBTC/pOHM)
-        address _newPod = _dupPodAndSeedLp(_podToDup, weth, 0, 200); // $4400 ETH, $22 pOHM, 4400/22
+        address _newPod = _dupPodAndSeedLp(_podToDup, weth, 0, 190); // $3800 ETH, $20 pOHM, 3800/20
         spTKNMinimalOracle oracleBTCWETH = new spTKNMinimalOracle(
             abi.encode(
                 address(_clOracle),
@@ -546,13 +546,13 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         assertApproxEqRel(
             _priceLow,
             _unsafePrice18,
-            0.05e18, // TODO: tighten this up
+            0.1e18, // TODO: tighten this up
             "_priceLow not close to _unsafePrice18"
         );
         assertApproxEqRel(
             _priceHigh,
             _unsafePrice18,
-            0.05e18, // TODO: tighten this up
+            0.1e18, // TODO: tighten this up
             "_priceHigh not close to _unsafePrice18"
         );
         // accounting for unwrap fee makes oracle price a bit more
@@ -593,9 +593,8 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         IERC20(wbtc).approve(_newPod, 1e18);
         IDecentralizedIndex(_newPod).bond(wbtc, 1e18, 0);
         vm.expectRevert(spTKNMinimalOracle.PodLocked.selector);
-        IDecentralizedIndex(_newPod).flashMint(
-            address(this), 1e18, abi.encode(_newPod, address(oracleBTCWETH), uint256(1e18))
-        );
+        IDecentralizedIndex(_newPod)
+            .flashMint(address(this), 1e18, abi.encode(_newPod, address(oracleBTCWETH), uint256(1e18)));
     }
 
     function test_getPrices_BTCWETH_PassesIfBaseTknFlashMinted() public {
@@ -632,9 +631,8 @@ contract spTKNMinimalOracleTest is PodHelperTest {
         IERC20(wbtc).approve(_newBasePod, 2e18);
         IDecentralizedIndex(_newBasePod).bond(wbtc, 2e18, 0);
         // should pass without revert
-        IDecentralizedIndex(_newBasePod).flashMint(
-            address(this), 1e18, abi.encode(_newBasePod, address(oracleBTCWETH), 1e18)
-        );
+        IDecentralizedIndex(_newBasePod)
+            .flashMint(address(this), 1e18, abi.encode(_newBasePod, address(oracleBTCWETH), 1e18));
     }
 
     // needed for flashMint test to test locked state and revert

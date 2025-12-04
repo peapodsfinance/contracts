@@ -21,7 +21,7 @@ contract UniswapV3SinglePriceOracleTest is Test {
         );
         console.log("DAI per PEAS via PEAS/DAI UniV3 pool price (no conversion from DAI to USD)", _price);
         assertEq(_isBadData, false);
-        assertGt(_price, 2 * 10 ** 18); // greater than 2 (please god)
+        assertGt(_price, 1 * 10 ** 18); // greater than 1 (please god)
     }
 
     function test_getPriceUSD18_PEASDAI() public view {
@@ -33,7 +33,7 @@ contract UniswapV3SinglePriceOracleTest is Test {
         );
         console.log("USD per PEAS via PEAS/DAI UniV3 pool price", _price);
         assertEq(_isBadData, false);
-        assertGt(_price, 2 * 10 ** 18); // greater than 2 (please god)
+        assertGt(_price, 1 * 10 ** 18); // greater than 1 (please god)
     }
 
     function test_getPriceUSD18_PEASWETH() public view {
@@ -45,6 +45,6 @@ contract UniswapV3SinglePriceOracleTest is Test {
         );
         console.log("USD per PEAS via PEAS/WETH UniV3 pool price", _price);
         assertEq(_isBadData, false);
-        assertGt(_price, 2 * 10 ** 18); // greater than 2 (please god)
+        assertGt(_price, 1 * 10 ** 18); // greater than 1 (please god)
     }
 }

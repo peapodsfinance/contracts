@@ -13,19 +13,20 @@ contract DeployVerificationPod is Script {
         _t[0] = 0x02f92800F57BCD74066F5709F1Daa1A4302Df875;
         uint256[] memory _w = new uint256[](1);
         _w[0] = 1e18;
-        address _pod = IIndexManager(vm.envAddress("INDEX_MANAGER")).deployNewIndex(
-            "Verification",
-            "pVER",
-            abi.encode(_c, _getFees(), _t, _w, address(0), true),
-            _getImmutables(
-                vm.envAddress("DAI"),
-                vm.envAddress("FEE_ROUTER"),
-                vm.envAddress("REWARDS"),
-                vm.envAddress("TWAP_UTILS"),
-                vm.envAddress("ADAPTER")
-            ),
-            vm.addr(vm.envUint("PRIVATE_KEY"))
-        );
+        address _pod = IIndexManager(vm.envAddress("INDEX_MANAGER"))
+            .deployNewIndex(
+                "Verification",
+                "pVER",
+                abi.encode(_c, _getFees(), _t, _w, address(0), true),
+                _getImmutables(
+                    vm.envAddress("DAI"),
+                    vm.envAddress("FEE_ROUTER"),
+                    vm.envAddress("REWARDS"),
+                    vm.envAddress("TWAP_UTILS"),
+                    vm.envAddress("ADAPTER")
+                ),
+                vm.addr(vm.envUint("PRIVATE_KEY"))
+            );
 
         vm.stopBroadcast();
 

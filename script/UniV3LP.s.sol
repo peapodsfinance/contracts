@@ -24,28 +24,28 @@ contract UniV3LP is Script {
         uint256 bal0 = IERC20(t0).balanceOf(recipient);
         uint256 bal1 = IERC20(t1).balanceOf(recipient);
 
-        address pool = INonfungiblePositionManager(nonfungiblePositionManager).createAndInitializePoolIfNecessary(
-            t0, t1, uint24(fee), uint160(sqrtPriceX96)
-        );
+        address pool = INonfungiblePositionManager(nonfungiblePositionManager)
+            .createAndInitializePoolIfNecessary(t0, t1, uint24(fee), uint160(sqrtPriceX96));
         int24 _offset = TickMath.MAX_TICK % IUniswapV3Pool(pool).tickSpacing();
 
         IERC20(t0).approve(nonfungiblePositionManager, bal0);
         IERC20(t1).approve(nonfungiblePositionManager, bal1);
-        INonfungiblePositionManager(nonfungiblePositionManager).mint(
-            INonfungiblePositionManager.MintParams({
-                token0: t0,
-                token1: t1,
-                fee: uint24(fee),
-                tickLower: TickMath.MIN_TICK + _offset,
-                tickUpper: TickMath.MAX_TICK - _offset,
-                amount0Desired: bal0 / 10,
-                amount1Desired: bal1 / 10,
-                amount0Min: 0,
-                amount1Min: 0,
-                recipient: recipient,
-                deadline: block.timestamp + 1 days
-            })
-        );
+        INonfungiblePositionManager(nonfungiblePositionManager)
+            .mint(
+                INonfungiblePositionManager.MintParams({
+                    token0: t0,
+                    token1: t1,
+                    fee: uint24(fee),
+                    tickLower: TickMath.MIN_TICK + _offset,
+                    tickUpper: TickMath.MAX_TICK - _offset,
+                    amount0Desired: bal0 / 10,
+                    amount1Desired: bal1 / 10,
+                    amount0Min: 0,
+                    amount1Min: 0,
+                    recipient: recipient,
+                    deadline: block.timestamp + 1 days
+                })
+            );
 
         vm.stopBroadcast();
 

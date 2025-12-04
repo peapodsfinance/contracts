@@ -13,12 +13,13 @@ contract ChainlinkSinglePriceOracleTest is Test {
     }
 
     function test_getPriceUSD18_quoteOnly() public view {
-        (bool _isBadData, uint256 _price) = oracle.getPriceUSD18(
-            0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419, // ETH / USD
-            address(0),
-            address(0),
-            0
-        );
+        (bool _isBadData, uint256 _price) =
+            oracle.getPriceUSD18(
+                0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419, // ETH / USD
+                address(0),
+                address(0),
+                0
+            );
         console.log("USD per ETH price", _price);
         assertEq(_isBadData, false);
         assertGt(_price, 10 ** 21); // greater than $1000 (please god)

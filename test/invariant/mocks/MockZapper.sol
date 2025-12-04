@@ -206,15 +206,16 @@ contract MockZapper is IZapper, Context, Ownable {
         uint256 _outBefore = IERC20(_out).balanceOf(address(this));
         IERC20(_in).safeIncreaseAllowance(V3_ROUTER, _amountIn);
         bytes memory _path = abi.encodePacked(_in, _fee1, _in2, _fee2, _out);
-        ISwapRouter(V3_ROUTER).exactInput(
-            ISwapRouter.ExactInputParams({
-                path: _path,
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: _amountIn,
-                amountOutMinimum: _amountOutMin
-            })
-        );
+        ISwapRouter(V3_ROUTER)
+            .exactInput(
+                ISwapRouter.ExactInputParams({
+                    path: _path,
+                    recipient: address(this),
+                    deadline: block.timestamp,
+                    amountIn: _amountIn,
+                    amountOutMinimum: _amountOutMin
+                })
+            );
         return IERC20(_out).balanceOf(address(this)) - _outBefore;
     }
 
@@ -243,10 +244,7 @@ contract MockZapper is IZapper, Context, Ownable {
         return _boughtYeth;
     }
 
-    function _styethToWeth(uint256 _stYethAmount, uint256 _minWethAmount, bool _isYethOnly)
-        internal
-        returns (uint256)
-    {
+    function _styethToWeth(uint256 _stYethAmount, uint256 _minWethAmount, bool _isYethOnly) internal returns (uint256) {
         uint256 _yethAmount;
         if (_isYethOnly) {
             _yethAmount = _stYethAmount;

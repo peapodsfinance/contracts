@@ -66,8 +66,7 @@ contract TokenRewards is Initializable, IInitializeSelector, ContextUpgradeable,
 
         (
             address _pairedLpToken,
-            address _lpRewardsToken,
-            ,
+            address _lpRewardsToken,,
             address _feeRouter,
             address _rewardsWhitelist,
             address _v3TwapUtilities,

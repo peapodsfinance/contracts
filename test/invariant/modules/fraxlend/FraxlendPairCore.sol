@@ -177,11 +177,11 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
     /// @param _includeVault Whether to include assets from the external asset vault, if configured in total available
     /// @return The balance of Asset Tokens held by contract
 
-    function _totalAssetAvailable(VaultAccount memory _totalAsset, VaultAccount memory _totalBorrow, bool _includeVault)
-        internal
-        view
-        returns (uint256)
-    {
+    function _totalAssetAvailable(
+        VaultAccount memory _totalAsset,
+        VaultAccount memory _totalBorrow,
+        bool _includeVault
+    ) internal view returns (uint256) {
         if (_includeVault) {
             return _totalAsset.totalAmount(address(externalAssetVault)) - _totalBorrow.amount;
         }
@@ -334,9 +334,8 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
             uint256 _utilizationRate =
                 _totalAssetsAvailable == 0 ? 0 : (UTIL_PREC * _results.totalBorrow.amount) / _totalAssetsAvailable;
             // Request new interest rate and full utilization rate from the rate calculator
-            (_results.newRate, _results.newFullUtilizationRate) = IRateCalculatorV2(rateContract).getNewRate(
-                _deltaTime, _utilizationRate, _currentRateInfo.fullUtilizationRate
-            );
+            (_results.newRate, _results.newFullUtilizationRate) = IRateCalculatorV2(rateContract)
+                .getNewRate(_deltaTime, _utilizationRate, _currentRateInfo.fullUtilizationRate);
             // Calculate interest accrued
             _results.interestEarned = (_deltaTime * _results.totalBorrow.amount * _results.newRate) / RATE_PRECISION;
             // Accrue interest (if any) and fees iff no overflow
@@ -470,9 +469,9 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
             _highExchangeRate = _exchangeRateInfo.highExchangeRate;
         }
         emit Message("HERE5");
-        uint256 _deviation = (
-            DEVIATION_PRECISION * (_exchangeRateInfo.highExchangeRate - _exchangeRateInfo.lowExchangeRate)
-        ) / _exchangeRateInfo.highExchangeRate;
+        uint256 _deviation =
+            (DEVIATION_PRECISION * (_exchangeRateInfo.highExchangeRate - _exchangeRateInfo.lowExchangeRate))
+                / _exchangeRateInfo.highExchangeRate;
         if (_deviation <= _exchangeRateInfo.maxOracleDeviation) {
             emit Message("HERE6");
             _isBorrowAllowed = true;
@@ -1120,9 +1119,8 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
         _assetContract.approve(_swapperAddress, _borrowAmount);
         // Even though swappers are trusted, we verify the balance before and after swap
         uint256 _initialCollateralBalance = _collateralContract.balanceOf(address(this));
-        ISwapper(_swapperAddress).swapExactTokensForTokens(
-            _borrowAmount, _amountCollateralOutMin, _path, address(this), block.timestamp
-        );
+        ISwapper(_swapperAddress)
+            .swapExactTokensForTokens(_borrowAmount, _amountCollateralOutMin, _path, address(this), block.timestamp);
         uint256 _finalCollateralBalance = _collateralContract.balanceOf(address(this));
         // Note: VIOLATES CHECKS-EFFECTS-INTERACTION pattern, make sure function is NONREENTRANT
         // Effects: bookkeeping & write to state
@@ -1193,9 +1191,8 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
         _collateralContract.approve(_swapperAddress, _collateralToSwap);
         // Even though swappers are trusted, we verify the balance before and after swap
         uint256 _initialAssetBalance = _assetContract.balanceOf(address(this));
-        ISwapper(_swapperAddress).swapExactTokensForTokens(
-            _collateralToSwap, _amountAssetOutMin, _path, address(this), _swapDeadline
-        );
+        ISwapper(_swapperAddress)
+            .swapExactTokensForTokens(_collateralToSwap, _amountAssetOutMin, _path, address(this), _swapDeadline);
 
         // Note: VIOLATES CHECKS-EFFECTS-INTERACTION pattern, make sure function is NONREENTRANT
         // Effects: bookkeeping

@@ -18,17 +18,18 @@ contract UniV3Swap is Script {
         uint256 amountIn = vm.envUint("AMOUNT");
 
         IERC20(source).approve(router, amountIn);
-        uint256 amountOut = ISwapRouter02(router).exactInputSingle(
-            ISwapRouter02.ExactInputSingleParams({
-                tokenIn: source,
-                tokenOut: targetToken,
-                fee: uint24(fee),
-                recipient: recipient,
-                amountIn: amountIn,
-                amountOutMinimum: 0,
-                sqrtPriceLimitX96: 0
-            })
-        );
+        uint256 amountOut = ISwapRouter02(router)
+            .exactInputSingle(
+                ISwapRouter02.ExactInputSingleParams({
+                    tokenIn: source,
+                    tokenOut: targetToken,
+                    fee: uint24(fee),
+                    recipient: recipient,
+                    amountIn: amountIn,
+                    amountOutMinimum: 0,
+                    sqrtPriceLimitX96: 0
+                })
+            );
 
         vm.stopBroadcast();
 

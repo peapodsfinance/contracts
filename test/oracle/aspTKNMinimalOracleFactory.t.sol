@@ -99,12 +99,13 @@ contract MockDecentralizedIndex is ERC20, IDecentralizedIndex {
     }
 
     function config() external pure returns (Config memory) {
-        return Config(
-            address(0), // partner
-            0, // debondCooldown
-            false, // hasTransferTax
-            false // blacklistTKNpTKNPoolV2
-        );
+        return
+            Config(
+                address(0), // partner
+                0, // debondCooldown
+                false, // hasTransferTax
+                false // blacklistTKNpTKNPoolV2
+            );
     }
 
     function fees() external pure returns (Fees memory) {

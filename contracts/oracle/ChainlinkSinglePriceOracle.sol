@@ -86,11 +86,10 @@ contract ChainlinkSinglePriceOracle is IMinimalSinglePriceOracle, Ownable {
             return;
         }
 
-        (
-            ,
+        (,
             /*uint80 roundID*/
             int256 answer,
-            uint256 _startedAt, /*uint256 updatedAt*/ /*uint80 answeredInRound*/
+            uint256 _startedAt,/*uint256 updatedAt*/ /*uint80 answeredInRound*/
             ,
         ) = _sequencerUptimeFeed.latestRoundData();
 

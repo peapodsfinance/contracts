@@ -77,10 +77,11 @@ contract DualOracleChainlinkUniV3 is Timelock2Step {
         uint8 _divideDecimals =
             _chainlinkDivideAddress != address(0) ? AggregatorV3Interface(_chainlinkDivideAddress).decimals() : 0;
         CHAINLINK_NORMALIZATION = 10
-            ** (
-                18 + _multiplyDecimals - _divideDecimals + IERC20Metadata(_baseToken).decimals()
-                    - IERC20Metadata(_quoteToken).decimals()
-            );
+            ** (18
+                + _multiplyDecimals
+                - _divideDecimals
+                + IERC20Metadata(_baseToken).decimals()
+                - IERC20Metadata(_quoteToken).decimals());
 
         maxOracleDelay = _maxOracleDelay;
 
@@ -138,9 +139,8 @@ contract DualOracleChainlinkUniV3 is Timelock2Step {
     function getPrices() external view returns (bool _isBadData, uint256 _priceLow, uint256 _priceHigh) {
         address[] memory _pools = new address[](1);
         _pools[0] = UNI_V3_PAIR_ADDRESS;
-        uint256 _price1 = IStaticOracle(0xB210CE856631EeEB767eFa666EC7C1C57738d438).quoteSpecificPoolsWithTimePeriod(
-            ORACLE_PRECISION, BASE_TOKEN, QUOTE_TOKEN, _pools, TWAP_DURATION
-        );
+        uint256 _price1 = IStaticOracle(0xB210CE856631EeEB767eFa666EC7C1C57738d438)
+            .quoteSpecificPoolsWithTimePeriod(ORACLE_PRECISION, BASE_TOKEN, QUOTE_TOKEN, _pools, TWAP_DURATION);
         uint256 _price2;
         (_isBadData, _price2) = _getChainlinkPrice();
 

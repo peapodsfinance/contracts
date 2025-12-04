@@ -253,8 +253,9 @@ contract WeightedIndexTest is PodHelperTest {
         pod.bond(address(peas), expectedFee, 0);
         pod.transfer(address(flashMintRecipient), expectedFee);
 
-        IFlashLoanSource.FlashData memory _d =
-            IFlashLoanSource.FlashData(address(flashMintRecipient), address(pod), mintAmount, callbackData, expectedFee);
+        IFlashLoanSource.FlashData memory _d = IFlashLoanSource.FlashData(
+            address(flashMintRecipient), address(pod), mintAmount, callbackData, expectedFee
+        );
         pod.flashMint(address(flashMintRecipient), mintAmount, abi.encode(_d));
 
         assertEq(flashMintRecipient.lastCallbackData(), callbackData, "Callback data should match");

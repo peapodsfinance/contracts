@@ -87,15 +87,16 @@ contract SwapRouter is
 
         bool zeroForOne = tokenIn < tokenOut;
 
-        (int256 amount0, int256 amount1) = getPool(tokenIn, tokenOut, fee).swap(
-            recipient,
-            zeroForOne,
-            amountIn.toInt256(),
-            sqrtPriceLimitX96 == 0
-                ? (zeroForOne ? TickMath.MIN_SQRT_RATIO + 1 : TickMath.MAX_SQRT_RATIO - 1)
-                : sqrtPriceLimitX96,
-            abi.encode(data)
-        );
+        (int256 amount0, int256 amount1) = getPool(tokenIn, tokenOut, fee)
+            .swap(
+                recipient,
+                zeroForOne,
+                amountIn.toInt256(),
+                sqrtPriceLimitX96 == 0
+                    ? (zeroForOne ? TickMath.MIN_SQRT_RATIO + 1 : TickMath.MAX_SQRT_RATIO - 1)
+                    : sqrtPriceLimitX96,
+                abi.encode(data)
+            );
 
         return uint256(-(zeroForOne ? amount1 : amount0));
     }
@@ -171,15 +172,16 @@ contract SwapRouter is
 
         bool zeroForOne = tokenIn < tokenOut;
 
-        (int256 amount0Delta, int256 amount1Delta) = getPool(tokenIn, tokenOut, fee).swap(
-            recipient,
-            zeroForOne,
-            -amountOut.toInt256(),
-            sqrtPriceLimitX96 == 0
-                ? (zeroForOne ? TickMath.MIN_SQRT_RATIO + 1 : TickMath.MAX_SQRT_RATIO - 1)
-                : sqrtPriceLimitX96,
-            abi.encode(data)
-        );
+        (int256 amount0Delta, int256 amount1Delta) = getPool(tokenIn, tokenOut, fee)
+            .swap(
+                recipient,
+                zeroForOne,
+                -amountOut.toInt256(),
+                sqrtPriceLimitX96 == 0
+                    ? (zeroForOne ? TickMath.MIN_SQRT_RATIO + 1 : TickMath.MAX_SQRT_RATIO - 1)
+                    : sqrtPriceLimitX96,
+                abi.encode(data)
+            );
 
         uint256 amountOutReceived;
         (amountIn, amountOutReceived) = zeroForOne

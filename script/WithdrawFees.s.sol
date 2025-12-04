@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Script.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {IIndexManager, IndexManager} from "../contracts/IndexManager.sol";
 import {LeverageManager} from "../contracts/lvf/LeverageManager.sol";
 import {FraxlendPair} from "../test/invariant/modules/fraxlend/FraxlendPair.sol";
@@ -43,12 +44,22 @@ contract WithdrawFees is Script {
 
             (uint256 i, uint256 f) = _getFloat(IERC20(asset).balanceOf(treasury), decimals);
             console.log("processing lending pair: %s", lendingPair);
-            console.log("Treasury balance before: %s.%s %s", i, f, IERC20Metadata(asset).symbol());
+            console.log(
+                "Treasury balance before: %s.%s %s",
+                Strings.toString(i),
+                Strings.toString(f),
+                IERC20Metadata(asset).symbol()
+            );
 
             FraxlendPair(lendingPair).withdrawFees(uint128(_shares), treasury);
 
             (i, f) = _getFloat(IERC20(asset).balanceOf(treasury), decimals);
-            console.log("Treasury balance after: %s.%s %s", i, f, IERC20Metadata(asset).symbol());
+            console.log(
+                "Treasury balance after: %s.%s %s",
+                Strings.toString(i),
+                Strings.toString(f),
+                IERC20Metadata(asset).symbol()
+            );
         }
 
         vm.stopBroadcast();

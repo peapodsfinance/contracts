@@ -83,10 +83,7 @@ interface IAerodromeRouter {
     /// @param tokenB   Address of token to query
     /// @param stable   True if pool is stable, false if volatile
     /// @param _factory Address of factory which created the pool
-    function poolFor(address tokenA, address tokenB, bool stable, address _factory)
-        external
-        view
-        returns (address pool);
+    function poolFor(address tokenA, address tokenB, bool stable, address _factory) external view returns (address pool);
 
     /// @notice Fetch and sort the reserves for a pool
     /// @param tokenA       .

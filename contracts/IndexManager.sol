@@ -67,11 +67,7 @@ contract IndexManager is IIndexManager, Context, Ownable {
         _indexIdx[_index] = indexes.length;
         indexes.push(
             IIndexAndStatus({
-                index: _index,
-                creator: _user,
-                verified: _verified,
-                selfLending: _selfLending,
-                makePublic: _makePublic
+                index: _index, creator: _user, verified: _verified, selfLending: _selfLending, makePublic: _makePublic
             })
         );
         emit AddIndex(_index, _verified);

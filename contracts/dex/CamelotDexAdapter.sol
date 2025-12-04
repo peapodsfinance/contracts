@@ -46,9 +46,10 @@ contract CamelotDexAdapter is UniswapDexAdapter {
         _path[0] = _tokenIn;
         _path[1] = _tokenOut;
         IERC20(_tokenIn).safeIncreaseAllowance(V2_ROUTER, _amountIn);
-        ICamelotRouter(V2_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            _amountIn, _amountOutMin, _path, _recipient, Ownable(address(V3_TWAP_UTILS)).owner(), block.timestamp
-        );
+        ICamelotRouter(V2_ROUTER)
+            .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                _amountIn, _amountOutMin, _path, _recipient, Ownable(address(V3_TWAP_UTILS)).owner(), block.timestamp
+            );
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }
 
@@ -92,17 +93,18 @@ contract CamelotDexAdapter is UniswapDexAdapter {
             IERC20(_tokenIn).safeTransferFrom(_msgSender(), address(this), _amountIn);
         }
         IERC20(_tokenIn).safeIncreaseAllowance(V3_ROUTER, _amountIn);
-        ISwapRouterAlgebra(V3_ROUTER).exactInputSingle(
-            ISwapRouterAlgebra.ExactInputSingleParams({
-                tokenIn: _tokenIn,
-                tokenOut: _tokenOut,
-                recipient: _recipient,
-                deadline: block.timestamp,
-                amountIn: _amountIn,
-                amountOutMinimum: _amountOutMin,
-                limitSqrtPrice: 0
-            })
-        );
+        ISwapRouterAlgebra(V3_ROUTER)
+            .exactInputSingle(
+                ISwapRouterAlgebra.ExactInputSingleParams({
+                    tokenIn: _tokenIn,
+                    tokenOut: _tokenOut,
+                    recipient: _recipient,
+                    deadline: block.timestamp,
+                    amountIn: _amountIn,
+                    amountOutMinimum: _amountOutMin,
+                    limitSqrtPrice: 0
+                })
+            );
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }
 }

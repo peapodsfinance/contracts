@@ -182,13 +182,7 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
     /// @return _isBadData Whether the price(s) returned should be considered bad
     /// @return _priceLow The lower of the dual prices returned
     /// @return _priceHigh The higher of the dual prices returned
-    function getPrices()
-        public
-        view
-        virtual
-        override
-        returns (bool _isBadData, uint256 _priceLow, uint256 _priceHigh)
-    {
+    function getPrices() public view virtual override returns (bool _isBadData, uint256 _priceLow, uint256 _priceHigh) {
         uint8 _baseDec = IERC20Metadata(BASE_TOKEN).decimals();
         uint256[] memory _prices = new uint256[](2);
         for (uint256 _i; _i < priceFeeds.length; _i++) {
@@ -240,8 +234,8 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
         if (_pairedLpTkn != BASE_TOKEN) {
             _k = IFraxlendPair(_pairedLpTkn).convertToAssets(_k);
         }
-        uint256 _kDec = 10 ** IERC20Metadata(IUniswapV2Pair(_pair).token0()).decimals()
-            * 10 ** IERC20Metadata(IUniswapV2Pair(_pair).token1()).decimals();
+        uint256 _kDec = 10 ** IERC20Metadata(IUniswapV2Pair(_pair).token0()).decimals() * 10
+            ** IERC20Metadata(IUniswapV2Pair(_pair).token1()).decimals();
         uint256 _avgBaseAssetInLp27 = _sqrt((_priceBasePerPTkn18 * _k) / _kDec) * 10 ** 18;
         uint256 _pairSupply = IERC20(_pair).totalSupply();
         if (_pairSupply == 0) {
@@ -284,13 +278,11 @@ contract spTKNMinimalOracle is IMinimalOracle, ISPTknOracle, Ownable {
 
     function _getDefaultPriceBasePerQuote18() internal view returns (bool _isBadData, uint256 _price18) {
         if (priceFeeds[0].priceType == PriceSourceType.CHAINLINK) {
-            (_isBadData, _price18) = IMinimalSinglePriceOracle(priceFeeds[0].singlePriceOracle).getPriceUSD18(
-                priceFeeds[0].quoteFeed, priceFeeds[0].baseFeed, address(0), 0
-            );
+            (_isBadData, _price18) = IMinimalSinglePriceOracle(priceFeeds[0].singlePriceOracle)
+                .getPriceUSD18(priceFeeds[0].quoteFeed, priceFeeds[0].baseFeed, address(0), 0);
         } else {
-            (_isBadData, _price18) = IMinimalSinglePriceOracle(priceFeeds[0].singlePriceOracle).getPriceUSD18(
-                BASE_CONVERSION_CHAINLINK_FEED, underlyingTkn, priceFeeds[0].quoteFeed, twapInterval
-            );
+            (_isBadData, _price18) = IMinimalSinglePriceOracle(priceFeeds[0].singlePriceOracle)
+                .getPriceUSD18(BASE_CONVERSION_CHAINLINK_FEED, underlyingTkn, priceFeeds[0].quoteFeed, twapInterval);
         }
         if (_isBadData) {
             return (true, 0);

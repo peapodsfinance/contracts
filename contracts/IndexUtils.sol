@@ -76,9 +76,10 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
             _zap(_pairedLpTokenProvided, _pairedLpToken, _amtPairedLpTokenProvided, _amountPairedLpTokenMin);
         }
 
-        IERC20(_pairedLpToken).safeIncreaseAllowance(
-            _indexFundAddy, IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore
-        );
+        IERC20(_pairedLpToken)
+            .safeIncreaseAllowance(
+                _indexFundAddy, IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore
+            );
 
         // keeping 1 wei of each asset on the CA reduces transfer gas cost due to non-zero storage
         // so worth it to keep 1 wei in the CA if there's not any here already
@@ -90,9 +91,8 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
         );
         require(_amountOut > 0, "LPM");
 
-        IERC20(DEX_ADAPTER.getV2Pool(_indexFundAddy, _pairedLpToken)).safeIncreaseAllowance(
-            _indexFund.lpStakingPool(), _amountOut
-        );
+        IERC20(DEX_ADAPTER.getV2Pool(_indexFundAddy, _pairedLpToken))
+            .safeIncreaseAllowance(_indexFund.lpStakingPool(), _amountOut);
         _amountOut = _stakeLPForUserHandlingLeftoverCheck(_indexFund.lpStakingPool(), _msgSender(), _amountOut);
 
         // refunds if needed for index tokens and pairedLpToken
@@ -125,14 +125,12 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
             _deadline
         );
         if (IERC20(address(_indexFund)).balanceOf(address(this)) > _indexBalBefore) {
-            IERC20(address(_indexFund)).safeTransfer(
-                _msgSender(), IERC20(address(_indexFund)).balanceOf(address(this)) - _indexBalBefore
-            );
+            IERC20(address(_indexFund))
+                .safeTransfer(_msgSender(), IERC20(address(_indexFund)).balanceOf(address(this)) - _indexBalBefore);
         }
         if (IERC20(_pairedLpToken).balanceOf(address(this)) > _pairedLpTokenBefore) {
-            IERC20(_pairedLpToken).safeTransfer(
-                _msgSender(), IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore
-            );
+            IERC20(_pairedLpToken)
+                .safeTransfer(_msgSender(), IERC20(_pairedLpToken).balanceOf(address(this)) - _pairedLpTokenBefore);
         }
     }
 
@@ -174,9 +172,8 @@ contract IndexUtils is Context, IIndexUtils, Zapper {
         IStakingPoolToken(_stakingPool).unstake(_unstakeAmount);
 
         _fundTokensBefore = _indexFund.balanceOf(address(this));
-        IERC20(_v2Pool).safeIncreaseAllowance(
-            address(_indexFund), IERC20(_v2Pool).balanceOf(address(this)) - _v2TokensBefore
-        );
+        IERC20(_v2Pool)
+            .safeIncreaseAllowance(address(_indexFund), IERC20(_v2Pool).balanceOf(address(this)) - _v2TokensBefore);
         _indexFund.removeLiquidityV2(
             IERC20(_v2Pool).balanceOf(address(this)) - _v2TokensBefore, _minLPTokens, _minPairedLpTokens, _deadline
         );

@@ -34,9 +34,12 @@ contract UniswapV2Handler is Properties {
         address to;
     }
 
-    function stakingPoolLp_buyTokens(uint256 podIndexSeed, uint256 fromIndexSeed, uint256 toIndexSeed, uint256 amountIn)
-        public
-    {
+    function stakingPoolLp_buyTokens(
+        uint256 podIndexSeed,
+        uint256 fromIndexSeed,
+        uint256 toIndexSeed,
+        uint256 amountIn
+    ) public {
         // PRE-CONDITIONS
         BuyTokenTemps memory cache;
         cache.pod = randomPod(podIndexSeed);

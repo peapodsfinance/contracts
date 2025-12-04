@@ -10,9 +10,10 @@ contract SetLeverageFactoryDependencies is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        LeverageFactory(vm.envAddress("LEV_FACTORY")).setLevMgrAndFactories(
-            address(0), address(0), vm.envAddress("INDEX_MANAGER"), address(0), address(0), address(0), address(0)
-        );
+        LeverageFactory(vm.envAddress("LEV_FACTORY"))
+            .setLevMgrAndFactories(
+                address(0), address(0), vm.envAddress("INDEX_MANAGER"), address(0), address(0), address(0), address(0)
+            );
 
         vm.stopBroadcast();
 

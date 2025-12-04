@@ -44,7 +44,7 @@ contract StakingPoolHandler is Properties {
         // ACTION
         vm.prank(cache.user);
         try StakingPoolToken(cache.stakingPool).stake(cache.user, amount) {}
-        catch {
+            catch {
             // fl.t(false, "STAKE FAILED");
         }
     }

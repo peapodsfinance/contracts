@@ -269,12 +269,7 @@ contract MockDexAdapter is IDexAdapter, Test {
         return _swapV3SingleReturn;
     }
 
-    function swapV3Single(address, address, int24, uint256, uint256, address)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function swapV3Single(address, address, int24, uint256, uint256, address) external view override returns (uint256) {
         return _swapV3SingleReturn;
     }
 

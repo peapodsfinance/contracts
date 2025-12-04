@@ -283,7 +283,9 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
             _amountIn,
             0, // _amountOutMin can be 0 because this is nested inside of function with LP slippage provided
             address(this)
-        ) returns (uint256 __amountOut) {
+        ) returns (
+            uint256 __amountOut
+        ) {
             _tokenToPairedSwapAmountInOverride[_rewardsToken][_swapOutputTkn] = 0;
             _amountOut = __amountOut;
 
@@ -318,9 +320,9 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
         uint256 _minPtknOut;
         if (address(podOracle) != address(0)) {
             // calculate the min out with 5% slippage
-            _minPtknOut = (
-                podOracle.getPodPerBasePrice() * _pairedSwapAmt * 10 ** IERC20Metadata(address(pod)).decimals() * 95
-            ) / 10 ** IERC20Metadata(_pairedLpToken).decimals() / 10 ** 18 / 100;
+            _minPtknOut =
+                (podOracle.getPodPerBasePrice() * _pairedSwapAmt * 10 ** IERC20Metadata(address(pod)).decimals() * 95)
+                    / 10 ** IERC20Metadata(_pairedLpToken).decimals() / 10 ** 18 / 100;
         }
         IERC20(_pairedLpToken).safeIncreaseAllowance(address(DEX_ADAPTER), _pairedSwapAmt);
         try DEX_ADAPTER.swapV2Single(_pairedLpToken, address(pod), _pairedSwapAmt, _minPtknOut, address(this)) returns (
@@ -333,7 +335,9 @@ contract AutoCompoundingPodLp is IERC4626, ERC20, ERC20Permit, Ownable {
             IERC20(_pairedLpToken).safeIncreaseAllowance(address(indexUtils), _pairedRemaining);
             try indexUtils.addLPAndStake(
                 pod, _podAmountOut, _pairedLpToken, _pairedRemaining, _pairedRemaining, lpSlippage, _deadline
-            ) returns (uint256 _lpTknOut) {
+            ) returns (
+                uint256 _lpTknOut
+            ) {
                 _amountOut = _lpTknOut;
             } catch {
                 IERC20(pod).safeDecreaseAllowance(address(indexUtils), _podAmountOut);

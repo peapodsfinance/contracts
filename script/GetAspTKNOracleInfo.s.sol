@@ -127,28 +127,29 @@ contract GetAspTKNOracleInfo is Script {
         internal
         returns (address _newOracle)
     {
-        _newOracle = IAspTknOracleFactory(_aspTknOracleFactory).create(
-            aspTKNMinimalOracle(_originalOracle).ASP_TKN(),
-            abi.encode(
-                aspTKNMinimalOracle(_originalOracle).CHAINLINK_SINGLE_PRICE_ORACLE(),
-                aspTKNMinimalOracle(_originalOracle).UNISWAP_V3_SINGLE_PRICE_ORACLE(),
-                aspTKNMinimalOracle(_originalOracle).DIA_SINGLE_PRICE_ORACLE(),
-                aspTKNMinimalOracle(_originalOracle).BASE_TOKEN(),
-                aspTKNMinimalOracle(_originalOracle).BASE_IS_POD(),
-                aspTKNMinimalOracle(_originalOracle).BASE_IS_FRAX_PAIR(),
-                aspTKNMinimalOracle(_originalOracle).spTkn(),
-                aspTKNMinimalOracle(_originalOracle).UNDERLYING_TKN_CL_POOL()
-            ),
-            abi.encode(
-                aspTKNMinimalOracle(_originalOracle).BASE_CONVERSION_CHAINLINK_FEED(),
-                aspTKNMinimalOracle(_originalOracle).BASE_CONVERSION_CL_POOL(),
-                aspTKNMinimalOracle(_originalOracle).BASE_CONVERSION_DIA_FEED(),
-                aspTKNMinimalOracle(_originalOracle).CHAINLINK_BASE_PRICE_FEED(),
-                aspTKNMinimalOracle(_originalOracle).CHAINLINK_QUOTE_PRICE_FEED(),
-                _diaOracle,
-                address(aspTKNMinimalOracle(_originalOracle).V2_RESERVES())
-            ),
-            uint96(uint160(_originalOracle) % 2 ** 96)
-        );
+        _newOracle = IAspTknOracleFactory(_aspTknOracleFactory)
+            .create(
+                aspTKNMinimalOracle(_originalOracle).ASP_TKN(),
+                abi.encode(
+                    aspTKNMinimalOracle(_originalOracle).CHAINLINK_SINGLE_PRICE_ORACLE(),
+                    aspTKNMinimalOracle(_originalOracle).UNISWAP_V3_SINGLE_PRICE_ORACLE(),
+                    aspTKNMinimalOracle(_originalOracle).DIA_SINGLE_PRICE_ORACLE(),
+                    aspTKNMinimalOracle(_originalOracle).BASE_TOKEN(),
+                    aspTKNMinimalOracle(_originalOracle).BASE_IS_POD(),
+                    aspTKNMinimalOracle(_originalOracle).BASE_IS_FRAX_PAIR(),
+                    aspTKNMinimalOracle(_originalOracle).spTkn(),
+                    aspTKNMinimalOracle(_originalOracle).UNDERLYING_TKN_CL_POOL()
+                ),
+                abi.encode(
+                    aspTKNMinimalOracle(_originalOracle).BASE_CONVERSION_CHAINLINK_FEED(),
+                    aspTKNMinimalOracle(_originalOracle).BASE_CONVERSION_CL_POOL(),
+                    aspTKNMinimalOracle(_originalOracle).BASE_CONVERSION_DIA_FEED(),
+                    aspTKNMinimalOracle(_originalOracle).CHAINLINK_BASE_PRICE_FEED(),
+                    aspTKNMinimalOracle(_originalOracle).CHAINLINK_QUOTE_PRICE_FEED(),
+                    _diaOracle,
+                    address(aspTKNMinimalOracle(_originalOracle).V2_RESERVES())
+                ),
+                uint96(uint160(_originalOracle) % 2 ** 96)
+            );
     }
 }

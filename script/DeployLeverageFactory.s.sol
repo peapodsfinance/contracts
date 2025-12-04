@@ -28,9 +28,8 @@ contract DeployLeverageFactory is Script {
         // Ownable(vm.envAddress("ASP_ORACLE_FACTORY")).transferOwnership(address(_levFactory));
         LeverageFactory(_currentFactory).transferContractOwnership(vm.envAddress("LVF"), address(_levFactory));
         LeverageFactory(_currentFactory).transferContractOwnership(vm.envAddress("ASP_FACTORY"), address(_levFactory));
-        LeverageFactory(_currentFactory).transferContractOwnership(
-            vm.envAddress("ASP_ORACLE_FACTORY"), address(_levFactory)
-        );
+        LeverageFactory(_currentFactory)
+            .transferContractOwnership(vm.envAddress("ASP_ORACLE_FACTORY"), address(_levFactory));
 
         vm.stopBroadcast();
 

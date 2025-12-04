@@ -75,9 +75,10 @@ contract PancakeswapDexAdapter is IDexAdapter, Context {
         _path[0] = _tokenIn;
         _path[1] = _tokenOut;
         IERC20(_tokenIn).safeIncreaseAllowance(V2_ROUTER, _amountIn);
-        IUniswapV2Router02(V2_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            _amountIn, _amountOutMin, _path, _recipient, block.timestamp
-        );
+        IUniswapV2Router02(V2_ROUTER)
+            .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                _amountIn, _amountOutMin, _path, _recipient, block.timestamp
+            );
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }
 
@@ -98,9 +99,8 @@ contract PancakeswapDexAdapter is IDexAdapter, Context {
         _path[0] = _tokenIn;
         _path[1] = _tokenOut;
         IERC20(_tokenIn).safeIncreaseAllowance(V2_ROUTER, _amountInMax);
-        IUniswapV2Router02(V2_ROUTER).swapTokensForExactTokens(
-            _amountOut, _amountInMax, _path, _recipient, block.timestamp
-        );
+        IUniswapV2Router02(V2_ROUTER)
+            .swapTokensForExactTokens(_amountOut, _amountInMax, _path, _recipient, block.timestamp);
         uint256 _inRemaining = IERC20(_tokenIn).balanceOf(address(this)) - _inBefore;
         if (_inRemaining > 0) {
             IERC20(_tokenIn).safeTransfer(_msgSender(), _inRemaining);
@@ -123,18 +123,19 @@ contract PancakeswapDexAdapter is IDexAdapter, Context {
             IERC20(_tokenIn).safeTransferFrom(_msgSender(), address(this), _amountIn);
         }
         IERC20(_tokenIn).safeIncreaseAllowance(V3_ROUTER, _amountIn);
-        ISwapRouterPancakeswap(V3_ROUTER).exactInputSingle(
-            ISwapRouterPancakeswap.ExactInputSingleParams({
-                tokenIn: _tokenIn,
-                tokenOut: _tokenOut,
-                fee: _fee,
-                recipient: _recipient,
-                deadline: block.timestamp,
-                amountIn: _amountIn,
-                amountOutMinimum: _amountOutMin,
-                sqrtPriceLimitX96: 0
-            })
-        );
+        ISwapRouterPancakeswap(V3_ROUTER)
+            .exactInputSingle(
+                ISwapRouterPancakeswap.ExactInputSingleParams({
+                    tokenIn: _tokenIn,
+                    tokenOut: _tokenOut,
+                    fee: _fee,
+                    recipient: _recipient,
+                    deadline: block.timestamp,
+                    amountIn: _amountIn,
+                    amountOutMinimum: _amountOutMin,
+                    sqrtPriceLimitX96: 0
+                })
+            );
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }
 
@@ -164,9 +165,8 @@ contract PancakeswapDexAdapter is IDexAdapter, Context {
         IERC20(_tokenB).safeTransferFrom(_msgSender(), address(this), _amountBDesired);
         IERC20(_tokenA).safeIncreaseAllowance(V2_ROUTER, _amountADesired);
         IERC20(_tokenB).safeIncreaseAllowance(V2_ROUTER, _amountBDesired);
-        IUniswapV2Router02(V2_ROUTER).addLiquidity(
-            _tokenA, _tokenB, _amountADesired, _amountBDesired, _amountAMin, _amountBMin, _to, _deadline
-        );
+        IUniswapV2Router02(V2_ROUTER)
+            .addLiquidity(_tokenA, _tokenB, _amountADesired, _amountBDesired, _amountAMin, _amountBMin, _to, _deadline);
         if (IERC20(_tokenA).balanceOf(address(this)) > _aBefore) {
             IERC20(_tokenA).safeTransfer(_to, IERC20(_tokenA).balanceOf(address(this)) - _aBefore);
         }
@@ -188,9 +188,8 @@ contract PancakeswapDexAdapter is IDexAdapter, Context {
         uint256 _lpBefore = IERC20(_pool).balanceOf(address(this));
         IERC20(_pool).safeTransferFrom(_msgSender(), address(this), _liquidity);
         IERC20(_pool).safeIncreaseAllowance(V2_ROUTER, _liquidity);
-        IUniswapV2Router02(V2_ROUTER).removeLiquidity(
-            _tokenA, _tokenB, _liquidity, _amountAMin, _amountBMin, _to, _deadline
-        );
+        IUniswapV2Router02(V2_ROUTER)
+            .removeLiquidity(_tokenA, _tokenB, _liquidity, _amountAMin, _amountBMin, _to, _deadline);
         if (IERC20(_pool).balanceOf(address(this)) > _lpBefore) {
             IERC20(_pool).safeTransfer(_to, IERC20(_pool).balanceOf(address(this)) - _lpBefore);
         }

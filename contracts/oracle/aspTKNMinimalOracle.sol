@@ -13,13 +13,7 @@ contract aspTKNMinimalOracle is spTKNMinimalOracle {
         ASP_TKN = _aspTKN;
     }
 
-    function getPrices()
-        public
-        view
-        virtual
-        override
-        returns (bool _isBadData, uint256 _priceLow, uint256 _priceHigh)
-    {
+    function getPrices() public view virtual override returns (bool _isBadData, uint256 _priceLow, uint256 _priceHigh) {
         uint256 _assetFactor = 10 ** 18;
         uint256 _aspTknPerSpTkn = IERC4626(ASP_TKN).convertToShares(_assetFactor);
         (_isBadData, _priceLow, _priceHigh) = super.getPrices();

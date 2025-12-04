@@ -305,9 +305,12 @@ contract FraxlendPairHandler is Properties {
         FraxlendPair fraxPair;
     }
 
-    function fraxPair_repayAsset(uint256 userIndexSeed, uint256 borrowerIndexSeed, uint256 fraxlendSeed, uint256 shares)
-        public
-    {
+    function fraxPair_repayAsset(
+        uint256 userIndexSeed,
+        uint256 borrowerIndexSeed,
+        uint256 fraxlendSeed,
+        uint256 shares
+    ) public {
         // PRE-CONDITIONS
         RepayAssetTemps memory cache;
         cache.user = randomAddress(userIndexSeed);

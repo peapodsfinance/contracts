@@ -161,7 +161,9 @@ contract WeightedIndex is Initializable, IInitializeSelector, DecentralizedIndex
         for (uint256 _i; _i < _il; _i++) {
             uint256 _transferAmt = _firstIn
                 ? getInitialAmount(_token, _amount, indexTokens[_i].token)
-                : FullMath.mulDivRoundingUp(_totalAssets[indexTokens[_i].token], _tokenAmtSupplyRatioX96, FixedPoint96.Q96);
+                : FullMath.mulDivRoundingUp(
+                    _totalAssets[indexTokens[_i].token], _tokenAmtSupplyRatioX96, FixedPoint96.Q96
+                );
             require(_transferAmt > 0, "T0");
             _totalAssets[indexTokens[_i].token] += _transferAmt;
             _transferFromAndValidate(IERC20(indexTokens[_i].token), _user, _transferAmt);

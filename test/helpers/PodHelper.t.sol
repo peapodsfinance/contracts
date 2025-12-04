@@ -50,8 +50,9 @@ contract PodHelperTest is Test {
         uint256 _pairedOverrideFactorMult,
         uint256 _pairedOverrideFactorDiv
     ) internal returns (address _newPod) {
-        address pairedLpToken =
-            _pairedOverride != address(0) ? _pairedOverride : IDecentralizedIndex(_pod).PAIRED_LP_TOKEN();
+        address pairedLpToken = _pairedOverride != address(0)
+            ? _pairedOverride
+            : IDecentralizedIndex(_pod).PAIRED_LP_TOKEN();
 
         IndexUtils _utils = new IndexUtils(
             IV3TwapUtilities(0x024ff47D552cB222b265D68C7aeB26E586D5229D),
@@ -66,19 +67,17 @@ contract PodHelperTest is Test {
         deal(
             _underlying,
             address(this),
-            (IERC20(_pod).balanceOf(_podV2Pool) * 10 ** IERC20Metadata(_underlying).decimals())
-                / 10 ** IERC20Metadata(_pod).decimals()
+            (IERC20(_pod).balanceOf(_podV2Pool) * 10 ** IERC20Metadata(_underlying).decimals()) / 10
+                ** IERC20Metadata(_pod).decimals()
         );
         deal(
             pairedLpToken,
             address(this),
-            (
-                (_pairedOverrideFactorMult == 0 ? 1 : _pairedOverrideFactorMult)
-                    * (
-                        IERC20(IDecentralizedIndex(_pod).PAIRED_LP_TOKEN()).balanceOf(_podV2Pool)
-                            * 10 ** IERC20Metadata(pairedLpToken).decimals()
-                    )
-            ) / 10 ** IERC20Metadata(IDecentralizedIndex(_pod).PAIRED_LP_TOKEN()).decimals()
+            ((_pairedOverrideFactorMult == 0 ? 1 : _pairedOverrideFactorMult)
+                    * (IERC20(IDecentralizedIndex(_pod).PAIRED_LP_TOKEN()).balanceOf(_podV2Pool)
+                        * 10
+                        ** IERC20Metadata(pairedLpToken).decimals())) / 10
+                ** IERC20Metadata(IDecentralizedIndex(_pod).PAIRED_LP_TOKEN()).decimals()
                 / (_pairedOverrideFactorDiv == 0 ? 1 : _pairedOverrideFactorDiv)
         );
 
@@ -121,10 +120,12 @@ contract PodHelperTest is Test {
         );
     }
 
-    function _duplicatePod(address _oldPod, address _pairedLpToken, address[] memory _tokens, uint256[] memory _weights)
-        internal
-        returns (address _underlying, address _newPod)
-    {
+    function _duplicatePod(
+        address _oldPod,
+        address _pairedLpToken,
+        address[] memory _tokens,
+        uint256[] memory _weights
+    ) internal returns (address _underlying, address _newPod) {
         IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_oldPod).getAllAssets();
         _underlying = _assets[0].token;
         _newPod = _createPod(

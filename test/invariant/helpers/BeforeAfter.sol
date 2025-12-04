@@ -107,16 +107,14 @@ contract BeforeAfter is FuzzSetup {
         _afterLM.pairAssetApproval = IERC20(IFraxlendPair(vault).asset()).allowance(vault, address(_lendingAssetVault));
         _afterLM.podLpApproval =
             IERC20(WeightedIndex(payable(pod)).PAIRED_LP_TOKEN()).allowance(address(_leverageManager), vault);
-        _afterLM.podLpIndexApproval = IERC20(WeightedIndex(payable(pod)).PAIRED_LP_TOKEN()).allowance(
-            address(_leverageManager), address(_indexUtils)
-        );
+        _afterLM.podLpIndexApproval = IERC20(WeightedIndex(payable(pod)).PAIRED_LP_TOKEN())
+            .allowance(address(_leverageManager), address(_indexUtils));
         _afterLM.podDexApproval = IERC20(pod).allowance(address(_leverageManager), address(_dexAdapter));
         _afterLM.podIndexApproval = IERC20(pod).allowance(address(_leverageManager), address(_indexUtils));
         _afterLM.spTKNApproval =
             StakingPoolToken(WeightedIndex(payable(pod)).lpStakingPool()).allowance(address(_leverageManager), aspTKN);
-        _afterLM.spTKNIndexApproval = StakingPoolToken(WeightedIndex(payable(pod)).lpStakingPool()).allowance(
-            address(_leverageManager), address(_indexUtils)
-        );
+        _afterLM.spTKNIndexApproval = StakingPoolToken(WeightedIndex(payable(pod)).lpStakingPool())
+            .allowance(address(_leverageManager), address(_indexUtils));
         _afterLM.custodianPairApproval = IERC20(IFraxlendPair(vault).collateralContract()).allowance(custodian, vault);
     }
 
@@ -135,9 +133,7 @@ contract BeforeAfter is FuzzSetup {
     AspTknVars internal _beforeASP;
     AspTknVars internal _afterASP;
 
-    function __beforeAsp(AutoCompoundingPodLp aspTKN, StakingPoolToken spTKN, address user, address receiver)
-        internal
-    {
+    function __beforeAsp(AutoCompoundingPodLp aspTKN, StakingPoolToken spTKN, address user, address receiver) internal {
         _beforeASP.spTotalSupply = spTKN.totalSupply();
         _beforeASP.aspTotalSupply = aspTKN.totalSupply();
         _beforeASP.spUserBalance = spTKN.balanceOf(user);
@@ -187,9 +183,7 @@ contract BeforeAfter is FuzzSetup {
         if (_borrowerAmount == 0) return 0;
         uint256 _collateralAmount = IFraxlendPair(lendingPair).userCollateralBalance(borrower);
         if (_collateralAmount == 0) return 0;
-        return (
-            ((_borrowerAmount * highExchangeRate) / FraxlendPair(lendingPair).EXCHANGE_PRECISION())
-                * FraxlendPair(lendingPair).LTV_PRECISION()
-        ) / _collateralAmount;
+        return (((_borrowerAmount * highExchangeRate) / FraxlendPair(lendingPair).EXCHANGE_PRECISION())
+                * FraxlendPair(lendingPair).LTV_PRECISION()) / _collateralAmount;
     }
 }

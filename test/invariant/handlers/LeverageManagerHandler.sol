@@ -41,7 +41,8 @@ contract LeverageManagerHandler is Properties {
             address(cache.pod),
             cache.user,
             false // change for self-lending
-        ) {} catch {
+        ) {}
+        catch {
             fl.t(false, "INIT POSITION FAILED");
         }
     }
@@ -245,15 +246,13 @@ contract LeverageManagerHandler is Properties {
                 || borrowAssets > IERC20(cache.borrowToken).balanceOf(UniswapV3FlashSource(cache.flashSource).source())
         ) return;
 
-        if (
-            !_solventCheckAfterRepay(
+        if (!_solventCheckAfterRepay(
                 cache.custodian,
                 cache.lendingPair,
                 IFraxlendPair(cache.lendingPair).userBorrowShares(cache.custodian),
                 cache.repayShares,
                 IFraxlendPair(cache.lendingPair).userCollateralBalance(cache.custodian) - collateralAmount
-            )
-        ) return;
+            )) return;
 
         vm.prank(cache.user);
         IERC20(cache.borrowToken).approve(address(_leverageManager), borrowAssets + feeAmount);
@@ -323,10 +322,9 @@ contract LeverageManagerHandler is Properties {
         uint256 sharesAfterRepay = sharesAvailable - repayShares;
 
         isSolvent = true;
-        uint256 _ltv = (
-            ((sharesAfterRepay * highExchangeRate) / FraxlendPair(lendingPair).EXCHANGE_PRECISION())
-                * FraxlendPair(lendingPair).LTV_PRECISION()
-        ) / _collateralAmount;
+        uint256 _ltv =
+            (((sharesAfterRepay * highExchangeRate) / FraxlendPair(lendingPair).EXCHANGE_PRECISION())
+                    * FraxlendPair(lendingPair).LTV_PRECISION()) / _collateralAmount;
         isSolvent = _ltv <= FraxlendPair(lendingPair).maxLTV();
     }
 }

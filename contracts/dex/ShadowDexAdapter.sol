@@ -57,9 +57,10 @@ contract ShadowDexAdapter is UniswapDexAdapter {
         _path[0].from = _tokenIn;
         _path[0].to = _tokenOut;
         IERC20(_tokenIn).safeIncreaseAllowance(V2_ROUTER, _amountIn);
-        IShadowV2Router(V2_ROUTER).swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            _amountIn, _amountOutMin, _path, _recipient, block.timestamp
-        );
+        IShadowV2Router(V2_ROUTER)
+            .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                _amountIn, _amountOutMin, _path, _recipient, block.timestamp
+            );
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }
 
@@ -88,18 +89,19 @@ contract ShadowDexAdapter is UniswapDexAdapter {
             IERC20(_tokenIn).safeTransferFrom(_msgSender(), address(this), _amountIn);
         }
         IERC20(_tokenIn).safeIncreaseAllowance(V3_ROUTER, _amountIn);
-        ISwapRouterShadow(V3_ROUTER).exactInputSingle(
-            ISwapRouterShadow.ExactInputSingleParams({
-                tokenIn: _tokenIn,
-                tokenOut: _tokenOut,
-                tickSpacing: _tickSpacing,
-                recipient: _recipient,
-                deadline: block.timestamp,
-                amountIn: _amountIn,
-                amountOutMinimum: _amountOutMin,
-                sqrtPriceLimitX96: 0
-            })
-        );
+        ISwapRouterShadow(V3_ROUTER)
+            .exactInputSingle(
+                ISwapRouterShadow.ExactInputSingleParams({
+                    tokenIn: _tokenIn,
+                    tokenOut: _tokenOut,
+                    tickSpacing: _tickSpacing,
+                    recipient: _recipient,
+                    deadline: block.timestamp,
+                    amountIn: _amountIn,
+                    amountOutMinimum: _amountOutMin,
+                    sqrtPriceLimitX96: 0
+                })
+            );
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }
 
@@ -119,9 +121,10 @@ contract ShadowDexAdapter is UniswapDexAdapter {
         IERC20(_tokenB).safeTransferFrom(_msgSender(), address(this), _amountBDesired);
         IERC20(_tokenA).safeIncreaseAllowance(V2_ROUTER, _amountADesired);
         IERC20(_tokenB).safeIncreaseAllowance(V2_ROUTER, _amountBDesired);
-        IShadowV2Router(V2_ROUTER).addLiquidity(
-            _tokenA, _tokenB, false, _amountADesired, _amountBDesired, _amountAMin, _amountBMin, _to, _deadline
-        );
+        IShadowV2Router(V2_ROUTER)
+            .addLiquidity(
+                _tokenA, _tokenB, false, _amountADesired, _amountBDesired, _amountAMin, _amountBMin, _to, _deadline
+            );
         if (IERC20(_tokenA).balanceOf(address(this)) > _aBefore) {
             IERC20(_tokenA).safeTransfer(_to, IERC20(_tokenA).balanceOf(address(this)) - _aBefore);
         }
@@ -143,9 +146,8 @@ contract ShadowDexAdapter is UniswapDexAdapter {
         uint256 _lpBefore = IERC20(_pool).balanceOf(address(this));
         IERC20(_pool).safeTransferFrom(_msgSender(), address(this), _liquidity);
         IERC20(_pool).safeIncreaseAllowance(V2_ROUTER, _liquidity);
-        IShadowV2Router(V2_ROUTER).removeLiquidity(
-            _tokenA, _tokenB, false, _liquidity, _amountAMin, _amountBMin, _to, _deadline
-        );
+        IShadowV2Router(V2_ROUTER)
+            .removeLiquidity(_tokenA, _tokenB, false, _liquidity, _amountAMin, _amountBMin, _to, _deadline);
         if (IERC20(_pool).balanceOf(address(this)) > _lpBefore) {
             IERC20(_pool).safeTransfer(_to, IERC20(_pool).balanceOf(address(this)) - _lpBefore);
         }

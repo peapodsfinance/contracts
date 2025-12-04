@@ -52,10 +52,7 @@ library Oracle {
         returns (uint16 cardinality, uint16 cardinalityNext)
     {
         self[0] = Observation({
-            blockTimestamp: time,
-            tickCumulative: 0,
-            secondsPerLiquidityCumulativeX128: 0,
-            initialized: true
+            blockTimestamp: time, tickCumulative: 0, secondsPerLiquidityCumulativeX128: 0, initialized: true
         });
         return (1, 1);
     }
@@ -142,11 +139,13 @@ library Oracle {
     /// @param cardinality The number of populated elements in the oracle array
     /// @return beforeOrAt The observation recorded before, or at, the target
     /// @return atOrAfter The observation recorded at, or after, the target
-    function binarySearch(Observation[65535] storage self, uint32 time, uint32 target, uint16 index, uint16 cardinality)
-        private
-        view
-        returns (Observation memory beforeOrAt, Observation memory atOrAfter)
-    {
+    function binarySearch(
+        Observation[65535] storage self,
+        uint32 time,
+        uint32 target,
+        uint16 index,
+        uint16 cardinality
+    ) private view returns (Observation memory beforeOrAt, Observation memory atOrAfter) {
         uint256 l = (index + 1) % cardinality; // oldest observation
         uint256 r = l + cardinality - 1; // newest observation
         uint256 i;
@@ -265,14 +264,14 @@ library Oracle {
             return (
                 beforeOrAt.tickCumulative
                     + ((atOrAfter.tickCumulative - beforeOrAt.tickCumulative) / int56(int32(observationTimeDelta)))
-                        * int56(int32(targetDelta)),
+                    * int56(int32(targetDelta)),
                 beforeOrAt.secondsPerLiquidityCumulativeX128
                     + uint160(
-                        (
-                            uint256(
-                                atOrAfter.secondsPerLiquidityCumulativeX128 - beforeOrAt.secondsPerLiquidityCumulativeX128
-                            ) * targetDelta
-                        ) / observationTimeDelta
+                        (uint256(
+                                    atOrAfter.secondsPerLiquidityCumulativeX128
+                                        - beforeOrAt.secondsPerLiquidityCumulativeX128
+                                )
+                                * targetDelta) / observationTimeDelta
                     )
             );
         }

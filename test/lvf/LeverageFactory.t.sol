@@ -402,9 +402,10 @@ contract LeverageFactoryTest is LVFHelper, PodHelperTest {
         address[] memory path = new address[](2);
         path[0] = address(returnedPod);
         path[1] = address(lendingPair);
-        IUniswapV2Router02(dexAdapter.V2_ROUTER()).swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            IERC20(returnedPod).balanceOf(ALICE) / 100, 0, path, ALICE, block.timestamp
-        );
+        IUniswapV2Router02(dexAdapter.V2_ROUTER())
+            .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                IERC20(returnedPod).balanceOf(ALICE) / 100, 0, path, ALICE, block.timestamp
+            );
 
         vm.stopPrank();
 
@@ -481,9 +482,10 @@ contract LeverageFactoryTest is LVFHelper, PodHelperTest {
         address[] memory path = new address[](2);
         path[0] = address(lendingPair);
         path[1] = address(returnedPod);
-        IUniswapV2Router02(dexAdapter.V2_ROUTER()).swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            IERC20(lendingPair).balanceOf(ALICE) / 100, 0, path, ALICE, block.timestamp
-        );
+        IUniswapV2Router02(dexAdapter.V2_ROUTER())
+            .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                IERC20(lendingPair).balanceOf(ALICE) / 100, 0, path, ALICE, block.timestamp
+            );
 
         vm.stopPrank();
 

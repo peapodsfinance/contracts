@@ -337,7 +337,13 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
         uint256 _pairedLPTokens,
         uint256 _slippage, // 100 == 10%, 1000 == 100%
         uint256 _deadline
-    ) external override lock noSwapOrFee returns (uint256) {
+    )
+        external
+        override
+        lock
+        noSwapOrFee
+        returns (uint256)
+    {
         uint256 _idxTokensBefore = balanceOf(address(this));
         uint256 _pairedBefore = IERC20(PAIRED_LP_TOKEN).balanceOf(address(this));
 
@@ -365,9 +371,8 @@ abstract contract DecentralizedIndex is Initializable, ERC20Upgradeable, ERC20Pe
             super._update(address(this), _msgSender(), balanceOf(address(this)) - _idxTokensBefore);
         }
         if (IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) > _pairedBefore) {
-            IERC20(PAIRED_LP_TOKEN).safeTransfer(
-                _msgSender(), IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) - _pairedBefore
-            );
+            IERC20(PAIRED_LP_TOKEN)
+                .safeTransfer(_msgSender(), IERC20(PAIRED_LP_TOKEN).balanceOf(address(this)) - _pairedBefore);
         }
         emit AddLiquidity(_msgSender(), _pTKNLPTokens, _pairedLPTokens);
         return IERC20(DEX_HANDLER.getV2Pool(address(this), PAIRED_LP_TOKEN)).balanceOf(_msgSender()) - _poolBalBefore;

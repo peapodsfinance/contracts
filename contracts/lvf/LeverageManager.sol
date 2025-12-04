@@ -223,9 +223,10 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _props.sender = _sender;
         bytes memory _additionalInfo = abi.encode(_borrowSharesAmt, _finalRemLevConfig);
         if (_borrowAmt > _userProvidedDebtAmt) {
-            IFlashLoanSource(_getFlashSource(_positionId)).flash(
-                _borrowTkn, _borrowAmt - _userProvidedDebtAmt, address(this), abi.encode(_props, _additionalInfo)
-            );
+            IFlashLoanSource(_getFlashSource(_positionId))
+                .flash(
+                    _borrowTkn, _borrowAmt - _userProvidedDebtAmt, address(this), abi.encode(_props, _additionalInfo)
+                );
         } else {
             _callback(
                 abi.encode(
@@ -245,16 +246,16 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         onlyPositionOwner(_positionId)
     {
         if (_collateralAmt > 0) {
-            IERC20(_getAspTkn(_positionId)).safeTransferFrom(
-                _msgSender(), positionProps[_positionId].custodian, _collateralAmt
-            );
+            IERC20(_getAspTkn(_positionId))
+                .safeTransferFrom(_msgSender(), positionProps[_positionId].custodian, _collateralAmt);
         }
-        LeveragePositionCustodian(positionProps[_positionId].custodian).borrowAsset(
-            positionProps[_positionId].lendingPair,
-            _borrowAmt,
-            _collateralAmt,
-            openFeePerc > 0 ? address(this) : _recipient
-        );
+        LeveragePositionCustodian(positionProps[_positionId].custodian)
+            .borrowAsset(
+                positionProps[_positionId].lendingPair,
+                _borrowAmt,
+                _collateralAmt,
+                openFeePerc > 0 ? address(this) : _recipient
+            );
         if (openFeePerc > 0) {
             address _borrowTkn = IFraxlendPair(positionProps[_positionId].lendingPair).asset();
             uint256 _openFeeAmt = (_borrowAmt * openFeePerc) / PRECISION;
@@ -397,12 +398,13 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
         _processExtraFlashLoanPayment(_positionId, _sender);
 
         if (_pairedLpDesired > _userProvidedDebtAmt) {
-            IFlashLoanSource(_getFlashSource(_positionId)).flash(
-                _getBorrowTknForPosition(_positionId),
-                _pairedLpDesired - _userProvidedDebtAmt,
-                address(this),
-                _getFlashDataAddLeverage(_positionId, _sender, _pTknAmt, _pairedLpDesired, _config)
-            );
+            IFlashLoanSource(_getFlashSource(_positionId))
+                .flash(
+                    _getBorrowTknForPosition(_positionId),
+                    _pairedLpDesired - _userProvidedDebtAmt,
+                    address(this),
+                    _getFlashDataAddLeverage(_positionId, _sender, _pTknAmt, _pairedLpDesired, _config)
+                );
         } else {
             _callback(
                 abi.encode(
@@ -445,15 +447,13 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
 
         address _aspTkn = _getAspTkn(_props.positionId);
         IERC20(_aspTkn).safeTransfer(positionProps[_props.positionId].custodian, _aspTknCollateralBal);
-        LeveragePositionCustodian(positionProps[_props.positionId].custodian).borrowAsset(
-            positionProps[_props.positionId].lendingPair, _borrowAmt, _aspTknCollateralBal, address(this)
-        );
+        LeveragePositionCustodian(positionProps[_props.positionId].custodian)
+            .borrowAsset(positionProps[_props.positionId].lendingPair, _borrowAmt, _aspTknCollateralBal, address(this));
 
         // pay back flash loan and send remaining to borrower
         if (_flashPaybackAmt > 0) {
-            IERC20(_d.token).safeTransfer(
-                IFlashLoanSource(_getFlashSource(_props.positionId)).source(), _flashPaybackAmt
-            );
+            IERC20(_d.token)
+                .safeTransfer(IFlashLoanSource(_getFlashSource(_props.positionId)).source(), _flashPaybackAmt);
         }
         uint256 _remaining = IERC20(_d.token).balanceOf(address(this));
         if (_remaining != 0) {
@@ -479,18 +479,16 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
             abi.decode(_removeLevConfig, (uint256, uint256, uint256, uint256, uint256));
 
         if (_userProvidedDebtAmt > 0) {
-            IERC20(_getBorrowTknForPosition(_props.positionId)).safeTransferFrom(
-                _props.sender, address(this), _userProvidedDebtAmt
-            );
+            IERC20(_getBorrowTknForPosition(_props.positionId))
+                .safeTransferFrom(_props.sender, address(this), _userProvidedDebtAmt);
         }
 
         LeveragePositionProps memory _posProps = positionProps[_props.positionId];
 
         // allowance increases for borrowAmt prior to flash loaning asset
         IFraxlendPair(_posProps.lendingPair).repayAsset(_borrowSharesToRepay, _posProps.custodian);
-        LeveragePositionCustodian(_posProps.custodian).removeCollateral(
-            _posProps.lendingPair, _collateralAssetRemoveAmt, address(this)
-        );
+        LeveragePositionCustodian(_posProps.custodian)
+            .removeCollateral(_posProps.lendingPair, _collateralAssetRemoveAmt, address(this));
         (uint256 _podAmtReceived, uint256 _pairedAmtReceived) =
             _unstakeAndRemoveLP(_props.positionId, _posProps.pod, _collateralAssetRemoveAmt, _removeLevConfig);
         _podAmtRemaining = _podAmtReceived;
@@ -576,9 +574,8 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
                     IFraxlendPair(_lendingPair).convertToShares(_borrowAmtNeededToSwap),
                     _podPairedLiquidityPrice18
                 );
-                _borrowAmtFromSwap = IFraxlendPair(_lendingPair).redeem(
-                    IERC20(_lendingPair).balanceOf(address(this)), address(this), address(this)
-                );
+                _borrowAmtFromSwap = IFraxlendPair(_lendingPair)
+                    .redeem(IERC20(_lendingPair).balanceOf(address(this)), address(this), address(this));
             } else {
                 (_podAmtRemaining, _borrowAmtFromSwap) = _swapPodForBorrowToken(
                     _pod, _borrowToken, _podAmtReceived, _borrowAmtNeededToSwap, _podPairedLiquidityPrice18
@@ -674,14 +671,12 @@ contract LeverageManager is Initializable, LeverageManagerAccessControl, ILevera
             if (positionProps[_props.positionId].hasSelfLendingPairPod) {
                 address[] memory _noop1;
                 uint8[] memory _noop2;
-                IDecentralizedIndex(IDecentralizedIndex(positionProps[_props.positionId].pod).PAIRED_LP_TOKEN()).debond(
-                    _pairedRemainingAmt, _noop1, _noop2
-                );
+                IDecentralizedIndex(IDecentralizedIndex(positionProps[_props.positionId].pod).PAIRED_LP_TOKEN())
+                    .debond(_pairedRemainingAmt, _noop1, _noop2);
                 _pairedRemainingAmt = IERC20(positionProps[_props.positionId].lendingPair).balanceOf(address(this));
             }
-            IFraxlendPair(positionProps[_props.positionId].lendingPair).redeem(
-                _pairedRemainingAmt, address(this), address(this)
-            );
+            IFraxlendPair(positionProps[_props.positionId].lendingPair)
+                .redeem(_pairedRemainingAmt, address(this), address(this));
         }
     }
 

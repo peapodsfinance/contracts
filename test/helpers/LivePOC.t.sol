@@ -192,9 +192,8 @@ contract LivePOC is PodHelperTest, LVFHelper {
         deal(address(weth), address(this), 2e18);
         IStakingPoolToken stakingPoolToken = IStakingPoolToken(selfLendingPod.lpStakingPool());
 
-        uni_pair = IUniswapV2Factory(0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f).getPair(
-            address(pair), address(selfLendingPod)
-        );
+        uni_pair = IUniswapV2Factory(0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f)
+            .getPair(address(pair), address(selfLendingPod));
 
         uint256 balance = IERC20(uni_pair).balanceOf(address(this));
         IERC20(uni_pair).approve(address(stakingPoolToken), type(uint256).max);
