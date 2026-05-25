@@ -17,7 +17,10 @@ remappings = [
     "v2-periphery/=test/invariant/modules/uniswap-v2/v2-periphery/contracts/",
     "uniswap-v2/=test/invariant/modules/uniswap-v2/",
     "solidity-bytes-utils/contracts/=test/invariant/modules/fraxlend/libraries/",
-    "@rari-capital/solmate=node_modules/solmate"
+    "@rari-capital/solmate=node_modules/solmate",
+    "@openzeppelin/contracts@5.0.2/=node_modules/@openzeppelin/contracts-5.0.2/",
+    "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+    "@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/"
 ]
 [etherscan]
 berachain = { key = "${ETHERSCAN_API_KEY}", chain = 80094, url = "https://api.berascan.com/api" }
