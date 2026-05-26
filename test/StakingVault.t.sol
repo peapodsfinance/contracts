@@ -64,6 +64,13 @@ contract StakingVaultTest is Test {
         vault.setDepositorsWhitelistDepositAmounts(addrs, caps);
     }
 
+    function _seedLargeDeposit(uint256 amount) internal {
+        _whitelistOne(user1, amount);
+        asset.mint(user1, amount);
+        vm.prank(user1);
+        vault.deposit(amount, user1);
+    }
+
     // ============ Constructor ============
 
     function test_constructor() public view {
@@ -311,6 +318,18 @@ contract StakingVaultTest is Test {
         // 1000 * third / (1000e18 * SCALE) = floor → expect ≈ 333.33e18, floored
         uint256 expectedPrincipal = 1000e18 - (1000e18 * third) / (1000e18 * SCALE);
         assertEq(vault.depositedPrincipal(user1), expectedPrincipal);
+    }
+
+    function test_redeem_largePartial_usesFullPrecisionPrincipalMath() public {
+        uint256 amount = 1e36;
+        _seedLargeDeposit(amount);
+
+        uint256 halfShares = vault.balanceOf(user1) / 2;
+        vm.prank(user1);
+        vault.redeem(halfShares, user1, user1);
+
+        assertEq(vault.depositedPrincipal(user1), amount / 2);
+        assertEq(vault.maxDeposit(user1), amount / 2);
     }
 
     function test_redeem_withAllowance() public {
@@ -636,6 +655,12 @@ contract StakingVaultTest is Test {
         freshVault.acceptOwnership();
         assertEq(freshVault.owner(), user1);
         assertEq(freshVault.pendingOwner(), address(0));
+    }
+
+    function test_RevertWhen_RenounceOwnership() public {
+        vm.prank(owner);
+        vm.expectRevert(StakingVault.StakingVault__RenounceOwnershipDisabled.selector);
+        vault.renounceOwnership();
     }
 
     // ============ Fee-on-transfer guard ============

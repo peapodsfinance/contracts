@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title StakingVault
@@ -55,6 +56,7 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
     error StakingVault__ZeroAsset();
     error StakingVault__FeeOnTransferNotSupported();
     error StakingVault__ArrayLengthMismatch();
+    error StakingVault__RenounceOwnershipDisabled();
 
     constructor(IERC20 _asset, string memory _name, string memory _symbol)
         ERC4626(_asset)
@@ -87,6 +89,10 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
 
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    function renounceOwnership() public view override onlyOwner {
+        revert StakingVault__RenounceOwnershipDisabled();
     }
 
     /// @notice Deposit assets, mint shares to caller. Cap-gating is enforced by super.deposit's
@@ -161,7 +167,7 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
 
         uint256 principalOut = balanceBefore == 0
             ? 0
-            : (principalBefore * shares) / balanceBefore;
+            : Math.mulDiv(principalBefore, shares, balanceBefore);
         uint256 newPrincipal = principalBefore - principalOut;
         depositedPrincipal[owner] = newPrincipal;
         emit DepositorWhitelisted(owner, depositCap[owner], newPrincipal);
@@ -184,7 +190,7 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
 
         uint256 principalOut = balanceBefore == 0
             ? 0
-            : (principalBefore * shares) / balanceBefore;
+            : Math.mulDiv(principalBefore, shares, balanceBefore);
         uint256 newPrincipal = principalBefore - principalOut;
         depositedPrincipal[owner] = newPrincipal;
         emit DepositorWhitelisted(owner, depositCap[owner], newPrincipal);
