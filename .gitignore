@@ -2,6 +2,7 @@
 .vscode
 node_modules
 out
+broadcast/
 echidna/
 echidna-1/
 cache_forge
@@ -11,3 +12,6 @@ crytic-export
 cache
 artifacts
 .env
+
+#Claude Code
+.claude/settings.local.json

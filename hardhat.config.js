@@ -56,7 +56,7 @@ if (!privateKey) {
 // }
 
 function createConfig(network, rpcUrl = null) {
-  const url = rpcUrl || 'https://ethereum.publicnode.com' // `https://${network}.infura.io/v3/${infuraApiKey}`
+  const url = rpcUrl || 'https://rpc.mevblocker.io/norefunds' // `https://${network}.infura.io/v3/${infuraApiKey}`
   return {
     accounts: [privateKey],
     // accounts: {
