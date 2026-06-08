@@ -186,9 +186,7 @@ contract StakingVaultTest is Test {
     function test_RevertWhen_DepositReceiverMismatch() public {
         _whitelistOne(user1, 1000e18);
         vm.prank(user1);
-        vm.expectRevert(
-            abi.encodeWithSelector(StakingVault.StakingVault__ReceiverMismatch.selector, user1, user2)
-        );
+        vm.expectRevert(abi.encodeWithSelector(StakingVault.StakingVault__ReceiverMismatch.selector, user1, user2));
         vault.deposit(100e18, user2);
     }
 
@@ -265,9 +263,7 @@ contract StakingVaultTest is Test {
     function test_RevertWhen_MintReceiverMismatch() public {
         _whitelistOne(user1, 1000e18);
         vm.prank(user1);
-        vm.expectRevert(
-            abi.encodeWithSelector(StakingVault.StakingVault__ReceiverMismatch.selector, user1, user2)
-        );
+        vm.expectRevert(abi.encodeWithSelector(StakingVault.StakingVault__ReceiverMismatch.selector, user1, user2));
         vault.mint(100e18 * SCALE, user2);
     }
 
@@ -747,12 +743,7 @@ contract StakingVaultTest is Test {
     function test_RevertWhen_ReentrantCall_outerDeposit() public {
         (StakingVault reVault, MockReentrantERC20 reAsset) = _setupReentrancyHarness();
 
-        reAsset.arm(
-            IStakingVaultReentry(address(reVault)),
-            MockReentrantERC20.Mode.ReenterDeposit,
-            10e18,
-            user1
-        );
+        reAsset.arm(IStakingVaultReentry(address(reVault)), MockReentrantERC20.Mode.ReenterDeposit, 10e18, user1);
 
         vm.prank(user1);
         vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
@@ -762,12 +753,7 @@ contract StakingVaultTest is Test {
     function test_RevertWhen_ReentrantCall_outerMint() public {
         (StakingVault reVault, MockReentrantERC20 reAsset) = _setupReentrancyHarness();
 
-        reAsset.arm(
-            IStakingVaultReentry(address(reVault)),
-            MockReentrantERC20.Mode.ReenterDeposit,
-            10e18,
-            user1
-        );
+        reAsset.arm(IStakingVaultReentry(address(reVault)), MockReentrantERC20.Mode.ReenterDeposit, 10e18, user1);
 
         vm.prank(user1);
         vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
@@ -778,12 +764,7 @@ contract StakingVaultTest is Test {
         (StakingVault reVault, MockReentrantERC20 reAsset) = _setupReentrancyHarness();
 
         // Reenter deposit from the asset's transfer callback (outer = redeem → safeTransfer)
-        reAsset.arm(
-            IStakingVaultReentry(address(reVault)),
-            MockReentrantERC20.Mode.ReenterDeposit,
-            10e18,
-            user1
-        );
+        reAsset.arm(IStakingVaultReentry(address(reVault)), MockReentrantERC20.Mode.ReenterDeposit, 10e18, user1);
 
         vm.prank(user1);
         vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
@@ -793,12 +774,7 @@ contract StakingVaultTest is Test {
     function test_RevertWhen_ReentrantCall_outerWithdraw() public {
         (StakingVault reVault, MockReentrantERC20 reAsset) = _setupReentrancyHarness();
 
-        reAsset.arm(
-            IStakingVaultReentry(address(reVault)),
-            MockReentrantERC20.Mode.ReenterDeposit,
-            10e18,
-            user1
-        );
+        reAsset.arm(IStakingVaultReentry(address(reVault)), MockReentrantERC20.Mode.ReenterDeposit, 10e18, user1);
 
         vm.prank(user1);
         vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
@@ -813,12 +789,7 @@ contract StakingVaultTest is Test {
 
         // Arm to reenter MINT (different target from deposit) so we can confirm the
         // ReentrancyGuardReentrantCall selector matches even when target != outer.
-        reAsset.arm(
-            IStakingVaultReentry(address(reVault)),
-            MockReentrantERC20.Mode.ReenterMint,
-            10e18 * SCALE,
-            user1
-        );
+        reAsset.arm(IStakingVaultReentry(address(reVault)), MockReentrantERC20.Mode.ReenterMint, 10e18 * SCALE, user1);
 
         vm.prank(user1);
         vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);

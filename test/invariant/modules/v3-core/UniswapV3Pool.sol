@@ -177,21 +177,13 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
             Tick.Info storage lower = ticks[tickLower];
             Tick.Info storage upper = ticks[tickUpper];
             bool initializedLower;
-            (tickCumulativeLower, secondsPerLiquidityOutsideLowerX128, secondsOutsideLower, initializedLower) = (
-                lower.tickCumulativeOutside,
-                lower.secondsPerLiquidityOutsideX128,
-                lower.secondsOutside,
-                lower.initialized
-            );
+            (tickCumulativeLower, secondsPerLiquidityOutsideLowerX128, secondsOutsideLower, initializedLower) =
+            (lower.tickCumulativeOutside, lower.secondsPerLiquidityOutsideX128, lower.secondsOutside, lower.initialized);
             require(initializedLower);
 
             bool initializedUpper;
-            (tickCumulativeUpper, secondsPerLiquidityOutsideUpperX128, secondsOutsideUpper, initializedUpper) = (
-                upper.tickCumulativeOutside,
-                upper.secondsPerLiquidityOutsideX128,
-                upper.secondsOutside,
-                upper.initialized
-            );
+            (tickCumulativeUpper, secondsPerLiquidityOutsideUpperX128, secondsOutsideUpper, initializedUpper) =
+            (upper.tickCumulativeOutside, upper.secondsPerLiquidityOutsideX128, upper.secondsOutside, upper.initialized);
             require(initializedUpper);
         }
 
@@ -521,7 +513,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
 
         if (amount0 > 0 || amount1 > 0) {
             (position.tokensOwed0, position.tokensOwed1) =
-                (position.tokensOwed0 + uint128(amount0), position.tokensOwed1 + uint128(amount1));
+            (position.tokensOwed0 + uint128(amount0), position.tokensOwed1 + uint128(amount1));
         }
 
         emit Burn(msg.sender, tickLower, tickUpper, amount, amount0, amount1);
@@ -725,7 +717,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
                 slot0Start.observationCardinalityNext
             );
             (slot0.sqrtPriceX96, slot0.tick, slot0.observationIndex, slot0.observationCardinality) =
-                (state.sqrtPriceX96, state.tick, observationIndex, observationCardinality);
+            (state.sqrtPriceX96, state.tick, observationIndex, observationCardinality);
             emit MessageUint("slot0start", uint256(slot0Start.observationIndex));
             emit MessageUint("slot0start", uint256(slot0Start.observationCardinality));
             emit MessageUint("slot0startcardinalityNext", uint256(slot0Start.observationCardinalityNext));

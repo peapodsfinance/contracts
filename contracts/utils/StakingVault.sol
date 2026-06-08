@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
@@ -29,6 +31,11 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  *         Vault share decimals = `asset.decimals() + 6` (per `_decimalsOffset()`), as a
  *         defence against the first-depositor share-inflation attack. Operators integrating
  *         with wallets/explorers that assume 18 decimals must account for this.
+ *
+ *         When `asset()` is itself an ERC4626 whose own `asset()` is USDC, depositors can use the
+ *         standard ERC4626 `deposit`/`mint` (supplying `asset()` shares directly) OR the convenience
+ *         `depositFromUnderlyingAsset` (supplying USDC, which is wrapped into `asset()` shares and
+ *         then deposited here in a single call). Both paths charge the same per-share `depositCap`.
  *
  * @dev Cap-restoration on redeem decouples from asset availability: an under-reimbursed
  *      vault will distribute available assets proportionally (ERC4626 default), but each
@@ -54,6 +61,8 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
     error StakingVault__NonTransferable();
     error StakingVault__ZeroAddress();
     error StakingVault__ZeroAsset();
+    error StakingVault__ZeroAmount();
+    error StakingVault__ZeroShares();
     error StakingVault__FeeOnTransferNotSupported();
     error StakingVault__ArrayLengthMismatch();
     error StakingVault__RenounceOwnershipDisabled();
@@ -103,13 +112,7 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
     ///         `nonReentrant` is the load-bearing protection against ERC777-style callback reentry;
     ///         the deferred-mutation order is defense-in-depth for the cross-direction reentrancy
     ///         class only — same-direction (deposit→deposit) requires `nonReentrant`.
-    function deposit(uint256 assets, address receiver)
-        public
-        override
-        nonReentrant
-        whenNotPaused
-        returns (uint256)
-    {
+    function deposit(uint256 assets, address receiver) public override nonReentrant whenNotPaused returns (uint256) {
         if (receiver != msg.sender) revert StakingVault__ReceiverMismatch(msg.sender, receiver);
 
         uint256 balanceBefore = IERC20(asset()).balanceOf(address(this));
@@ -126,13 +129,7 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Mint shares to caller. Cap-gating is enforced by super.mint's `maxMint(receiver)` check.
     /// @dev    Same ordering rationale as `deposit`. `super.mint` returns the asset amount it
     ///         charged (== previewMint(shares)); we debit principal by that exact amount.
-    function mint(uint256 shares, address receiver)
-        public
-        override
-        nonReentrant
-        whenNotPaused
-        returns (uint256)
-    {
+    function mint(uint256 shares, address receiver) public override nonReentrant whenNotPaused returns (uint256) {
         if (receiver != msg.sender) revert StakingVault__ReceiverMismatch(msg.sender, receiver);
 
         uint256 balanceBefore = IERC20(asset()).balanceOf(address(this));
@@ -144,6 +141,84 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
         depositedPrincipal[msg.sender] = newPrincipal;
         emit DepositorWhitelisted(msg.sender, depositCap[msg.sender], newPrincipal);
         return assets;
+    }
+
+    /// @notice One-step deposit denominated in the *underlying vault's* asset (e.g. USDC), for the
+    ///         nested layout where `asset()` is itself an ERC4626 whose `asset()` is USDC. Performs:
+    ///           1. Pull `underlyingAssetAmount` of `underlyingAsset()` (USDC) from the caller and
+    ///              deposit it into `asset()` (the underlying ERC4626), minting that vault's shares
+    ///              to THIS contract.
+    ///           2. Deposit those freshly-minted vault shares into THIS vault, minting StakingVault
+    ///              shares to `receiver`.
+    ///         The caller must approve THIS contract to spend `underlyingAssetAmount` of
+    ///         `underlyingAsset()` (USDC). It does NOT need to approve or hold any `asset()` shares.
+    /// @dev    Cap-gating, principal tracking, soulbound, pause, and reentrancy semantics are
+    ///         identical to `deposit`; the ONLY difference is the token the caller supplies.
+    ///         Principal is charged in `asset()` units (underlying-vault shares ACTUALLY received),
+    ///         not USDC units — so a user's `depositCap` means the same thing on either deposit path.
+    ///
+    ///         Share math must use the price BEFORE the underlying-vault shares enter our balance:
+    ///         `asset()`-shares are minted to THIS contract in step 1, inflating `totalAssets()`
+    ///         before we mint StakingVault shares. Using the post-deposit price would shortchange
+    ///         the depositor (catastrophically for the first depositor, where `assetsBefore == 0`),
+    ///         so we snapshot `(totalAssets, totalSupply)` first and reproduce OZ's
+    ///         `_convertToShares(_, Floor)` against that snapshot — matching what a direct
+    ///         `deposit(vaultShares, receiver)` would have minted.
+    ///
+    ///         `vaultShares` is measured as the actual `totalAssets()` delta (not the underlying
+    ///         vault's return value or `previewDeposit`), so it is exact regardless of the
+    ///         underlying vault's rounding and inherently fee-on-transfer-safe at the `asset()` layer.
+    /// @param  underlyingAssetAmount amount of `underlyingAsset()` (USDC) to pull from the caller
+    /// @param  receiver must equal `msg.sender` (soulbound / per-depositor principal accounting)
+    /// @return shares StakingVault shares minted to `receiver`
+    function depositFromUnderlyingAsset(uint256 underlyingAssetAmount, address receiver)
+        external
+        nonReentrant
+        whenNotPaused
+        returns (uint256 shares)
+    {
+        if (receiver != msg.sender) revert StakingVault__ReceiverMismatch(msg.sender, receiver);
+        if (underlyingAssetAmount == 0) revert StakingVault__ZeroAmount();
+
+        IERC4626 underlyingVault = IERC4626(asset());
+        IERC20 underlyingAssetToken = IERC20(underlyingVault.asset());
+
+        // Pull USDC from caller; measure the actual amount received so a (hypothetical)
+        // fee-on-transfer underlying asset cannot desync what we approve/deposit downstream.
+        uint256 underlyingReceived = underlyingAssetToken.balanceOf(address(this));
+        underlyingAssetToken.safeTransferFrom(msg.sender, address(this), underlyingAssetAmount);
+        underlyingReceived = underlyingAssetToken.balanceOf(address(this)) - underlyingReceived;
+
+        // Snapshot THIS vault's price state BEFORE the underlying-vault shares land in our balance.
+        uint256 assetsBefore = totalAssets(); // asset()-shares held pre-deposit (OZ "A0")
+        uint256 supplyBefore = totalSupply(); // unchanged until our _mint below (OZ "S0")
+
+        // Step 1: USDC -> underlying-vault shares, credited to THIS contract.
+        underlyingAssetToken.forceApprove(address(underlyingVault), underlyingReceived);
+        underlyingVault.deposit(underlyingReceived, address(this));
+        // Clear any residual approval (defense-in-depth; a compliant vault consumes it all).
+        underlyingAssetToken.forceApprove(address(underlyingVault), 0);
+
+        // Underlying-vault shares actually received == increase in our asset balance. This is the
+        // "assets" deposited into THIS vault and the principal charged against the caller's cap.
+        uint256 vaultShares = totalAssets() - assetsBefore;
+
+        // Step 2: cap-gate exactly like `deposit` (super.deposit's maxDeposit check), same OZ error.
+        uint256 maxAssets = maxDeposit(receiver);
+        if (vaultShares > maxAssets) revert ERC4626ExceededMaxDeposit(receiver, vaultShares, maxAssets);
+
+        // Mirror previewDeposit(vaultShares) at the PRE-deposit price (OZ _convertToShares, Floor).
+        shares = Math.mulDiv(vaultShares, supplyBefore + 10 ** _decimalsOffset(), assetsBefore + 1, Math.Rounding.Floor);
+        // Reverts (unwinding step 1 atomically) on dust that would mint nothing, protecting the
+        // caller from depositing USDC for zero StakingVault shares.
+        if (shares == 0) revert StakingVault__ZeroShares();
+
+        _mint(receiver, shares);
+        emit Deposit(msg.sender, receiver, vaultShares, shares);
+
+        uint256 newPrincipal = depositedPrincipal[receiver] + vaultShares;
+        depositedPrincipal[receiver] = newPrincipal;
+        emit DepositorWhitelisted(receiver, depositCap[receiver], newPrincipal);
     }
 
     /// @notice Redeem shares for assets. NOT pause-gated — exits remain available at the vault layer.
@@ -165,9 +240,7 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
 
         assets = super.redeem(shares, receiver, owner);
 
-        uint256 principalOut = balanceBefore == 0
-            ? 0
-            : Math.mulDiv(principalBefore, shares, balanceBefore);
+        uint256 principalOut = balanceBefore == 0 ? 0 : Math.mulDiv(principalBefore, shares, balanceBefore);
         uint256 newPrincipal = principalBefore - principalOut;
         depositedPrincipal[owner] = newPrincipal;
         emit DepositorWhitelisted(owner, depositCap[owner], newPrincipal);
@@ -188,9 +261,7 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
 
         shares = super.withdraw(assets, receiver, owner);
 
-        uint256 principalOut = balanceBefore == 0
-            ? 0
-            : Math.mulDiv(principalBefore, shares, balanceBefore);
+        uint256 principalOut = balanceBefore == 0 ? 0 : Math.mulDiv(principalBefore, shares, balanceBefore);
         uint256 newPrincipal = principalBefore - principalOut;
         depositedPrincipal[owner] = newPrincipal;
         emit DepositorWhitelisted(owner, depositCap[owner], newPrincipal);
@@ -211,6 +282,13 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
         return previewDeposit(maxDeposit(receiver));
     }
 
+    /// @notice The asset of the underlying ERC4626 vault (i.e. `asset().asset()`, e.g. USDC) — the
+    ///         token a caller supplies to `depositFromUnderlyingAsset`. Convenience for integrators
+    ///         deciding which token to approve.
+    function underlyingAsset() external view returns (address) {
+        return IERC4626(asset()).asset();
+    }
+
     /// @notice Returns 6. Adds 6 decimals of virtual-share offset to harden against
     ///         first-depositor inflation attacks (raises attacker cost by ~10^6×).
     function _decimalsOffset() internal pure override returns (uint8) {
@@ -226,5 +304,4 @@ contract StakingVault is ERC4626, Ownable2Step, ReentrancyGuard, Pausable {
         if (from != address(0) && to != address(0)) revert StakingVault__NonTransferable();
         super._update(from, to, value);
     }
-
 }

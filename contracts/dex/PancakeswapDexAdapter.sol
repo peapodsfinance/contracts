@@ -126,15 +126,15 @@ contract PancakeswapDexAdapter is IDexAdapter, Context {
         ISwapRouterPancakeswap(V3_ROUTER)
             .exactInputSingle(
                 ISwapRouterPancakeswap.ExactInputSingleParams({
-                    tokenIn: _tokenIn,
-                    tokenOut: _tokenOut,
-                    fee: _fee,
-                    recipient: _recipient,
-                    deadline: block.timestamp,
-                    amountIn: _amountIn,
-                    amountOutMinimum: _amountOutMin,
-                    sqrtPriceLimitX96: 0
-                })
+                tokenIn: _tokenIn,
+                tokenOut: _tokenOut,
+                fee: _fee,
+                recipient: _recipient,
+                deadline: block.timestamp,
+                amountIn: _amountIn,
+                amountOutMinimum: _amountOutMin,
+                sqrtPriceLimitX96: 0
+            })
             );
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }

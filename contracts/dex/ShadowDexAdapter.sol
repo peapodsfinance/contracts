@@ -92,15 +92,15 @@ contract ShadowDexAdapter is UniswapDexAdapter {
         ISwapRouterShadow(V3_ROUTER)
             .exactInputSingle(
                 ISwapRouterShadow.ExactInputSingleParams({
-                    tokenIn: _tokenIn,
-                    tokenOut: _tokenOut,
-                    tickSpacing: _tickSpacing,
-                    recipient: _recipient,
-                    deadline: block.timestamp,
-                    amountIn: _amountIn,
-                    amountOutMinimum: _amountOutMin,
-                    sqrtPriceLimitX96: 0
-                })
+                tokenIn: _tokenIn,
+                tokenOut: _tokenOut,
+                tickSpacing: _tickSpacing,
+                recipient: _recipient,
+                deadline: block.timestamp,
+                amountIn: _amountIn,
+                amountOutMinimum: _amountOutMin,
+                sqrtPriceLimitX96: 0
+            })
             );
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }

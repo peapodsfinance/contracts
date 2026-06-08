@@ -23,5 +23,4 @@ pragma solidity >=0.7.0 <0.9.0;
  */
 interface IAsset {
     // solhint-disable-previous-line no-empty-blocks
-
-    }
+}

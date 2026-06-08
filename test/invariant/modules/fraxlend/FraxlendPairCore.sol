@@ -177,11 +177,11 @@ abstract contract FraxlendPairCore is FraxlendPairAccessControl, FraxlendPairCon
     /// @param _includeVault Whether to include assets from the external asset vault, if configured in total available
     /// @return The balance of Asset Tokens held by contract
 
-    function _totalAssetAvailable(
-        VaultAccount memory _totalAsset,
-        VaultAccount memory _totalBorrow,
-        bool _includeVault
-    ) internal view returns (uint256) {
+    function _totalAssetAvailable(VaultAccount memory _totalAsset, VaultAccount memory _totalBorrow, bool _includeVault)
+        internal
+        view
+        returns (uint256)
+    {
         if (_includeVault) {
             return _totalAsset.totalAmount(address(externalAssetVault)) - _totalBorrow.amount;
         }

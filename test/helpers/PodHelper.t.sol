@@ -120,12 +120,10 @@ contract PodHelperTest is Test {
         );
     }
 
-    function _duplicatePod(
-        address _oldPod,
-        address _pairedLpToken,
-        address[] memory _tokens,
-        uint256[] memory _weights
-    ) internal returns (address _underlying, address _newPod) {
+    function _duplicatePod(address _oldPod, address _pairedLpToken, address[] memory _tokens, uint256[] memory _weights)
+        internal
+        returns (address _underlying, address _newPod)
+    {
         IDecentralizedIndex.IndexAssetInfo[] memory _assets = IDecentralizedIndex(_oldPod).getAllAssets();
         _underlying = _assets[0].token;
         _newPod = _createPod(

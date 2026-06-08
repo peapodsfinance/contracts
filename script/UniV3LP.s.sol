@@ -33,18 +33,18 @@ contract UniV3LP is Script {
         INonfungiblePositionManager(nonfungiblePositionManager)
             .mint(
                 INonfungiblePositionManager.MintParams({
-                    token0: t0,
-                    token1: t1,
-                    fee: uint24(fee),
-                    tickLower: TickMath.MIN_TICK + _offset,
-                    tickUpper: TickMath.MAX_TICK - _offset,
-                    amount0Desired: bal0 / 10,
-                    amount1Desired: bal1 / 10,
-                    amount0Min: 0,
-                    amount1Min: 0,
-                    recipient: recipient,
-                    deadline: block.timestamp + 1 days
-                })
+                token0: t0,
+                token1: t1,
+                fee: uint24(fee),
+                tickLower: TickMath.MIN_TICK + _offset,
+                tickUpper: TickMath.MAX_TICK - _offset,
+                amount0Desired: bal0 / 10,
+                amount1Desired: bal1 / 10,
+                amount0Min: 0,
+                amount1Min: 0,
+                recipient: recipient,
+                deadline: block.timestamp + 1 days
+            })
             );
 
         vm.stopBroadcast();

@@ -96,14 +96,14 @@ contract CamelotDexAdapter is UniswapDexAdapter {
         ISwapRouterAlgebra(V3_ROUTER)
             .exactInputSingle(
                 ISwapRouterAlgebra.ExactInputSingleParams({
-                    tokenIn: _tokenIn,
-                    tokenOut: _tokenOut,
-                    recipient: _recipient,
-                    deadline: block.timestamp,
-                    amountIn: _amountIn,
-                    amountOutMinimum: _amountOutMin,
-                    limitSqrtPrice: 0
-                })
+                tokenIn: _tokenIn,
+                tokenOut: _tokenOut,
+                recipient: _recipient,
+                deadline: block.timestamp,
+                amountIn: _amountIn,
+                amountOutMinimum: _amountOutMin,
+                limitSqrtPrice: 0
+            })
             );
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }

@@ -126,14 +126,14 @@ contract UniswapDexAdapter is IDexAdapter, Context {
         ISwapRouter02(V3_ROUTER)
             .exactInputSingle(
                 ISwapRouter02.ExactInputSingleParams({
-                    tokenIn: _tokenIn,
-                    tokenOut: _tokenOut,
-                    fee: _fee,
-                    recipient: _recipient,
-                    amountIn: _amountIn,
-                    amountOutMinimum: _amountOutMin,
-                    sqrtPriceLimitX96: 0
-                })
+                tokenIn: _tokenIn,
+                tokenOut: _tokenOut,
+                fee: _fee,
+                recipient: _recipient,
+                amountIn: _amountIn,
+                amountOutMinimum: _amountOutMin,
+                sqrtPriceLimitX96: 0
+            })
             );
         return IERC20(_tokenOut).balanceOf(_recipient) - _outBefore;
     }

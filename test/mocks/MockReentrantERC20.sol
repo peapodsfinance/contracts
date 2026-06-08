@@ -13,7 +13,13 @@ interface IStakingVaultReentry {
 /// @notice ERC20 that reenters the target vault during `transfer` / `transferFrom`, used to verify
 ///         `nonReentrant` is present on every StakingVault entry point.
 contract MockReentrantERC20 is ERC20 {
-    enum Mode { None, ReenterDeposit, ReenterMint, ReenterRedeem, ReenterWithdraw }
+    enum Mode {
+        None,
+        ReenterDeposit,
+        ReenterMint,
+        ReenterRedeem,
+        ReenterWithdraw
+    }
 
     Mode public mode;
     IStakingVaultReentry public vault;

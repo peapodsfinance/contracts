@@ -194,12 +194,12 @@ contract Zapper is IZapper, Context, Ownable {
         ISwapRouter(V3_ROUTER)
             .exactInput(
                 ISwapRouter.ExactInputParams({
-                    path: _path,
-                    recipient: address(this),
-                    deadline: block.timestamp,
-                    amountIn: _amountIn,
-                    amountOutMinimum: _amountOutMin
-                })
+                path: _path,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: _amountIn,
+                amountOutMinimum: _amountOutMin
+            })
             );
         return IERC20(_out).balanceOf(address(this)) - _outBefore;
     }
